@@ -1,0 +1,21 @@
+# FastAPI & Server
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+pydantic>=2.5.0
+
+# YouTube Download
+yt-dlp>=2024.1.0
+
+# Whisper (로컬 자막 생성)
+faster-whisper>=0.10.0
+
+# Video Processing
+opencv-python>=4.9.0
+mediapipe>=0.10.0
+
+# LLM (Ollama 연동)
+requests>=2.31.0
+
+# Utilities
+httpx>=0.26.0

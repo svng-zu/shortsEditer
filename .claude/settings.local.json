@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wsl -e bash -c ' *)",
+      "Bash(wsl -e bash -c \"grep -n 'pollStatus\\\\|function poll' /home/user/edit_tool/static/index.html\")",
+      "Bash(wsl -e bash -c \"cp /home/user/edit_tool/editor/editor.py /home/user/edit_tool/editor/editor_sports.py && echo OK\")",
+      "Bash(wsl -e bash -c \"cp /home/user/edit_tool/editor/editor_sports.py /home/user/edit_tool/editor/editor_economy.py && cp /home/user/edit_tool/editor/editor_sports.py /home/user/edit_tool/editor/editor_politics.py && echo OK\")",
+      "Bash(wsl -e bash -c \"cd /home/user/edit_tool && source venv/bin/activate && python3 -c 'from editor.editor import Editor; print\\(\\\\\"OK\\\\\"\\)' 2>&1\")",
+      "Bash(wsl -e bash -c \"cd /home/user/edit_tool && source venv/bin/activate && python3 -c 'from llm.analyzer import Analyzer; print\\(\\\\\"OK\\\\\"\\)' 2>&1\")",
+      "Bash(wsl -e bash -c \"cd /home/user/edit_tool && source venv/bin/activate && python3 -c 'from editor.editor import Editor; from app import app; print\\(\\\\\"OK\\\\\"\\)' 2>&1\")",
+      "Bash(kill 1857 1859)"
+    ]
+  }
+}

@@ -1,0 +1,40 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+
+# 환경변수 (민감정보)
+.env
+*.env
+hf_token
+ollama_private_key
+
+# 데이터 파일 (용량 큼)
+downloads/
+outputs/
+temp/
+*.mp4
+*.mp3
+*.wav
+*.srt
+
+# Node.js
+node_modules/
+dist/
+.npm
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 로그
+*.log

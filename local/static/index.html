@@ -1,0 +1,1603 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHORTSAI — 쇼츠 자동 생성</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0e0e10;
+    --surface:   #1a1a1e;
+    --surface2:  #222228;
+    --border:    #2e2e36;
+    --accent:    #e8ff47;
+    --accent2:   #ff4d6d;
+    --text:      #f0f0f4;
+    --muted:     #888896;
+    --success:   #3ddc84;
+    --warn:      #ffb300;
+    --panel-w:   300px;
+    --right-w:   280px;
+    --header-h:  56px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── 헤더 ── */
+  header {
+    height: var(--header-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo span { color: var(--text); }
+
+  .header-status {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background .3s;
+  }
+  .status-dot.running { background: var(--accent); animation: pulse 1s infinite; }
+  .status-dot.done    { background: var(--success); }
+  .status-dot.error   { background: var(--accent2); }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: .3; }
+  }
+
+  #status-msg {
+    color: var(--muted);
+    font-size: 12px;
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ── 메인 레이아웃 ── */
+  .layout {
+    display: grid;
+    grid-template-columns: var(--panel-w) 1fr var(--right-w);
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── 공통 패널 ── */
+  .panel {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 14px 16px 10px;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-body { flex: 1; overflow-y: auto; padding: 12px; }
+  .panel-body::-webkit-scrollbar { width: 4px; }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── 왼쪽: 파이프라인 컨트롤 ── */
+  .pipeline-steps { display: flex; flex-direction: column; gap: 8px; }
+
+  .step-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition: border-color .2s;
+  }
+  .step-card:hover { border-color: #444; }
+  .step-card.active { border-color: var(--accent); }
+
+  .step-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .step-num {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--border);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all .3s;
+  }
+  .step-card.done .step-num   { background: var(--success); color: #000; }
+  .step-card.active .step-num { background: var(--accent);  color: #000; }
+
+  .step-title { font-weight: 700; font-size: 13px; }
+  .step-desc  { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  .step-file-list {
+    margin-top: 6px;
+    max-height: 90px;
+    overflow-y: auto;
+    border-radius: 5px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+  }
+  .step-file-list:empty { display: none; }
+  .step-file-list .sfl-item {
+    padding: 3px 8px;
+    font-size: 10px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .step-file-list .sfl-item:last-child { border-bottom: none; }
+  .step-file-list .sfl-item.done { color: var(--success); }
+  .step-file-list .sfl-empty {
+    padding: 6px 8px;
+    font-size: 10px;
+    color: var(--border);
+    text-align: center;
+  }
+
+  .step-btn {
+    width: 100%;
+    padding: 7px 0;
+    border-radius: 7px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    transition: all .2s;
+    margin-top: 8px;
+  }
+  .step-btn.primary {
+    background: var(--accent);
+    color: #000;
+  }
+  .step-btn.primary:hover { background: #d4eb00; }
+  .step-btn.primary:disabled {
+    background: var(--border);
+    color: var(--muted);
+    cursor: not-allowed;
+  }
+
+  /* 템플릿 셀렉터 */
+  .template-select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 12px;
+    margin-bottom: 0;
+    cursor: pointer;
+  }
+
+  /* 진행 바 */
+  .progress-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width .4s;
+    width: 0%;
+  }
+
+  /* 파일 카운트 */
+  .file-counts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .file-count-item {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .file-count-item .num { font-size: 18px; font-weight: 900; color: var(--accent); }
+  .file-count-item .lbl { font-size: 10px; color: var(--muted); }
+
+  /* ── 가운데: 쇼츠 목록 + 플레이어 ── */
+  .center-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .center-top {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* 쇼츠 목록 */
+  .shorts-list {
+    width: 240px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    background: var(--surface);
+  }
+  .shorts-list::-webkit-scrollbar { width: 4px; }
+  .shorts-list::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .shorts-list-header {
+    padding: 14px 14px 10px;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .shorts-count {
+    background: var(--accent);
+    color: #000;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 2px 6px;
+    border-radius: 10px;
+  }
+
+  .short-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background .15s;
+  }
+  .short-item:hover    { background: var(--surface2); }
+  .short-item.selected { background: var(--surface2); border-left: 3px solid var(--accent); }
+
+  .short-thumb {
+    width: 52px;
+    height: 52px;
+    background: var(--border);
+    border-radius: 6px;
+    flex-shrink: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 18px;
+  }
+  .short-thumb video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .short-info { flex: 1; min-width: 0; }
+  .short-title {
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 4px;
+  }
+  .short-cat {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .short-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 5px;
+  }
+  .short-btn {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .short-btn.dl  { background: #1d4ed8; color: #fff; }
+  .short-btn.del { background: #7f1d1d; color: #fff; }
+  .short-btn:hover { opacity: .85; }
+
+  /* 플레이어 영역 */
+  .player-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--bg);
+  }
+
+  .player-wrap {
+    width: 100%;
+    max-width: 360px;
+    aspect-ratio: 9/16;
+    background: var(--surface);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  #main-video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: none;
+  }
+
+  .player-empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 20px;
+  }
+  .player-empty .icon { font-size: 48px; margin-bottom: 12px; }
+  .player-empty p { font-size: 12px; line-height: 1.6; }
+
+  /* ── 오른쪽 패널 ── */
+  .right-panel {
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .right-panel .panel-header {
+    border-right: none;
+  }
+
+  .right-section {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .right-section:last-child { border-bottom: none; flex: 1; overflow-y: auto; }
+  .right-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .info-box {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    min-height: 40px;
+  }
+
+  .timeline-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .timeline-item:last-child { border-bottom: none; }
+  .t-order {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #000;
+    font-size: 10px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .t-info { flex: 1; min-width: 0; }
+  .t-time { font-size: 11px; color: var(--accent); font-weight: 700; }
+  .t-reason { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+  .script-box {
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--muted);
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  /* 빈 상태 */
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+  }
+  .empty-state .e-icon { font-size: 32px; margin-bottom: 8px; }
+  .empty-state p { font-size: 11px; line-height: 1.6; }
+
+  /* 스크롤바 없는 오른쪽 섹션 */
+  .right-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+  }
+  .right-scroll::-webkit-scrollbar { width: 4px; }
+  .right-scroll::-webkit-scrollbar-thumb { background: var(--border); }
+
+  /* 뱃지 */
+  .badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+  }
+  .badge.economy  { background: #1e3a5f; color: #60a5fa; }
+  .badge.politics { background: #3b1f2b; color: #f472b6; }
+  .badge.sports   { background: #1c3a2a; color: #34d399; }
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<header>
+  <div class="logo">SHORTS<span>AI</span></div>
+  <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
+  <span style="color:var(--muted);font-size:12px">쇼츠 자동 생성 파이프라인</span>
+  <div class="header-status">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-msg">대기 중</span>
+  </div>
+</header>
+
+<!-- 메인 -->
+<div class="layout">
+
+  <!-- ── 왼쪽: 파이프라인 ── -->
+  <div class="panel">
+    <div class="panel-header">
+      파이프라인
+      <button onclick="refreshFiles()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;" title="새로고침">↻</button>
+    </div>
+    <div class="panel-body">
+
+      <!-- 파일 현황 -->
+      <div class="file-counts" id="file-counts">
+        <div class="file-count-item"><div class="num" id="cnt-videos">0</div><div class="lbl">영상</div></div>
+        <div class="file-count-item"><div class="num" id="cnt-transcripts">0</div><div class="lbl">자막</div></div>
+        <div class="file-count-item"><div class="num" id="cnt-analyses">0</div><div class="lbl">분석</div></div>
+        <div class="file-count-item"><div class="num" id="cnt-shorts">0</div><div class="lbl">쇼츠</div></div>
+      </div>
+
+      <div style="height:12px"></div>
+
+      <!-- 진행 바 -->
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div style="height:14px"></div>
+
+      <div class="pipeline-steps">
+
+        <!-- Step 1: 수집 -->
+        <div class="step-card" id="step-1">
+          <div class="step-top">
+            <div class="step-num">1</div>
+            <div><div class="step-title">영상 수집</div></div>
+          </div>
+          <div id="step-list-1" class="step-file-list"></div>
+          <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--muted);cursor:pointer;">
+            <input type="checkbox" id="chk-clear" checked style="accent-color:var(--accent);">
+            기존 파일 전부 삭제 후 수집
+          </label>
+          <button class="step-btn primary" onclick="runCollect()">▶ 수집 시작</button>
+        </div>
+
+        <!-- Step 2: 자막 -->
+        <div class="step-card" id="step-2">
+          <div class="step-top">
+            <div class="step-num">2</div>
+            <div><div class="step-title">자막 생성</div></div>
+          </div>
+          <div id="step-list-2" class="step-file-list"></div>
+          <button class="step-btn primary" onclick="runTranscribe()">▶ 자막 생성</button>
+        </div>
+
+        <!-- Step 3: 분석 -->
+        <div class="step-card" id="step-3">
+          <div class="step-top">
+            <div class="step-num">3</div>
+            <div><div class="step-title">LLM 분석</div></div>
+          </div>
+          <div id="step-list-3" class="step-file-list"></div>
+          <button class="step-btn primary" onclick="runAnalyze()">▶ 분석 시작</button>
+        </div>
+
+        <!-- Step 4: 영상 편집 (Stage 1) -->
+        <div class="step-card" id="step-4">
+          <div class="step-top">
+            <div class="step-num">4</div>
+            <div><div class="step-title">영상 편집</div></div>
+          </div>
+          <div id="step-list-4" class="step-file-list"></div>
+          <button class="step-btn primary" onclick="runEdit()" style="margin-top:8px">▶ 영상 편집 시작</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 가운데 ── -->
+  <div class="center-panel">
+    <!-- 탭 -->
+    <div style="display:flex;gap:4px;padding:8px 12px 0;border-bottom:1px solid var(--border);">
+      <button onclick="switchTab('raws')"   id="tab-raws"   style="padding:6px 16px;border-radius:6px 6px 0 0;border:none;cursor:pointer;font-size:12px;font-weight:700;background:var(--accent);color:#000;">영상 편집</button>
+      <button onclick="switchTab('shorts')" id="tab-shorts" style="padding:6px 16px;border-radius:6px 6px 0 0;border:none;cursor:pointer;font-size:12px;font-weight:700;background:var(--surface2);color:var(--muted);">완성 쇼츠</button>
+    </div>
+
+    <div class="center-top">
+
+      <!-- ── RAW 편집 탭 ── -->
+      <div id="panel-raws" style="display:flex;flex:1;overflow:hidden;">
+
+        <!-- raw 목록 -->
+        <div class="shorts-list">
+          <div class="shorts-list-header">
+            편집된 영상 (raw)
+            <span class="shorts-count" id="raws-count">0</span>
+            <button onclick="loadRaws()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;" title="새로고침">↻</button>
+          </div>
+          <div id="raws-items">
+            <div class="empty-state"><div class="e-icon">🎞</div><p>영상 편집을 먼저 실행하세요.</p></div>
+          </div>
+        </div>
+
+        <!-- raw 플레이어 + 렌더링 편집기 -->
+        <div class="player-area" style="display:flex;flex-direction:column;gap:0;">
+          <div class="player-wrap" style="flex:1;">
+            <video id="raw-video" controls style="width:100%;height:100%;object-fit:contain;background:#000;"></video>
+            <div class="player-empty" id="raw-player-empty">
+              <div class="icon">▶</div>
+              <p>왼쪽에서 영상을 선택하세요</p>
+            </div>
+          </div>
+
+          <!-- 렌더링 옵션 -->
+          <div id="render-panel" style="display:none;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;max-height:55vh;overflow:hidden;">
+            <div style="display:flex;height:100%;">
+
+              <!-- ── 왼쪽: Canvas 미리보기 ── -->
+              <div style="padding:10px;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;">
+                <div style="font-size:10px;color:var(--muted);">실시간 미리보기</div>
+                <div style="position:relative;width:135px;height:240px;background:#111;border-radius:6px;overflow:hidden;">
+                  <!-- 배경 위에 video를 절대위치로 올려놓고 canvas가 맨 위에서 오버레이 -->
+                  <video id="raw-video-hidden" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;opacity:0;pointer-events:none;"></video>
+                  <canvas id="preview-canvas" width="135" height="240" style="position:absolute;top:0;left:0;width:135px;height:240px;"></canvas>
+                </div>
+                <button onclick="runFramePreview()" id="btn-frame-preview"
+                  style="width:135px;padding:5px 0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;cursor:pointer;">
+                  🔍 정밀 미리보기
+                </button>
+              </div>
+
+              <!-- ── 오른쪽: 컨트롤 ── -->
+              <div style="flex:1;padding:10px 12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+                <div style="font-size:10px;color:var(--muted);">선택: <span id="render-filename" style="color:var(--text);"></span></div>
+
+                <!-- 제목 -->
+                <div style="background:var(--surface2);border-radius:6px;padding:8px;">
+                  <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px;">제목</div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
+                    <input type="color" id="style-title1-color" value="#FFD700" oninput="updateCanvas()" style="width:28px;height:28px;border:none;background:none;cursor:pointer;padding:0;">
+                    <input id="render-title1" type="text" maxlength="30" placeholder="1줄 (노란색)" oninput="updateCanvas()"
+                      style="flex:1;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;">
+                  </div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                    <input type="color" id="style-title2-color" value="#FFFFFF" oninput="updateCanvas()" style="width:28px;height:28px;border:none;background:none;cursor:pointer;padding:0;">
+                    <input id="render-title2" type="text" maxlength="30" placeholder="2줄 (흰색)" oninput="updateCanvas()"
+                      style="flex:1;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;">
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                    <div>
+                      <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">Y 위치 <span id="lbl-title-y">0</span>px</div>
+                      <input type="range" id="style-title-y" min="-150" max="150" value="0" oninput="document.getElementById('lbl-title-y').textContent=this.value;updateCanvas();" style="width:100%;">
+                    </div>
+                    <div>
+                      <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">크기 <span id="lbl-title-size">1.0</span>×</div>
+                      <input type="range" id="style-title-size" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('lbl-title-size').textContent=parseFloat(this.value).toFixed(2);updateCanvas();" style="width:100%;">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 자막 -->
+                <div style="background:var(--surface2);border-radius:6px;padding:8px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <div style="font-size:11px;font-weight:700;color:var(--text);">자막</div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <button onclick="openSrtEditor()" style="padding:3px 8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:10px;cursor:pointer;">✏️ 자막 편집</button>
+                      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:var(--muted);">
+                        <input type="checkbox" id="render-subtitles" style="cursor:pointer;">
+                        자동 삽입
+                      </label>
+                    </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                    <div>
+                      <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">크기 <span id="lbl-sub-size">52</span>px</div>
+                      <input type="range" id="style-sub-size" min="16" max="80" value="52" oninput="document.getElementById('lbl-sub-size').textContent=this.value;updateCanvas();" style="width:100%;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <div>
+                        <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">색상</div>
+                        <input type="color" id="style-sub-color" value="#FFFFFF" oninput="updateCanvas()" style="width:36px;height:28px;border:none;background:none;cursor:pointer;padding:0;">
+                      </div>
+                    </div>
+                    <div>
+                      <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">하단 여백 <span id="lbl-sub-y">20</span>px</div>
+                      <input type="range" id="style-sub-y" min="5" max="120" value="20" oninput="document.getElementById('lbl-sub-y').textContent=this.value;" style="width:100%;">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 배경 이미지 -->
+                <div style="background:var(--surface2);border-radius:6px;padding:8px;">
+                  <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px;">배경 이미지</div>
+                  <select id="render-bg-image" onchange="onBgImageChange()" style="width:100%;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;">
+                    <option value="">단색 배경 (템플릿 색상)</option>
+                  </select>
+                </div>
+
+                <!-- 템플릿 + 버튼 -->
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <select id="render-template" onchange="updateCanvas()" style="padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;flex:1;">
+                    <option value="1">① 다크 계열</option>
+                    <option value="2">② 미니멀 흰배경</option>
+                    <option value="3">③ 네이비/포인트</option>
+                  </select>
+                  <button onclick="runRender()" style="padding:7px 14px;background:var(--accent);color:#000;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;white-space:nowrap;">▶ 렌더링</button>
+                </div>
+                <div id="render-status" style="font-size:11px;color:var(--muted);"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── 완성 쇼츠 탭 ── -->
+      <div id="panel-shorts" style="display:none;flex:1;overflow:hidden;">
+        <!-- 쇼츠 목록 -->
+        <div class="shorts-list">
+          <div class="shorts-list-header">
+            완성 쇼츠
+            <span class="shorts-count" id="shorts-count">0</span>
+            <button onclick="refreshFiles()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;" title="새로고침">↻</button>
+          </div>
+          <div id="shorts-items">
+            <div class="empty-state">
+              <div class="e-icon">🎬</div>
+              <p>아직 생성된 쇼츠가 없어요.<br>영상 편집 후 렌더링하세요.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 플레이어 -->
+        <div class="player-area">
+          <div class="player-wrap">
+            <video id="main-video" controls></video>
+            <div class="player-empty" id="player-empty">
+              <div class="icon">▶</div>
+              <p>왼쪽 목록에서<br>쇼츠를 선택하세요</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 오른쪽 패널 ── -->
+  <div class="right-panel">
+    <div class="panel-header">상세 정보</div>
+    <div class="right-scroll">
+
+      <div class="right-section">
+        <div class="right-label">제목 <span id="title-saved" style="color:var(--success);font-size:10px;display:none;">✓ 저장됨</span></div>
+        <textarea
+          id="detail-title"
+          rows="3"
+          placeholder="쇼츠를 선택하면 제목이 표시됩니다"
+          style="
+            width:100%;
+            background:var(--surface2);
+            border:1px solid var(--border);
+            border-radius:8px;
+            padding:10px 12px;
+            color:var(--text);
+            font-family:'Noto Sans KR',sans-serif;
+            font-size:13px;
+            line-height:1.6;
+            resize:vertical;
+            outline:none;
+            transition:border-color .2s;
+          "
+          oninput="onTitleInput()"
+        ></textarea>
+        <button
+          id="title-save-btn"
+          onclick="saveTitle()"
+          style="
+            display:none;
+            margin-top:6px;
+            width:100%;
+            padding:7px 0;
+            background:var(--accent);
+            color:#000;
+            border:none;
+            border-radius:7px;
+            font-family:'Noto Sans KR',sans-serif;
+            font-weight:700;
+            font-size:12px;
+            cursor:pointer;
+          "
+        >저장 (재편집 시 반영)</button>
+      </div>
+
+      <div class="right-section">
+        <div class="right-label">편집 구간 타임라인</div>
+        <div id="detail-timeline">
+          <div class="empty-state"><p>쇼츠를 선택하면<br>타임라인이 표시됩니다.</p></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── 상태 폴링 ──────────────────────────────────────────────
+let pollInterval = null;
+let currentShort = null;
+
+function startPolling() {
+  if (pollInterval) return;
+  pollInterval = setInterval(async () => {
+    await fetchStatus();
+    await refreshFiles();
+  }, 2000);
+}
+
+function stopPolling() {
+  clearInterval(pollInterval);
+  pollInterval = null;
+}
+
+async function fetchStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const s = await r.json();
+    updateStatusUI(s);
+    if (['idle','done','error'].includes(s.step)) {
+      stopPolling();
+      await loadShorts();
+    }
+  } catch(e) {}
+}
+
+function updateStatusUI(s) {
+  const dot = document.getElementById('status-dot');
+  const msg = document.getElementById('status-msg');
+  const fill = document.getElementById('progress-fill');
+
+  dot.className = 'status-dot';
+  const running = ['collecting','transcribing','analyzing','editing'].includes(s.step);
+  if (running)           dot.classList.add('running');
+  else if (s.step === 'done')  dot.classList.add('done');
+  else if (s.step === 'error') dot.classList.add('error');
+
+  msg.textContent = s.message || '대기 중';
+  fill.style.width = s.progress + '%';
+
+  // 파이프라인 실행 중엔 step 버튼 비활성화
+  document.querySelectorAll('.step-btn.primary').forEach(btn => {
+    btn.disabled = running;
+    btn.style.opacity = running ? '0.45' : '';
+  });
+}
+
+function _renderStepList(elId, items, nextSet) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!items || !items.length) {
+    el.innerHTML = '<div class="sfl-empty">없음</div>';
+    return;
+  }
+  el.innerHTML = items.map(name => {
+    const advanced = nextSet && nextSet.has(name);
+    // advanced = 다음 단계까지 완료 → 초록 ✓
+    // not advanced = 이 단계에만 있음 → 흰색 (대기 중)
+    return `<div class="sfl-item${advanced ? ' done' : ''}" title="${name}">${advanced ? '✓ ' : '· '}${name}</div>`;
+  }).join('');
+}
+
+async function refreshFiles() {
+  try {
+    const r = await fetch('/api/files');
+    const d = await r.json();
+    document.getElementById('cnt-videos').textContent     = d.videos.length;
+    document.getElementById('cnt-transcripts').textContent= d.transcripts.length;
+    document.getElementById('cnt-analyses').textContent   = d.analyses.length;
+    document.getElementById('cnt-shorts').textContent     = d.shorts.length;
+
+    const transcriptSet = new Set(d.transcripts);
+    const analysisSet   = new Set(d.analyses);
+    const videoSet      = new Set(d.videos);
+    const shortsSet     = new Set(d.shorts);
+
+    _renderStepList('step-list-1', d.downloads, transcriptSet);
+    _renderStepList('step-list-2', d.transcripts, analysisSet);
+    _renderStepList('step-list-3', d.analyses, videoSet);
+    _renderStepList('step-list-4', d.videos, shortsSet);
+  } catch(e) {}
+}
+
+// ── 쇼츠 목록 ─────────────────────────────────────────────
+async function loadShorts() {
+  try {
+    const r = await fetch('/api/shorts');
+    const d = await r.json();
+    renderShortsList(d.shorts);
+    document.getElementById('shorts-count').textContent = d.shorts.length;
+  } catch(e) {}
+}
+
+function renderShortsList(shorts) {
+  const el = document.getElementById('shorts-items');
+  if (!shorts.length) {
+    el.innerHTML = `<div class="empty-state"><div class="e-icon">🎬</div><p>아직 생성된 쇼츠가 없어요.<br>파이프라인을 실행해주세요.</p></div>`;
+    return;
+  }
+  el.innerHTML = shorts.map((s, i) => `
+    <div class="short-item" id="si-${i}" onclick="selectShort(${i})">
+      <div class="short-thumb">
+        <video src="${s.url}#t=1" preload="metadata" muted></video>
+      </div>
+      <div class="short-info">
+        <div class="short-title">${s.title || s.filename}</div>
+        <div class="short-cat">
+          ${s.category ? `<span class="badge ${s.category}">${s.category}</span>` : ''}
+        </div>
+        <div class="short-actions">
+          <a class="short-btn dl" href="${s.url}" download="${s.filename}">다운로드</a>
+          <button class="short-btn del" onclick="deleteShort(event,'${s.filename}',${i})">삭제</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  // 전역에 저장
+  window._shorts = shorts;
+}
+
+function selectShort(idx) {
+  const shorts = window._shorts || [];
+  const s = shorts[idx];
+  if (!s) return;
+
+  // 선택 표시
+  document.querySelectorAll('.short-item').forEach(el => el.classList.remove('selected'));
+  const el = document.getElementById(`si-${idx}`);
+  if (el) el.classList.add('selected');
+
+  // 플레이어
+  const vid = document.getElementById('main-video');
+  const empty = document.getElementById('player-empty');
+  vid.src = s.url;
+  vid.style.display = 'block';
+  empty.style.display = 'none';
+
+  // 우측 패널
+  document.getElementById('detail-title').value = s.title || '';
+  document.getElementById('title-save-btn').style.display = 'none';
+  document.getElementById('title-saved').style.display = 'none';
+
+  // 타임라인
+  const tl = document.getElementById('detail-timeline');
+  if (s.candidates && s.candidates.length) {
+    tl.innerHTML = s.candidates.map((c, i) => `
+      <div class="timeline-item">
+        <div class="t-order">${c.edit_order || i+1}</div>
+        <div class="t-info">
+          <div class="t-time">${fmtTime(c.start)} ~ ${fmtTime(c.end)}</div>
+          <div class="t-reason">${c.reason || ''}</div>
+        </div>
+      </div>
+    `).join('');
+  } else {
+    tl.innerHTML = '<div class="empty-state"><p>타임라인 정보 없음</p></div>';
+  }
+}
+
+function fmtTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+async function deleteShort(e, filename, idx) {
+  e.stopPropagation();
+  if (!confirm(`'${filename}' 을 삭제할까요?`)) return;
+  await fetch(`/api/shorts/${filename}`, { method: 'DELETE' });
+  await loadShorts();
+}
+
+// ── 파이프라인 실행 ────────────────────────────────────────
+async function _pipelinePost(url, body, btn) {
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+  try {
+    const hasBody = body !== null && body !== undefined;
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: hasBody ? {'Content-Type':'application/json'} : {},
+      body: hasBody ? JSON.stringify(body) : undefined,
+    });
+    if (!r.ok) {
+      const msg = await r.text().catch(() => '오류 발생');
+      let detail = msg;
+      try { detail = JSON.parse(msg).detail || msg; } catch(_){}
+      showToast(detail, 'error');
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+      return false;
+    }
+    startPolling();
+    return true;
+  } catch(e) {
+    showToast('서버 연결 실패: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+    return false;
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
+}
+
+function showToast(msg, type='info') {
+  const existing = document.getElementById('pipeline-toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'pipeline-toast';
+  const color = type === 'error' ? '#e55' : 'var(--accent)';
+  toast.style.cssText = `
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:var(--surface);border:1px solid ${color};color:${color};
+    padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;
+    z-index:9998;box-shadow:0 4px 16px rgba(0,0,0,0.4);
+    animation:fadeIn .2s ease;
+  `;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3500);
+}
+
+async function runCollect() {
+  const clear = document.getElementById('chk-clear').checked;
+  const btn = event?.target;
+  await _pipelinePost('/api/collect', { clear_existing: clear }, btn);
+}
+
+async function runTranscribe() {
+  await _pipelinePost('/api/transcribe', null, event?.target);
+}
+
+async function runAnalyze() {
+  await _pipelinePost('/api/analyze', null, event?.target);
+}
+
+async function runEdit() {
+  await _pipelinePost('/api/edit', { template_id: 1 }, event?.target);
+}
+
+// ── 탭 전환 ───────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('panel-raws').style.display   = tab === 'raws'   ? 'flex' : 'none';
+  document.getElementById('panel-shorts').style.display = tab === 'shorts' ? 'flex' : 'none';
+  document.getElementById('tab-raws').style.background   = tab === 'raws'   ? 'var(--accent)' : 'var(--surface2)';
+  document.getElementById('tab-raws').style.color        = tab === 'raws'   ? '#000' : 'var(--muted)';
+  document.getElementById('tab-shorts').style.background = tab === 'shorts' ? 'var(--accent)' : 'var(--surface2)';
+  document.getElementById('tab-shorts').style.color      = tab === 'shorts' ? '#000' : 'var(--muted)';
+  if (tab === 'raws')   loadRaws();
+  if (tab === 'shorts') loadShorts();
+}
+
+// ── raw 영상 목록 ─────────────────────────────────────────
+let _raws = [];
+async function loadRaws() {
+  const r = await fetch('/api/raws');
+  const data = await r.json();
+  _raws = data.raws || [];
+  document.getElementById('raws-count').textContent = _raws.length;
+  const container = document.getElementById('raws-items');
+  if (!_raws.length) {
+    container.innerHTML = '<div class="empty-state"><div class="e-icon">🎞</div><p>영상 편집을 먼저 실행하세요.</p></div>';
+    return;
+  }
+  container.innerHTML = _raws.map((r, i) => `
+    <div class="short-item" id="ri-${i}" onclick="selectRaw(${i})" style="cursor:pointer;padding:10px 12px;border-bottom:1px solid var(--border);">
+      <div class="short-title" style="font-size:12px;font-weight:600;">${r.title}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px;">${r.filename} · ${r.category}</div>
+    </div>
+  `).join('');
+}
+
+// ── 템플릿별 색상 팔레트 ──────────────────────────────────
+const TMPL_COLORS = {
+  sports:   { 1:{bg:'#0d0d0d',div:'#FFD700'}, 2:{bg:'#f5f5f5',div:'#DAA520'}, 3:{bg:'#1a1a0d',div:'#FFD700'} },
+  economy:  { 1:{bg:'#0a0f0a',div:'#00E676'}, 2:{bg:'#f5f5f5',div:'#00897B'}, 3:{bg:'#0d1b2a',div:'#00E676'} },
+  politics: { 1:{bg:'#0d0505',div:'#FF3D3D'}, 2:{bg:'#f5f5f5',div:'#CC0000'}, 3:{bg:'#111111',div:'#FF3D3D'} },
+};
+let _selectedRaw = null;
+let _canvasRafId = null;
+
+// ── 배경 이미지 드롭다운 로드 ────────────────────────────
+let _availableBgs = [];
+async function loadBackgrounds() {
+  try {
+    const r = await fetch('/api/backgrounds');
+    const d = await r.json();
+    _availableBgs = d.backgrounds || [];
+    const sel = document.getElementById('render-bg-image');
+    // 기존 옵션(단색)은 유지하고 이미지 옵션 추가
+    sel.innerHTML = '<option value="">단색 배경 (템플릿 색상)</option>';
+    _availableBgs.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = `🖼 ${name}.png`;
+      sel.appendChild(opt);
+    });
+  } catch(e) {}
+}
+
+function onBgImageChange() {
+  // canvas에서 선택된 배경 이미지 미리 로드
+  const sel = document.getElementById('render-bg-image').value;
+  if (sel) _loadBgImage(sel);
+  updateCanvas();
+}
+
+function getSelectedBgImage() {
+  return document.getElementById('render-bg-image')?.value || null;
+}
+
+// ── raw 영상 선택 ─────────────────────────────────────────
+function selectRaw(idx) {
+  document.querySelectorAll('#raws-items .short-item').forEach(el => el.classList.remove('selected'));
+  const el = document.getElementById(`ri-${idx}`);
+  if (el) el.classList.add('selected');
+
+  _selectedRaw = _raws[idx];
+  const r = _selectedRaw;
+
+  // 실제 재생용 video (player-wrap 안)
+  const vid = document.getElementById('raw-video');
+  vid.src = r.url;
+  vid.style.display = 'block';
+  document.getElementById('raw-player-empty').style.display = 'none';
+
+  // canvas 피드용 hidden video
+  const hidVid = document.getElementById('raw-video-hidden');
+  hidVid.src = r.url;
+  hidVid.muted = true;
+
+  // 렌더링 패널 표시
+  document.getElementById('render-panel').style.display = 'block';
+  document.getElementById('render-filename').textContent = r.filename;
+  const parts = r.title.split(' / ');
+  document.getElementById('render-title1').value = parts[0] || '';
+  document.getElementById('render-title2').value = parts[1] || '';
+  document.getElementById('render-status').textContent = '';
+
+  // 카테고리에 맞는 배경 이미지 자동 선택
+  const sel = document.getElementById('render-bg-image');
+  if (sel && _availableBgs.includes(r.category)) {
+    sel.value = r.category;
+    _loadBgImage(r.category);
+  } else if (sel) {
+    sel.value = '';
+  }
+
+  // hidden video 로드 후 canvas 루프 시작
+  hidVid.onloadeddata = () => {
+    hidVid.play().catch(() => {});
+    startCanvasLoop();
+  };
+}
+
+// ── Canvas 실시간 드로우 ──────────────────────────────────
+const CV_W = 135, CV_H = 240;
+const FULL_W = 1080, FULL_H = 1920;
+const VID_H_FULL = 810, VID_Y_FULL = 555;
+const SCALE = CV_W / FULL_W;
+const VID_Y_PX = Math.round(VID_Y_FULL * SCALE);
+const VID_H_PX = Math.round(VID_H_FULL * SCALE);
+
+// 카테고리별 배경 이미지 캐시 (URL → Image 객체)
+const _bgImgCache = {};
+function _loadBgImage(category) {
+  if (_bgImgCache[category]) return _bgImgCache[category];
+  const img = new Image();
+  img.src = `/static/backgrounds/${category}.png`;
+  img.onload  = () => { _bgImgCache[category] = img; };
+  img.onerror = () => { _bgImgCache[category] = null; };  // 이미지 없음
+  _bgImgCache[category] = img;  // 로딩 중 객체도 저장
+  return img;
+}
+
+// 카테고리 선택 시 미리 로드
+function _prefetchBgImages() {
+  ['sports','economy','politics'].forEach(_loadBgImage);
+}
+_prefetchBgImages();
+
+function startCanvasLoop() {
+  if (_canvasRafId) cancelAnimationFrame(_canvasRafId);
+  const canvas = document.getElementById('preview-canvas');
+  const ctx = canvas.getContext('2d');
+  const vid = document.getElementById('raw-video-hidden');
+
+  function draw() {
+    ctx.clearRect(0, 0, CV_W, CV_H);
+    const tmplId = parseInt(document.getElementById('render-template')?.value) || 1;
+    const cat = _selectedRaw?.category || 'economy';
+    const colors = (TMPL_COLORS[cat] || TMPL_COLORS.economy)[tmplId] || {bg:'#0a0f0a', div:'#00E676'};
+
+    // 배경: 드롭다운 선택 우선, 없으면 카테고리 자동
+    const selectedBg = document.getElementById('render-bg-image')?.value || '';
+    const bgKey = selectedBg || cat;
+    const bgImg = _bgImgCache[bgKey];
+    if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
+      ctx.drawImage(bgImg, 0, 0, CV_W, CV_H);
+    } else {
+      ctx.fillStyle = colors.bg;
+      ctx.fillRect(0, 0, CV_W, CV_H);
+    }
+
+    // 영상 프레임 (video 영역만)
+    if (vid.readyState >= 2) {
+      ctx.drawImage(vid, 0, VID_Y_PX, CV_W, VID_H_PX);
+    }
+
+    // 구분선
+    ctx.fillStyle = colors.div;
+    ctx.fillRect(0, VID_Y_PX, CV_W, Math.max(1, Math.round(4 * SCALE)));
+    ctx.fillRect(0, VID_Y_PX + VID_H_PX - Math.max(1, Math.round(4 * SCALE)), CV_W, Math.max(1, Math.round(4 * SCALE)));
+
+    // 제목
+    const t1 = document.getElementById('render-title1')?.value || '';
+    const t2 = document.getElementById('render-title2')?.value || '';
+    const c1 = document.getElementById('style-title1-color')?.value || '#FFD700';
+    const c2 = document.getElementById('style-title2-color')?.value || '#FFFFFF';
+    const yExtra = parseInt(document.getElementById('style-title-y')?.value) || 0;
+    const sizeScale = parseFloat(document.getElementById('style-title-size')?.value) || 1.0;
+    const lines = [t1, t2].filter(l => l.trim());
+    if (lines.length) drawTitleCanvas(ctx, lines, [c1, c2], yExtra, sizeScale);
+
+    // 자막 샘플
+    if (document.getElementById('render-subtitles')?.checked) {
+      drawSubSample(ctx, colors);
+    }
+
+    _canvasRafId = requestAnimationFrame(draw);
+  }
+  _canvasRafId = requestAnimationFrame(draw);
+}
+
+function drawTitleCanvas(ctx, lines, colors, yExtra, sizeScale) {
+  const BASE = 115;
+  const maxLen = Math.max(...lines.map(l => l.length));
+  let sz = maxLen <= 7 ? BASE : maxLen <= 10 ? Math.round(BASE*0.88)
+         : maxLen <= 13 ? Math.round(BASE*0.75) : maxLen <= 16 ? Math.round(BASE*0.63)
+         : Math.round(BASE*0.54);
+  sz = Math.max(10, Math.round(sz * sizeScale * SCALE));
+  const lineH = sz + Math.round(20 * SCALE);
+  const yCenter = Math.round((VID_Y_FULL / 2 + 140 + yExtra) * SCALE);
+  const startY  = yCenter - (lines.length * lineH) / 2;
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  lines.forEach((line, i) => {
+    ctx.font = `900 ${sz}px 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif`;
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur = 3;
+    ctx.shadowOffsetX = Math.round(2*SCALE);
+    ctx.shadowOffsetY = Math.round(2*SCALE);
+    ctx.fillStyle = colors[i] || '#FFFFFF';
+    ctx.fillText(line, CV_W / 2, startY + i * lineH);
+  });
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+}
+
+function drawSubSample(ctx, colors) {
+  const sz = Math.round(parseInt(document.getElementById('style-sub-size')?.value || 28) * SCALE);
+  const marginV = Math.round(parseInt(document.getElementById('style-sub-y')?.value || 20) * SCALE);
+  const color   = document.getElementById('style-sub-color')?.value || '#FFFFFF';
+  const y = CV_H - VID_Y_PX - marginV - sz - 4;  // video 영역 하단 기준
+  const sampleY = VID_Y_PX + VID_H_PX - marginV - sz - 4;
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.font = `bold ${sz}px 'Malgun Gothic', sans-serif`;
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  const tw = ctx.measureText('자막 샘플 텍스트').width + 8;
+  ctx.fillRect(CV_W/2 - tw/2, sampleY - 2, tw, sz + 4);
+  ctx.shadowColor = 'rgba(0,0,0,0.9)';
+  ctx.shadowBlur = 2;
+  ctx.fillStyle = color;
+  ctx.fillText('자막 샘플 텍스트', CV_W/2, sampleY);
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+}
+
+function updateCanvas() { /* RAF 루프가 자동으로 반영 */ }
+
+// ── 정밀 미리보기 (FFmpeg 1-frame PNG) ───────────────────
+async function runFramePreview() {
+  const filename = document.getElementById('render-filename').textContent.trim();
+  if (!filename) { showToast('먼저 왼쪽에서 영상을 선택하세요', 'error'); return; }
+  const btn = document.getElementById('btn-frame-preview');
+  btn.textContent = '생성 중...';
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/api/preview', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        filename,
+        title: getTitle(),
+        style: getStyleParams(),
+        seek: 2.0,
+        bg_image: getSelectedBgImage() || null,
+      })
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const blob = await resp.blob();
+    const url  = URL.createObjectURL(blob);
+    const modal = document.createElement('div');
+    modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer;';
+    modal.title = '클릭하면 닫힙니다';
+    modal.onclick = () => { modal.remove(); URL.revokeObjectURL(url); };
+    const img = document.createElement('img');
+    img.src = url;
+    img.style = 'max-height:92vh;max-width:92vw;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.8);';
+    modal.appendChild(img);
+    document.body.appendChild(modal);
+  } catch(e) {
+    alert('미리보기 오류: ' + e.message);
+  } finally {
+    btn.textContent = '🔍 정밀 미리보기';
+    btn.disabled = false;
+  }
+}
+
+function getTitle() {
+  const t1 = document.getElementById('render-title1').value.trim();
+  const t2 = document.getElementById('render-title2').value.trim();
+  return t1 && t2 ? `${t1}\n${t2}` : (t1 || t2 || '');
+}
+
+function getStyleParams() {
+  return {
+    title1_color:         document.getElementById('style-title1-color').value,
+    title2_color:         document.getElementById('style-title2-color').value,
+    title_y_extra:        parseInt(document.getElementById('style-title-y').value) || 0,
+    title_fontsize_scale: parseFloat(document.getElementById('style-title-size').value) || 1.0,
+    sub_fontsize:         parseInt(document.getElementById('style-sub-size').value) || 28,
+    sub_color:            document.getElementById('style-sub-color').value,
+    sub_margin_v:         parseInt(document.getElementById('style-sub-y').value) || 20,
+  };
+}
+
+// ── 렌더링 실행 ──────────────────────────────────────────
+async function runRender() {
+  const filename  = document.getElementById('render-filename').textContent.trim();
+  const subtitles = document.getElementById('render-subtitles').checked;
+  const tid       = parseInt(document.getElementById('render-template').value) || 1;
+  if (!filename) return;
+
+  document.getElementById('render-status').textContent = '렌더링 요청 중...';
+  const r = await fetch('/api/render', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ filename, title: getTitle(), subtitles, template_id: tid, style: getStyleParams(), bg_image: getSelectedBgImage() || null })
+  });
+  if (r.ok) {
+    document.getElementById('render-status').textContent = '✓ 렌더링 시작됨 — 완성 쇼츠 탭에서 확인하세요';
+    startPolling();
+  } else {
+    document.getElementById('render-status').textContent = '오류가 발생했습니다.';
+  }
+}
+
+function onTitleInput() {
+  document.getElementById('title-save-btn').style.display = 'block';
+  document.getElementById('title-saved').style.display = 'none';
+}
+
+async function saveTitle() {
+  const shorts = window._shorts || [];
+  const selected = shorts.find((_, i) => {
+    const el = document.getElementById(`si-${i}`);
+    return el && el.classList.contains('selected');
+  });
+  if (!selected) return;
+
+  const newTitle = document.getElementById('detail-title').value.trim();
+  if (!newTitle) return;
+
+  const r = await fetch('/api/update-title', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename: selected.filename, intro_text: newTitle })
+  });
+
+  if (r.ok) {
+    // 로컬 캐시도 업데이트
+    selected.title = newTitle;
+    const idx = shorts.indexOf(selected);
+    const titleEl = document.querySelector(`#si-${idx} .short-title`);
+    if (titleEl) titleEl.textContent = newTitle;
+
+    document.getElementById('title-save-btn').style.display = 'none';
+    document.getElementById('title-saved').textContent = '✓ 저장됨 — 재렌더링 중...';
+    document.getElementById('title-saved').style.display = 'inline';
+
+    // 저장 후 재렌더링 자동 실행
+    const tid = parseInt(document.getElementById('template-select').value) || 1;
+    const rr = await fetch('/api/rerender', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template_id: tid })
+    });
+
+    if (rr.ok) {
+      document.getElementById('title-saved').textContent = '✓ 재렌더링 시작됨';
+      startPolling();
+    }
+  }
+}
+
+// ── 초기화 ────────────────────────────────────────────────
+(async () => {
+  await fetchStatus();
+  await refreshFiles();
+  await loadBackgrounds();
+  await loadRaws();
+  await loadShorts();
+})();
+
+// ── 자막 편집 모달 ────────────────────────────────────────
+let _srtStem = null;
+
+async function openSrtEditor() {
+  const filename = document.getElementById('render-filename').textContent.trim();
+  if (!filename) { alert('먼저 영상을 선택하세요.'); return; }
+
+  _srtStem = filename.replace('_raw.mp4', '');
+  const btn = event.target;
+  btn.textContent = '로딩 중...';
+  btn.disabled = true;
+
+  try {
+    const r = await fetch(`/api/srt/${_srtStem}`);
+    if (!r.ok) {
+      const msg = await r.text();
+      throw new Error(msg);
+    }
+    const data = await r.json();
+    renderSrtModal(data.entries);
+  } catch(e) {
+    alert('자막 불러오기 실패: ' + e.message);
+  } finally {
+    btn.textContent = '✏️ 자막 편집';
+    btn.disabled = false;
+  }
+}
+
+function renderSrtModal(entries) {
+  const existing = document.getElementById('srt-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'srt-modal';
+  modal.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.75);
+    display:flex;align-items:center;justify-content:center;z-index:9999;
+  `;
+
+  const panel = document.createElement('div');
+  panel.style.cssText = `
+    background:var(--surface);border-radius:10px;padding:0;
+    width:560px;max-width:95vw;max-height:88vh;
+    display:flex;flex-direction:column;overflow:hidden;
+    box-shadow:0 12px 48px rgba(0,0,0,0.6);
+  `;
+
+  // 헤더
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0;';
+  header.innerHTML = `
+    <div style="font-size:14px;font-weight:700;color:var(--text);">자막 편집</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button onclick="addSrtEntry()" style="padding:5px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;cursor:pointer;">+ 추가</button>
+      <button onclick="saveSrt()" style="padding:5px 14px;background:var(--accent);color:#000;border:none;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">저장</button>
+      <button onclick="document.getElementById('srt-modal').remove()" style="padding:5px 10px;background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:12px;cursor:pointer;">✕</button>
+    </div>
+  `;
+
+  // 안내
+  const hint = document.createElement('div');
+  hint.style.cssText = 'padding:8px 18px;font-size:11px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0;';
+  hint.textContent = '시간 형식: 00:00:00,000 --> 00:00:00,000 / 텍스트 수정 후 저장하면 다음 렌더링에 반영됩니다.';
+
+  // 엔트리 목록
+  const list = document.createElement('div');
+  list.id = 'srt-entry-list';
+  list.style.cssText = 'overflow-y:auto;flex:1;padding:12px 18px;display:flex;flex-direction:column;gap:8px;';
+
+  entries.forEach((e, i) => list.appendChild(makeSrtEntry(e, i)));
+
+  // 저장 상태
+  const status = document.createElement('div');
+  status.id = 'srt-save-status';
+  status.style.cssText = 'padding:8px 18px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);flex-shrink:0;min-height:28px;';
+
+  panel.appendChild(header);
+  panel.appendChild(hint);
+  panel.appendChild(list);
+  panel.appendChild(status);
+  modal.appendChild(panel);
+
+  // 모달 바깥 클릭 시 닫기
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+function makeSrtEntry(entry, idx) {
+  const div = document.createElement('div');
+  div.className = 'srt-entry';
+  div.dataset.idx = idx;
+  div.style.cssText = 'background:var(--surface2);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;position:relative;';
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:10px;color:var(--muted);min-width:16px;">${entry.index}</span>
+      <input class="srt-times" value="${entry.times}"
+        style="flex:1;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;
+               color:var(--muted);font-size:11px;font-family:monospace;">
+      <button onclick="this.closest('.srt-entry').remove()" title="삭제"
+        style="padding:2px 8px;background:none;border:1px solid var(--border);border-radius:5px;color:#e55;font-size:12px;cursor:pointer;flex-shrink:0;">✕</button>
+    </div>
+    <textarea class="srt-text" rows="2"
+      style="width:100%;padding:6px 8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;
+             color:var(--text);font-size:13px;resize:vertical;box-sizing:border-box;">${entry.text}</textarea>
+  `;
+  return div;
+}
+
+function addSrtEntry() {
+  const list = document.getElementById('srt-entry-list');
+  const entries = collectSrtEntries();
+  const lastIdx = entries.length > 0 ? parseInt(entries[entries.length-1].index) + 1 : 1;
+  const newEntry = { index: String(lastIdx), times: '00:00:00,000 --> 00:00:00,000', text: '' };
+  list.appendChild(makeSrtEntry(newEntry, lastIdx));
+  list.lastChild.querySelector('textarea').focus();
+}
+
+function collectSrtEntries() {
+  const nodes = document.querySelectorAll('#srt-entry-list .srt-entry');
+  return Array.from(nodes).map((node, i) => ({
+    index: String(i + 1),
+    times: node.querySelector('.srt-times').value.trim(),
+    text:  node.querySelector('.srt-text').value.trim(),
+  })).filter(e => e.text);
+}
+
+async function saveSrt() {
+  if (!_srtStem) return;
+  const entries = collectSrtEntries();
+  const status = document.getElementById('srt-save-status');
+  status.textContent = '저장 중...';
+  try {
+    const r = await fetch('/api/srt', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ stem: _srtStem, entries }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    status.textContent = `✓ ${entries.length}개 저장 완료 — 렌더링 시 적용됩니다.`;
+    status.style.color = 'var(--accent)';
+  } catch(e) {
+    status.textContent = '저장 실패: ' + e.message;
+    status.style.color = '#e55';
+  }
+}
+</script>
+</body>
+</html>

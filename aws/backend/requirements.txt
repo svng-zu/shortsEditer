@@ -1,0 +1,21 @@
+# FastAPI & Server
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# AWS SDK
+boto3>=1.34.0
+botocore>=1.34.0
+
+# YouTube Download
+yt-dlp>=2024.1.0
+
+# Video Processing
+opencv-python>=4.9.0
+mediapipe>=0.10.0
+
+# Utilities
+httpx>=0.26.0
+aiofiles>=23.2.0
