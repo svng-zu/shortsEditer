@@ -3,826 +3,871 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SHORTSAI — 쇼츠 자동 생성</title>
+<title>ShortsAI — AI 쇼츠 자동 생성</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg:        #0e0e10;
-    --surface:   #1a1a1e;
-    --surface2:  #222228;
-    --border:    #2e2e36;
-    --accent:    #e8ff47;
-    --accent2:   #ff4d6d;
-    --text:      #f0f0f4;
-    --muted:     #888896;
-    --success:   #3ddc84;
-    --warn:      #ffb300;
-    --panel-w:   300px;
-    --right-w:   280px;
-    --header-h:  56px;
-  }
+:root {
+  --bg:        #09090f;
+  --s1:        #111118;
+  --s2:        #17171f;
+  --s3:        #1e1e28;
+  --border:    rgba(255,255,255,0.07);
+  --border2:   rgba(255,255,255,0.12);
+  --accent:    #7c5cfc;
+  --accent2:   #5c9afc;
+  --accent-g:  linear-gradient(135deg,#7c5cfc,#5c9afc);
+  --text:      #e8e8f4;
+  --muted:     #6e6e98;
+  --success:   #22c55e;
+  --error:     #ef4444;
+  --warn:      #f59e0b;
+  --sidebar-w: 420px;
+  --right-w:   270px;
+  --header-h:  58px;
+  --radius:    12px;
+  --radius-sm: 8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Inter','Noto Sans KR',sans-serif;
+  font-size:13px;
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── 헤더 ── */
+header{
+  height:var(--header-h);
+  background:var(--s1);
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  padding:0 20px;
+  gap:14px;
+  flex-shrink:0;
+  z-index:50;
+}
+.logo{
+  font-size:18px;
+  font-weight:800;
+  letter-spacing:-0.5px;
+  background:var(--accent-g);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+.logo-sub{
+  font-size:11px;
+  color:var(--muted);
+  font-weight:500;
+  letter-spacing:0.2px;
+}
+.header-sep{ width:1px;height:18px;background:var(--border2);margin:0 2px; }
+.header-status{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-left:auto;
+  background:var(--s2);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:5px 12px 5px 9px;
+}
+.status-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--muted);flex-shrink:0;
+  transition:background .3s;
+}
+.status-dot.running{background:var(--accent);box-shadow:0 0 0 3px rgba(124,92,252,.25);animation:pulse 1.5s infinite;}
+.status-dot.done   {background:var(--success);}
+.status-dot.error  {background:var(--error);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+#status-msg{font-size:12px;color:var(--text);font-weight:500;}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Noto Sans KR', sans-serif;
-    font-size: 13px;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
+/* ── 레이아웃 ── */
+.layout{
+  display:flex;
+  flex:1;
+  overflow:hidden;
+}
 
-  /* ── 헤더 ── */
-  header {
-    height: var(--header-h);
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    padding: 0 20px;
-    gap: 16px;
-    flex-shrink: 0;
-    z-index: 10;
-  }
+/* ── 사이드바 (파이프라인) ── */
+.sidebar{
+  width:var(--sidebar-w);
+  background:var(--s1);
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  flex-shrink:0;
+  overflow:hidden;
+}
+.sidebar-header{
+  padding:16px 18px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.sidebar-title{
+  font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:1px;
+  color:var(--muted);
+}
+.refresh-btn{
+  background:none;border:none;color:var(--muted);
+  cursor:pointer;font-size:15px;padding:2px;
+  border-radius:4px;transition:color .2s;
+}
+.refresh-btn:hover{color:var(--text);}
 
-  .logo {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 22px;
-    letter-spacing: 2px;
-    color: var(--accent);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .logo span { color: var(--text); }
+/* 파일 카운터 */
+.file-stats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  padding:14px 16px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.stat-item{
+  background:var(--s2);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:8px 10px;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.stat-num{font-size:20px;font-weight:800;color:var(--text);line-height:1;}
+.stat-lbl{font-size:10px;color:var(--muted);font-weight:500;}
 
-  .header-status {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
+/* 진행바 */
+.prog-wrap{padding:10px 16px 6px;flex-shrink:0;}
+.prog-bar{
+  height:3px;background:var(--s3);border-radius:2px;overflow:hidden;
+}
+.prog-fill{
+  height:100%;
+  background:var(--accent-g);
+  border-radius:2px;
+  width:0%;
+  transition:width .4s ease;
+}
 
-  .status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--muted);
-    transition: background .3s;
-  }
-  .status-dot.running { background: var(--accent); animation: pulse 1s infinite; }
-  .status-dot.done    { background: var(--success); }
-  .status-dot.error   { background: var(--accent2); }
+/* 파이프라인 스텝 */
+.steps-wrap{
+  flex:1;overflow-y:auto;padding:12px 16px 16px;
+  display:flex;flex-direction:column;gap:6px;
+}
+.steps-wrap::-webkit-scrollbar{width:4px;}
+.steps-wrap::-webkit-scrollbar-track{background:transparent;}
+.steps-wrap::-webkit-scrollbar-thumb{background:var(--s3);border-radius:2px;}
 
-  @keyframes pulse {
-    0%,100% { opacity: 1; }
-    50%      { opacity: .3; }
-  }
+.step-card{
+  background:var(--s2);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  transition:border-color .2s;
+}
+.step-card:hover{border-color:var(--border2);}
+.step-head{display:flex;align-items:center;gap:10px;}
+.step-badge{
+  width:26px;height:26px;border-radius:8px;
+  background:var(--s3);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;color:var(--muted);
+  flex-shrink:0;
+}
+.step-name{font-size:12px;font-weight:700;color:var(--text);}
 
-  #status-msg {
-    color: var(--muted);
-    font-size: 12px;
-    max-width: 300px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+/* step file list */
+.step-file-list{
+  display:flex;flex-direction:column;gap:2px;
+  max-height:80px;overflow-y:auto;
+}
+.step-file-list::-webkit-scrollbar{width:3px;}
+.step-file-list::-webkit-scrollbar-thumb{background:var(--s3);}
+.sfl-empty{font-size:10px;color:var(--muted);padding:2px 0;}
+.sfl-item{
+  font-size:10px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  padding:1px 0;
+}
+.sfl-item.done{color:var(--success);}
 
-  /* ── 메인 레이아웃 ── */
-  .layout {
-    display: grid;
-    grid-template-columns: var(--panel-w) 1fr var(--right-w);
-    flex: 1;
-    overflow: hidden;
-  }
+.step-btn{
+  width:100%;padding:8px 0;border-radius:var(--radius-sm);
+  border:none;cursor:pointer;font-weight:700;
+  font-size:12px;font-family:inherit;
+  transition:all .18s;
+}
+.step-btn.primary{
+  background:var(--accent-g);
+  color:#fff;
+}
+.step-btn.primary:hover{opacity:.9;transform:translateY(-1px);}
+.step-btn.primary:disabled{opacity:.35;cursor:not-allowed;transform:none;}
 
-  /* ── 공통 패널 ── */
-  .panel {
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .panel-header {
-    padding: 14px 16px 10px;
-    font-weight: 700;
-    font-size: 11px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: var(--muted);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .panel-body { flex: 1; overflow-y: auto; padding: 12px; }
-  .panel-body::-webkit-scrollbar { width: 4px; }
-  .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.clear-check{
+  display:flex;align-items:center;gap:6px;
+  font-size:11px;color:var(--muted);cursor:pointer;
+}
+.clear-check input{accent-color:var(--accent);}
 
-  /* ── 왼쪽: 파이프라인 컨트롤 ── */
-  .pipeline-steps { display: flex; flex-direction: column; gap: 8px; }
+/* ── 메인 센터 ── */
+.main-area{
+  flex:1;display:flex;flex-direction:column;
+  overflow:hidden;min-width:0;
+}
 
-  .step-card {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-    transition: border-color .2s;
-  }
-  .step-card:hover { border-color: #444; }
-  .step-card.active { border-color: var(--accent); }
+/* 탭바 */
+.tab-bar{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  padding:10px 16px 0;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+  background:var(--s1);
+}
+.tab-btn{
+  padding:8px 18px;
+  border-radius:8px 8px 0 0;
+  border:1px solid transparent;
+  border-bottom:none;
+  cursor:pointer;
+  font-size:12px;
+  font-weight:700;
+  font-family:inherit;
+  background:transparent;
+  color:var(--muted);
+  transition:all .18s;
+  position:relative;
+  bottom:-1px;
+}
+.tab-btn.active{
+  background:var(--bg);
+  border-color:var(--border);
+  color:var(--text);
+}
 
-  .step-top {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-  }
-  .step-num {
-    width: 24px; height: 24px;
-    border-radius: 50%;
-    background: var(--border);
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: all .3s;
-  }
-  .step-card.done .step-num   { background: var(--success); color: #000; }
-  .step-card.active .step-num { background: var(--accent);  color: #000; }
+/* 탭 콘텐츠 */
+.tab-content{
+  flex:1;display:flex;overflow:hidden;
+}
 
-  .step-title { font-weight: 700; font-size: 13px; }
-  .step-desc  { font-size: 11px; color: var(--muted); line-height: 1.5; }
+/* ── 영상 리스트 + 플레이어 구조 ── */
+.video-list{
+  width:210px;
+  background:var(--s1);
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  flex-shrink:0;
+  overflow:hidden;
+}
+.list-header{
+  padding:12px 14px 10px;
+  font-size:11px;font-weight:700;
+  color:var(--muted);
+  text-transform:uppercase;
+  letter-spacing:.8px;
+  display:flex;align-items:center;gap:6px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.list-count{
+  background:var(--accent);
+  color:#fff;
+  border-radius:10px;
+  padding:1px 7px;
+  font-size:10px;font-weight:700;
+}
+.list-refresh{
+  margin-left:auto;background:none;border:none;
+  color:var(--muted);cursor:pointer;font-size:14px;
+}
+.list-body{flex:1;overflow-y:auto;}
+.list-body::-webkit-scrollbar{width:3px;}
+.list-body::-webkit-scrollbar-thumb{background:var(--s3);}
 
-  .step-file-list {
-    margin-top: 6px;
-    max-height: 90px;
-    overflow-y: auto;
-    border-radius: 5px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-  }
-  .step-file-list:empty { display: none; }
-  .step-file-list .sfl-item {
-    padding: 3px 8px;
-    font-size: 10px;
-    color: var(--muted);
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .step-file-list .sfl-item:last-child { border-bottom: none; }
-  .step-file-list .sfl-item.done { color: var(--success); }
-  .step-file-list .sfl-empty {
-    padding: 6px 8px;
-    font-size: 10px;
-    color: var(--border);
-    text-align: center;
-  }
+.video-item{
+  padding:10px 14px;
+  border-bottom:1px solid var(--border);
+  cursor:pointer;
+  transition:background .15s;
+}
+.video-item:hover{background:var(--s2);}
+.video-item.selected{background:var(--s3);border-left:2px solid var(--accent);}
+.vi-title{
+  font-size:11px;font-weight:600;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.vi-sub{font-size:10px;color:var(--muted);margin-top:2px;}
 
-  .step-btn {
-    width: 100%;
-    padding: 7px 0;
-    border-radius: 7px;
-    border: none;
-    cursor: pointer;
-    font-family: 'Noto Sans KR', sans-serif;
-    font-weight: 700;
-    font-size: 12px;
-    transition: all .2s;
-    margin-top: 8px;
-  }
-  .step-btn.primary {
-    background: var(--accent);
-    color: #000;
-  }
-  .step-btn.primary:hover { background: #d4eb00; }
-  .step-btn.primary:disabled {
-    background: var(--border);
-    color: var(--muted);
-    cursor: not-allowed;
-  }
+/* short item card */
+.short-item{
+  display:flex;gap:10px;
+  padding:10px 14px;
+  border-bottom:1px solid var(--border);
+  cursor:pointer;
+  transition:background .15s;
+}
+.short-item:hover{background:var(--s2);}
+.short-item.selected{background:var(--s3);border-left:2px solid var(--accent);}
+.short-thumb{
+  width:44px;height:78px;
+  border-radius:6px;overflow:hidden;
+  background:#000;flex-shrink:0;
+}
+.short-thumb video{width:100%;height:100%;object-fit:cover;}
+.short-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
+.short-title{font-size:11px;font-weight:600;color:var(--text);line-height:1.4;}
+.short-cat{display:flex;gap:4px;flex-wrap:wrap;}
+.badge{
+  font-size:9px;font-weight:700;padding:2px 7px;
+  border-radius:10px;text-transform:uppercase;
+}
+.badge.sports  {background:rgba(255,215,0,.15);color:#FFD700;}
+.badge.economy {background:rgba(0,230,118,.12);color:#00E676;}
+.badge.politics{background:rgba(255,61,61,.12);color:#FF3D3D;}
+.short-actions{display:flex;gap:4px;margin-top:2px;}
+.short-btn{
+  padding:3px 10px;border-radius:5px;
+  font-size:10px;font-weight:600;cursor:pointer;
+  text-decoration:none;display:inline-block;
+  font-family:inherit;
+}
+.short-btn.dl{background:var(--s3);border:1px solid var(--border2);color:var(--text);}
+.short-btn.del{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--error);}
 
-  /* 템플릿 셀렉터 */
-  .template-select {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 6px 8px;
-    border-radius: 6px;
-    font-family: 'Noto Sans KR', sans-serif;
-    font-size: 12px;
-    margin-bottom: 0;
-    cursor: pointer;
-  }
+/* 플레이어 영역 */
+.player-zone{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;
+}
+.player-wrap{
+  flex:1;position:relative;background:#000;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+}
+.player-wrap video{max-width:100%;max-height:100%;object-fit:contain;}
+.player-empty{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;color:var(--muted);
+}
+.player-empty .icon{font-size:36px;opacity:.3;}
+.player-empty p{font-size:12px;text-align:center;line-height:1.6;opacity:.5;}
 
-  /* 진행 바 */
-  .progress-bar {
-    height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    margin-top: 8px;
-    overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 2px;
-    transition: width .4s;
-    width: 0%;
-  }
+/* 렌더 패널 */
+.render-panel{
+  display:none;
+  border-top:1px solid var(--border);
+  background:var(--s1);
+  flex-shrink:0;
+  max-height:52vh;
+  overflow:hidden;
+}
+.render-inner{
+  display:flex;
+  height:100%;
+}
 
-  /* 파일 카운트 */
-  .file-counts {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    margin-top: 8px;
-  }
-  .file-count-item {
-    background: var(--bg);
-    border-radius: 6px;
-    padding: 6px 8px;
-    text-align: center;
-  }
-  .file-count-item .num { font-size: 18px; font-weight: 900; color: var(--accent); }
-  .file-count-item .lbl { font-size: 10px; color: var(--muted); }
+/* 캔버스 사이드 */
+.canvas-side{
+  padding:14px 12px;
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+  flex-shrink:0;
+  background:var(--s2);
+}
+.canvas-label{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px;}
+.canvas-wrap{
+  position:relative;
+  width:120px;height:214px;
+  background:#000;
+  border-radius:10px;
+  overflow:hidden;
+  border:1px solid var(--border2);
+}
+.canvas-wrap video{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;opacity:0;pointer-events:none;}
+.canvas-wrap canvas{position:absolute;top:0;left:0;width:120px;height:214px;}
+.preview-btn{
+  width:120px;
+  padding:7px 0;
+  background:var(--s3);
+  border:1px solid var(--border2);
+  border-radius:var(--radius-sm);
+  color:var(--text);
+  font-size:11px;font-weight:600;
+  cursor:pointer;font-family:inherit;
+  transition:all .18s;
+}
+.preview-btn:hover{background:var(--accent);border-color:var(--accent);color:#fff;}
 
-  /* ── 가운데: 쇼츠 목록 + 플레이어 ── */
-  .center-panel {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--bg);
-  }
+/* 컨트롤 사이드 */
+.controls-side{
+  flex:1;
+  padding:12px 16px;
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.controls-side::-webkit-scrollbar{width:3px;}
+.controls-side::-webkit-scrollbar-thumb{background:var(--s3);}
+.ctrl-file-tag{
+  font-size:11px;color:var(--muted);
+  padding:4px 0;
+}
+.ctrl-file-tag span{color:var(--text);font-weight:600;}
 
-  .center-top {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-  }
+/* 컨트롤 섹션 */
+.ctrl-section{
+  background:var(--s2);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:12px 14px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.ctrl-section-title{
+  font-size:11px;font-weight:700;color:var(--text);
+  letter-spacing:.3px;
+}
+.ctrl-row{display:flex;gap:8px;align-items:flex-end;}
+.ctrl-col{flex:1;display:flex;flex-direction:column;gap:4px;}
+.ctrl-label{font-size:10px;color:var(--muted);font-weight:500;}
+.ctrl-input{
+  padding:6px 10px;
+  background:var(--s1);
+  border:1px solid var(--border2);
+  border-radius:var(--radius-sm);
+  color:var(--text);
+  font-size:12px;
+  font-family:inherit;
+  outline:none;
+  transition:border-color .2s;
+  width:100%;
+}
+.ctrl-input:focus{border-color:var(--accent);}
+.ctrl-select{
+  padding:7px 10px;
+  background:var(--s1);
+  border:1px solid var(--border2);
+  border-radius:var(--radius-sm);
+  color:var(--text);
+  font-size:12px;
+  font-family:inherit;
+  outline:none;
+  cursor:pointer;
+  width:100%;
+}
+.ctrl-range{width:100%;accent-color:var(--accent);}
+.ctrl-color{
+  width:32px;height:32px;
+  border:none;background:none;
+  cursor:pointer;padding:0;border-radius:6px;
+  flex-shrink:0;
+}
+.ctrl-checkbox{
+  display:flex;align-items:center;gap:6px;
+  font-size:11px;color:var(--muted);cursor:pointer;
+}
+.ctrl-checkbox input{accent-color:var(--accent);cursor:pointer;}
 
-  /* 쇼츠 목록 */
-  .shorts-list {
-    width: 240px;
-    flex-shrink: 0;
-    border-right: 1px solid var(--border);
-    overflow-y: auto;
-    background: var(--surface);
-  }
-  .shorts-list::-webkit-scrollbar { width: 4px; }
-  .shorts-list::-webkit-scrollbar-thumb { background: var(--border); }
+.render-actions{
+  display:flex;align-items:center;gap:8px;
+}
+.render-btn{
+  flex:1;
+  padding:9px 0;
+  background:var(--accent-g);
+  border:none;border-radius:var(--radius-sm);
+  color:#fff;font-weight:700;font-size:13px;
+  cursor:pointer;font-family:inherit;
+  transition:opacity .18s;
+}
+.render-btn:hover{opacity:.88;}
+.render-status{font-size:11px;color:var(--muted);padding:2px 0;}
 
-  .shorts-list-header {
-    padding: 14px 14px 10px;
-    font-weight: 700;
-    font-size: 11px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: var(--muted);
-    border-bottom: 1px solid var(--border);
-    position: sticky;
-    top: 0;
-    background: var(--surface);
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
+/* ── 오른쪽 패널 ── */
+.right-panel{
+  width:var(--right-w);
+  background:var(--s1);
+  border-left:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  flex-shrink:0;
+  overflow:hidden;
+}
+.rp-header{
+  padding:16px 18px 12px;
+  font-size:11px;font-weight:700;
+  color:var(--muted);
+  text-transform:uppercase;letter-spacing:1px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.rp-body{
+  flex:1;overflow-y:auto;
+  padding:14px 16px;
+  display:flex;flex-direction:column;gap:14px;
+}
+.rp-body::-webkit-scrollbar{width:3px;}
+.rp-body::-webkit-scrollbar-thumb{background:var(--s3);}
+.rp-section{display:flex;flex-direction:column;gap:8px;}
+.rp-label{
+  font-size:11px;font-weight:700;color:var(--muted);
+  display:flex;align-items:center;gap:6px;
+}
+.rp-textarea{
+  width:100%;
+  background:var(--s2);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:10px 12px;
+  color:var(--text);
+  font-family:'Noto Sans KR',sans-serif;
+  font-size:12px;
+  line-height:1.6;
+  resize:vertical;
+  outline:none;
+  transition:border-color .2s;
+}
+.rp-textarea:focus{border-color:var(--accent);}
+.rp-save-btn{
+  display:none;
+  width:100%;
+  padding:8px 0;
+  background:var(--accent-g);
+  border:none;
+  border-radius:var(--radius-sm);
+  color:#fff;font-weight:700;font-size:12px;
+  cursor:pointer;font-family:inherit;
+}
 
-  .shorts-count {
-    background: var(--accent);
-    color: #000;
-    font-size: 10px;
-    font-weight: 900;
-    padding: 2px 6px;
-    border-radius: 10px;
-  }
+/* 타임라인 */
+.timeline-item{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:8px 10px;
+  background:var(--s2);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+}
+.t-order{
+  width:22px;height:22px;border-radius:6px;
+  background:var(--accent);
+  color:#fff;font-size:10px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.t-info{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;}
+.t-time{font-size:11px;color:var(--accent2);font-weight:600;}
+.t-reason{font-size:11px;color:var(--muted);line-height:1.4;}
 
-  .short-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    cursor: pointer;
-    border-bottom: 1px solid var(--border);
-    transition: background .15s;
-  }
-  .short-item:hover    { background: var(--surface2); }
-  .short-item.selected { background: var(--surface2); border-left: 3px solid var(--accent); }
+/* 빈 상태 */
+.empty-state{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:28px 16px;gap:8px;
+  color:var(--muted);
+}
+.e-icon{font-size:28px;opacity:.4;}
+.empty-state p{font-size:11px;text-align:center;line-height:1.6;opacity:.6;}
 
-  .short-thumb {
-    width: 52px;
-    height: 52px;
-    background: var(--border);
-    border-radius: 6px;
-    flex-shrink: 0;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--muted);
-    font-size: 18px;
-  }
-  .short-thumb video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
+/* 토스트 / 애니메이션 */
+@keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
-  .short-info { flex: 1; min-width: 0; }
-  .short-title {
-    font-weight: 700;
-    font-size: 12px;
-    line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    margin-bottom: 4px;
-  }
-  .short-cat {
-    font-size: 10px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: .5px;
-  }
-  .short-actions {
-    display: flex;
-    gap: 4px;
-    margin-top: 5px;
-  }
-  .short-btn {
-    font-size: 10px;
-    font-weight: 700;
-    padding: 3px 7px;
-    border-radius: 4px;
-    border: none;
-    cursor: pointer;
-    font-family: 'Noto Sans KR', sans-serif;
-  }
-  .short-btn.dl  { background: #1d4ed8; color: #fff; }
-  .short-btn.del { background: #7f1d1d; color: #fff; }
-  .short-btn:hover { opacity: .85; }
-
-  /* 플레이어 영역 */
-  .player-area {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    background: var(--bg);
-  }
-
-  .player-wrap {
-    width: 100%;
-    max-width: 360px;
-    aspect-ratio: 9/16;
-    background: var(--surface);
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0,0,0,.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-  }
-
-  #main-video {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    display: none;
-  }
-
-  .player-empty {
-    text-align: center;
-    color: var(--muted);
-    padding: 20px;
-  }
-  .player-empty .icon { font-size: 48px; margin-bottom: 12px; }
-  .player-empty p { font-size: 12px; line-height: 1.6; }
-
-  /* ── 오른쪽 패널 ── */
-  .right-panel {
-    background: var(--surface);
-    border-left: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .right-panel .panel-header {
-    border-right: none;
-  }
-
-  .right-section {
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--border);
-  }
-  .right-section:last-child { border-bottom: none; flex: 1; overflow-y: auto; }
-  .right-label {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 8px;
-  }
-
-  .info-box {
-    background: var(--surface2);
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-size: 13px;
-    line-height: 1.6;
-    color: var(--text);
-    min-height: 40px;
-  }
-
-  .timeline-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 7px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .timeline-item:last-child { border-bottom: none; }
-  .t-order {
-    width: 20px; height: 20px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: #000;
-    font-size: 10px;
-    font-weight: 900;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin-top: 1px;
-  }
-  .t-info { flex: 1; min-width: 0; }
-  .t-time { font-size: 11px; color: var(--accent); font-weight: 700; }
-  .t-reason { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
-
-  .script-box {
-    font-size: 12px;
-    line-height: 1.8;
-    color: var(--muted);
-    white-space: pre-wrap;
-    word-break: break-all;
-  }
-
-  /* 빈 상태 */
-  .empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--muted);
-  }
-  .empty-state .e-icon { font-size: 32px; margin-bottom: 8px; }
-  .empty-state p { font-size: 11px; line-height: 1.6; }
-
-  /* 스크롤바 없는 오른쪽 섹션 */
-  .right-scroll {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0;
-  }
-  .right-scroll::-webkit-scrollbar { width: 4px; }
-  .right-scroll::-webkit-scrollbar-thumb { background: var(--border); }
-
-  /* 뱃지 */
-  .badge {
-    display: inline-block;
-    font-size: 9px;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
-    letter-spacing: .5px;
-    text-transform: uppercase;
-  }
-  .badge.economy  { background: #1e3a5f; color: #60a5fa; }
-  .badge.politics { background: #3b1f2b; color: #f472b6; }
-  .badge.sports   { background: #1c3a2a; color: #34d399; }
+/* SRT 모달용 */
+.srt-entry{
+  background:var(--s2);border-radius:var(--radius-sm);
+  padding:10px 12px;display:flex;flex-direction:column;gap:6px;position:relative;
+}
 </style>
 </head>
 <body>
 
 <!-- 헤더 -->
 <header>
-  <div class="logo">SHORTS<span>AI</span></div>
-  <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
-  <span style="color:var(--muted);font-size:12px">쇼츠 자동 생성 파이프라인</span>
+  <div class="logo">ShortsAI</div>
+  <div class="header-sep"></div>
+  <span class="logo-sub">AI 쇼츠 자동 생성 파이프라인</span>
   <div class="header-status">
     <div class="status-dot" id="status-dot"></div>
     <span id="status-msg">대기 중</span>
   </div>
 </header>
 
-<!-- 메인 -->
+<!-- 메인 레이아웃 -->
 <div class="layout">
 
-  <!-- ── 왼쪽: 파이프라인 ── -->
-  <div class="panel">
-    <div class="panel-header">
-      파이프라인
-      <button onclick="refreshFiles()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;" title="새로고침">↻</button>
+  <!-- ── 왼쪽 사이드바: 파이프라인 ── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">Pipeline</span>
+      <button class="refresh-btn" onclick="refreshFiles()" title="새로고침">↻</button>
     </div>
-    <div class="panel-body">
 
-      <!-- 파일 현황 -->
-      <div class="file-counts" id="file-counts">
-        <div class="file-count-item"><div class="num" id="cnt-videos">0</div><div class="lbl">영상</div></div>
-        <div class="file-count-item"><div class="num" id="cnt-transcripts">0</div><div class="lbl">자막</div></div>
-        <div class="file-count-item"><div class="num" id="cnt-analyses">0</div><div class="lbl">분석</div></div>
-        <div class="file-count-item"><div class="num" id="cnt-shorts">0</div><div class="lbl">쇼츠</div></div>
+    <!-- 파일 카운터 -->
+    <div class="file-stats" id="file-counts">
+      <div class="stat-item">
+        <div class="stat-num" id="cnt-videos">0</div>
+        <div class="stat-lbl">영상</div>
       </div>
-
-      <div style="height:12px"></div>
-
-      <!-- 진행 바 -->
-      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
-      <div style="height:14px"></div>
-
-      <div class="pipeline-steps">
-
-        <!-- Step 1: 수집 -->
-        <div class="step-card" id="step-1">
-          <div class="step-top">
-            <div class="step-num">1</div>
-            <div><div class="step-title">영상 수집</div></div>
-          </div>
-          <div id="step-list-1" class="step-file-list"></div>
-          <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--muted);cursor:pointer;">
-            <input type="checkbox" id="chk-clear" checked style="accent-color:var(--accent);">
-            기존 파일 전부 삭제 후 수집
-          </label>
-          <button class="step-btn primary" onclick="runCollect()">▶ 수집 시작</button>
-        </div>
-
-        <!-- Step 2: 자막 -->
-        <div class="step-card" id="step-2">
-          <div class="step-top">
-            <div class="step-num">2</div>
-            <div><div class="step-title">자막 생성</div></div>
-          </div>
-          <div id="step-list-2" class="step-file-list"></div>
-          <button class="step-btn primary" onclick="runTranscribe()">▶ 자막 생성</button>
-        </div>
-
-        <!-- Step 3: 분석 -->
-        <div class="step-card" id="step-3">
-          <div class="step-top">
-            <div class="step-num">3</div>
-            <div><div class="step-title">LLM 분석</div></div>
-          </div>
-          <div id="step-list-3" class="step-file-list"></div>
-          <button class="step-btn primary" onclick="runAnalyze()">▶ 분석 시작</button>
-        </div>
-
-        <!-- Step 4: 영상 편집 (Stage 1) -->
-        <div class="step-card" id="step-4">
-          <div class="step-top">
-            <div class="step-num">4</div>
-            <div><div class="step-title">영상 편집</div></div>
-          </div>
-          <div id="step-list-4" class="step-file-list"></div>
-          <button class="step-btn primary" onclick="runEdit()" style="margin-top:8px">▶ 영상 편집 시작</button>
-        </div>
-
+      <div class="stat-item">
+        <div class="stat-num" id="cnt-transcripts">0</div>
+        <div class="stat-lbl">자막</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" id="cnt-analyses">0</div>
+        <div class="stat-lbl">분석</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" id="cnt-shorts">0</div>
+        <div class="stat-lbl">쇼츠</div>
       </div>
     </div>
-  </div>
 
-  <!-- ── 가운데 ── -->
-  <div class="center-panel">
+    <!-- 진행바 -->
+    <div class="prog-wrap">
+      <div class="prog-bar"><div class="prog-fill" id="progress-fill"></div></div>
+    </div>
+
+    <!-- 스텝 -->
+    <div class="steps-wrap">
+
+      <div class="step-card" id="step-1">
+        <div class="step-head">
+          <div class="step-badge">1</div>
+          <div class="step-name">영상 수집</div>
+        </div>
+        <div id="step-list-1" class="step-file-list"></div>
+        <label class="clear-check">
+          <input type="checkbox" id="chk-clear" checked>
+          기존 파일 삭제 후 수집
+        </label>
+        <button class="step-btn primary" onclick="runCollect()">수집 시작</button>
+      </div>
+
+      <div class="step-card" id="step-2">
+        <div class="step-head">
+          <div class="step-badge">2</div>
+          <div class="step-name">자막 생성</div>
+        </div>
+        <div id="step-list-2" class="step-file-list"></div>
+        <button class="step-btn primary" onclick="runTranscribe()">자막 생성</button>
+      </div>
+
+      <div class="step-card" id="step-3">
+        <div class="step-head">
+          <div class="step-badge">3</div>
+          <div class="step-name">AI 분석</div>
+        </div>
+        <div id="step-list-3" class="step-file-list"></div>
+        <button class="step-btn primary" onclick="runAnalyze()">분석 시작</button>
+      </div>
+
+      <div class="step-card" id="step-4">
+        <div class="step-head">
+          <div class="step-badge">4</div>
+          <div class="step-name">영상 편집</div>
+        </div>
+        <div id="step-list-4" class="step-file-list"></div>
+        <button class="step-btn primary" onclick="runEdit()">편집 시작</button>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ── 메인 영역 ── -->
+  <div class="main-area">
+
     <!-- 탭 -->
-    <div style="display:flex;gap:4px;padding:8px 12px 0;border-bottom:1px solid var(--border);">
-      <button onclick="switchTab('raws')"   id="tab-raws"   style="padding:6px 16px;border-radius:6px 6px 0 0;border:none;cursor:pointer;font-size:12px;font-weight:700;background:var(--accent);color:#000;">영상 편집</button>
-      <button onclick="switchTab('shorts')" id="tab-shorts" style="padding:6px 16px;border-radius:6px 6px 0 0;border:none;cursor:pointer;font-size:12px;font-weight:700;background:var(--surface2);color:var(--muted);">완성 쇼츠</button>
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-raws"   onclick="switchTab('raws')">영상 편집</button>
+      <button class="tab-btn"        id="tab-shorts" onclick="switchTab('shorts')">완성 쇼츠</button>
     </div>
 
-    <div class="center-top">
+    <!-- RAW 편집 탭 -->
+    <div class="tab-content" id="panel-raws">
 
-      <!-- ── RAW 편집 탭 ── -->
-      <div id="panel-raws" style="display:flex;flex:1;overflow:hidden;">
-
-        <!-- raw 목록 -->
-        <div class="shorts-list">
-          <div class="shorts-list-header">
-            편집된 영상 (raw)
-            <span class="shorts-count" id="raws-count">0</span>
-            <button onclick="loadRaws()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;" title="새로고침">↻</button>
-          </div>
-          <div id="raws-items">
-            <div class="empty-state"><div class="e-icon">🎞</div><p>영상 편집을 먼저 실행하세요.</p></div>
-          </div>
+      <!-- 영상 목록 -->
+      <div class="video-list">
+        <div class="list-header">
+          편집 영상
+          <span class="list-count" id="raws-count">0</span>
+          <button class="list-refresh" onclick="loadRaws()" title="새로고침">↻</button>
         </div>
-
-        <!-- raw 플레이어 + 렌더링 편집기 -->
-        <div class="player-area" style="display:flex;flex-direction:column;gap:0;">
-          <div class="player-wrap" style="flex:1;">
-            <video id="raw-video" controls style="width:100%;height:100%;object-fit:contain;background:#000;"></video>
-            <div class="player-empty" id="raw-player-empty">
-              <div class="icon">▶</div>
-              <p>왼쪽에서 영상을 선택하세요</p>
-            </div>
-          </div>
-
-          <!-- 렌더링 옵션 -->
-          <div id="render-panel" style="display:none;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;max-height:55vh;overflow:hidden;">
-            <div style="display:flex;height:100%;">
-
-              <!-- ── 왼쪽: Canvas 미리보기 ── -->
-              <div style="padding:10px;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;">
-                <div style="font-size:10px;color:var(--muted);">실시간 미리보기</div>
-                <div style="position:relative;width:135px;height:240px;background:#111;border-radius:6px;overflow:hidden;">
-                  <!-- 배경 위에 video를 절대위치로 올려놓고 canvas가 맨 위에서 오버레이 -->
-                  <video id="raw-video-hidden" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;opacity:0;pointer-events:none;"></video>
-                  <canvas id="preview-canvas" width="135" height="240" style="position:absolute;top:0;left:0;width:135px;height:240px;"></canvas>
-                </div>
-                <button onclick="runFramePreview()" id="btn-frame-preview"
-                  style="width:135px;padding:5px 0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;cursor:pointer;">
-                  🔍 정밀 미리보기
-                </button>
-              </div>
-
-              <!-- ── 오른쪽: 컨트롤 ── -->
-              <div style="flex:1;padding:10px 12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
-                <div style="font-size:10px;color:var(--muted);">선택: <span id="render-filename" style="color:var(--text);"></span></div>
-
-                <!-- 제목 -->
-                <div style="background:var(--surface2);border-radius:6px;padding:8px;">
-                  <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px;">제목</div>
-                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
-                    <input type="color" id="style-title1-color" value="#FFD700" oninput="updateCanvas()" style="width:28px;height:28px;border:none;background:none;cursor:pointer;padding:0;">
-                    <input id="render-title1" type="text" maxlength="30" placeholder="1줄 (노란색)" oninput="updateCanvas()"
-                      style="flex:1;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;">
-                  </div>
-                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-                    <input type="color" id="style-title2-color" value="#FFFFFF" oninput="updateCanvas()" style="width:28px;height:28px;border:none;background:none;cursor:pointer;padding:0;">
-                    <input id="render-title2" type="text" maxlength="30" placeholder="2줄 (흰색)" oninput="updateCanvas()"
-                      style="flex:1;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;">
-                  </div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-                    <div>
-                      <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">Y 위치 <span id="lbl-title-y">0</span>px</div>
-                      <input type="range" id="style-title-y" min="-150" max="150" value="0" oninput="document.getElementById('lbl-title-y').textContent=this.value;updateCanvas();" style="width:100%;">
-                    </div>
-                    <div>
-                      <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">크기 <span id="lbl-title-size">1.0</span>×</div>
-                      <input type="range" id="style-title-size" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('lbl-title-size').textContent=parseFloat(this.value).toFixed(2);updateCanvas();" style="width:100%;">
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 자막 -->
-                <div style="background:var(--surface2);border-radius:6px;padding:8px;">
-                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                    <div style="font-size:11px;font-weight:700;color:var(--text);">자막</div>
-                    <div style="display:flex;align-items:center;gap:6px;">
-                      <button onclick="openSrtEditor()" style="padding:3px 8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:10px;cursor:pointer;">✏️ 자막 편집</button>
-                      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:var(--muted);">
-                        <input type="checkbox" id="render-subtitles" style="cursor:pointer;">
-                        자동 삽입
-                      </label>
-                    </div>
-                  </div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-                    <div>
-                      <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">크기 <span id="lbl-sub-size">52</span>px</div>
-                      <input type="range" id="style-sub-size" min="16" max="80" value="52" oninput="document.getElementById('lbl-sub-size').textContent=this.value;updateCanvas();" style="width:100%;">
-                    </div>
-                    <div style="display:flex;align-items:center;gap:6px;">
-                      <div>
-                        <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">색상</div>
-                        <input type="color" id="style-sub-color" value="#FFFFFF" oninput="updateCanvas()" style="width:36px;height:28px;border:none;background:none;cursor:pointer;padding:0;">
-                      </div>
-                    </div>
-                    <div>
-                      <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">하단 여백 <span id="lbl-sub-y">20</span>px</div>
-                      <input type="range" id="style-sub-y" min="5" max="120" value="20" oninput="document.getElementById('lbl-sub-y').textContent=this.value;" style="width:100%;">
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 배경 이미지 -->
-                <div style="background:var(--surface2);border-radius:6px;padding:8px;">
-                  <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px;">배경 이미지</div>
-                  <select id="render-bg-image" onchange="onBgImageChange()" style="width:100%;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;">
-                    <option value="">단색 배경 (템플릿 색상)</option>
-                  </select>
-                </div>
-
-                <!-- 템플릿 + 버튼 -->
-                <div style="display:flex;align-items:center;gap:6px;">
-                  <select id="render-template" onchange="updateCanvas()" style="padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;flex:1;">
-                    <option value="1">① 다크 계열</option>
-                    <option value="2">② 미니멀 흰배경</option>
-                    <option value="3">③ 네이비/포인트</option>
-                  </select>
-                  <button onclick="runRender()" style="padding:7px 14px;background:var(--accent);color:#000;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;white-space:nowrap;">▶ 렌더링</button>
-                </div>
-                <div id="render-status" style="font-size:11px;color:var(--muted);"></div>
-              </div>
-            </div>
-          </div>
+        <div class="list-body" id="raws-items">
+          <div class="empty-state"><div class="e-icon">🎞</div><p>영상 편집을<br>먼저 실행하세요</p></div>
         </div>
-
       </div>
 
-      <!-- ── 완성 쇼츠 탭 ── -->
-      <div id="panel-shorts" style="display:none;flex:1;overflow:hidden;">
-        <!-- 쇼츠 목록 -->
-        <div class="shorts-list">
-          <div class="shorts-list-header">
-            완성 쇼츠
-            <span class="shorts-count" id="shorts-count">0</span>
-            <button onclick="refreshFiles()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;" title="새로고침">↻</button>
-          </div>
-          <div id="shorts-items">
-            <div class="empty-state">
-              <div class="e-icon">🎬</div>
-              <p>아직 생성된 쇼츠가 없어요.<br>영상 편집 후 렌더링하세요.</p>
-            </div>
+      <!-- 플레이어 + 렌더 -->
+      <div class="player-zone">
+        <div class="player-wrap" style="flex:1;">
+          <video id="raw-video" controls style="display:none;width:100%;height:100%;object-fit:contain;background:#000;"></video>
+          <div class="player-empty" id="raw-player-empty">
+            <div class="icon">▶</div>
+            <p>왼쪽에서 영상을 선택하세요</p>
           </div>
         </div>
 
-        <!-- 플레이어 -->
-        <div class="player-area">
-          <div class="player-wrap">
-            <video id="main-video" controls></video>
-            <div class="player-empty" id="player-empty">
-              <div class="icon">▶</div>
-              <p>왼쪽 목록에서<br>쇼츠를 선택하세요</p>
+        <!-- 렌더 패널 -->
+        <div class="render-panel" id="render-panel">
+          <div class="render-inner">
+
+            <!-- 캔버스 미리보기 -->
+            <div class="canvas-side">
+              <span class="canvas-label">미리보기</span>
+              <div class="canvas-wrap">
+                <video id="raw-video-hidden" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;opacity:0;pointer-events:none;"></video>
+                <canvas id="preview-canvas" width="120" height="214"></canvas>
+              </div>
+              <button class="preview-btn" id="btn-frame-preview" onclick="runFramePreview()">🔍 정밀 미리보기</button>
+            </div>
+
+            <!-- 컨트롤 -->
+            <div class="controls-side">
+              <div class="ctrl-file-tag">선택: <span id="render-filename"></span></div>
+
+              <!-- 제목 -->
+              <div class="ctrl-section">
+                <div class="ctrl-section-title">제목</div>
+                <div class="ctrl-row">
+                  <input type="color" id="style-title1-color" value="#FFD700" oninput="updateCanvas()" class="ctrl-color">
+                  <input id="render-title1" type="text" maxlength="30" placeholder="1줄 텍스트" oninput="updateCanvas()" class="ctrl-input">
+                </div>
+                <div class="ctrl-row">
+                  <input type="color" id="style-title2-color" value="#FFFFFF" oninput="updateCanvas()" class="ctrl-color">
+                  <input id="render-title2" type="text" maxlength="30" placeholder="2줄 텍스트" oninput="updateCanvas()" class="ctrl-input">
+                </div>
+                <div class="ctrl-row">
+                  <div class="ctrl-col">
+                    <div class="ctrl-label">Y 위치 <span id="lbl-title-y">0</span>px</div>
+                    <input type="range" id="style-title-y" min="-150" max="150" value="0" oninput="document.getElementById('lbl-title-y').textContent=this.value;updateCanvas();" class="ctrl-range">
+                  </div>
+                  <div class="ctrl-col">
+                    <div class="ctrl-label">크기 <span id="lbl-title-size">1.0</span>×</div>
+                    <input type="range" id="style-title-size" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('lbl-title-size').textContent=parseFloat(this.value).toFixed(2);updateCanvas();" class="ctrl-range">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 자막 -->
+              <div class="ctrl-section">
+                <div class="ctrl-row" style="align-items:center;">
+                  <div class="ctrl-section-title">자막</div>
+                  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+                    <button onclick="openSrtEditor()" style="padding:4px 10px;background:var(--s1);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:10px;cursor:pointer;font-family:inherit;">✏️ 편집</button>
+                    <label class="ctrl-checkbox">
+                      <input type="checkbox" id="render-subtitles">자동 삽입
+                    </label>
+                  </div>
+                </div>
+                <div class="ctrl-row">
+                  <div class="ctrl-col">
+                    <div class="ctrl-label">크기 <span id="lbl-sub-size">52</span>px</div>
+                    <input type="range" id="style-sub-size" min="16" max="80" value="52" oninput="document.getElementById('lbl-sub-size').textContent=this.value;updateCanvas();" class="ctrl-range">
+                  </div>
+                  <div class="ctrl-col">
+                    <div class="ctrl-label">하단 여백 <span id="lbl-sub-y">20</span>px</div>
+                    <input type="range" id="style-sub-y" min="5" max="120" value="20" oninput="document.getElementById('lbl-sub-y').textContent=this.value;" class="ctrl-range">
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+                    <div class="ctrl-label">색상</div>
+                    <input type="color" id="style-sub-color" value="#FFFFFF" oninput="updateCanvas()" class="ctrl-color">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 배경 + 템플릿 -->
+              <div class="ctrl-section">
+                <div class="ctrl-section-title">배경 / 템플릿</div>
+                <select id="render-bg-image" onchange="onBgImageChange()" class="ctrl-select">
+                  <option value="">단색 배경 (템플릿)</option>
+                </select>
+                <select id="render-template" onchange="updateCanvas()" class="ctrl-select">
+                  <option value="1">① 다크 계열</option>
+                  <option value="2">② 미니멀 흰배경</option>
+                  <option value="3">③ 네이비/포인트</option>
+                </select>
+              </div>
+
+              <!-- 렌더 실행 -->
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <button onclick="runRender()" class="render-btn">▶ 렌더링</button>
+                <div id="render-status" class="render-status"></div>
+              </div>
+
             </div>
           </div>
         </div>
       </div>
-
     </div>
+
+    <!-- 완성 쇼츠 탭 -->
+    <div class="tab-content" id="panel-shorts" style="display:none;">
+      <div class="video-list">
+        <div class="list-header">
+          완성 쇼츠
+          <span class="list-count" id="shorts-count">0</span>
+          <button class="list-refresh" onclick="refreshFiles()" title="새로고침">↻</button>
+        </div>
+        <div class="list-body" id="shorts-items">
+          <div class="empty-state">
+            <div class="e-icon">🎬</div>
+            <p>아직 생성된 쇼츠가 없어요.<br>렌더링을 먼저 실행하세요.</p>
+          </div>
+        </div>
+      </div>
+      <div class="player-zone">
+        <div class="player-wrap">
+          <video id="main-video" controls style="max-width:100%;max-height:100%;"></video>
+          <div class="player-empty" id="player-empty">
+            <div class="icon">▶</div>
+            <p>왼쪽 목록에서<br>쇼츠를 선택하세요</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── 오른쪽 패널 ── -->
   <div class="right-panel">
-    <div class="panel-header">상세 정보</div>
-    <div class="right-scroll">
+    <div class="rp-header">상세 정보</div>
+    <div class="rp-body">
 
-      <div class="right-section">
-        <div class="right-label">제목 <span id="title-saved" style="color:var(--success);font-size:10px;display:none;">✓ 저장됨</span></div>
+      <div class="rp-section">
+        <div class="rp-label">
+          제목
+          <span id="title-saved" style="color:var(--success);font-size:10px;display:none;">✓ 저장됨</span>
+        </div>
         <textarea
           id="detail-title"
+          class="rp-textarea"
           rows="3"
           placeholder="쇼츠를 선택하면 제목이 표시됩니다"
-          style="
-            width:100%;
-            background:var(--surface2);
-            border:1px solid var(--border);
-            border-radius:8px;
-            padding:10px 12px;
-            color:var(--text);
-            font-family:'Noto Sans KR',sans-serif;
-            font-size:13px;
-            line-height:1.6;
-            resize:vertical;
-            outline:none;
-            transition:border-color .2s;
-          "
           oninput="onTitleInput()"
         ></textarea>
-        <button
-          id="title-save-btn"
-          onclick="saveTitle()"
-          style="
-            display:none;
-            margin-top:6px;
-            width:100%;
-            padding:7px 0;
-            background:var(--accent);
-            color:#000;
-            border:none;
-            border-radius:7px;
-            font-family:'Noto Sans KR',sans-serif;
-            font-weight:700;
-            font-size:12px;
-            cursor:pointer;
-          "
-        >저장 (재편집 시 반영)</button>
+        <button id="title-save-btn" class="rp-save-btn" onclick="saveTitle()">저장 (재편집 시 반영)</button>
       </div>
 
-      <div class="right-section">
-        <div class="right-label">편집 구간 타임라인</div>
+      <div class="rp-section">
+        <div class="rp-label">편집 구간 타임라인</div>
         <div id="detail-timeline">
           <div class="empty-state"><p>쇼츠를 선택하면<br>타임라인이 표시됩니다.</p></div>
         </div>
@@ -877,7 +922,6 @@ function updateStatusUI(s) {
   msg.textContent = s.message || '대기 중';
   fill.style.width = s.progress + '%';
 
-  // 파이프라인 실행 중엔 step 버튼 비활성화
   document.querySelectorAll('.step-btn.primary').forEach(btn => {
     btn.disabled = running;
     btn.style.opacity = running ? '0.45' : '';
@@ -893,8 +937,6 @@ function _renderStepList(elId, items, nextSet) {
   }
   el.innerHTML = items.map(name => {
     const advanced = nextSet && nextSet.has(name);
-    // advanced = 다음 단계까지 완료 → 초록 ✓
-    // not advanced = 이 단계에만 있음 → 흰색 (대기 중)
     return `<div class="sfl-item${advanced ? ' done' : ''}" title="${name}">${advanced ? '✓ ' : '· '}${name}</div>`;
   }).join('');
 }
@@ -953,8 +995,6 @@ function renderShortsList(shorts) {
       </div>
     </div>
   `).join('');
-
-  // 전역에 저장
   window._shorts = shorts;
 }
 
@@ -962,25 +1002,17 @@ function selectShort(idx) {
   const shorts = window._shorts || [];
   const s = shorts[idx];
   if (!s) return;
-
-  // 선택 표시
   document.querySelectorAll('.short-item').forEach(el => el.classList.remove('selected'));
   const el = document.getElementById(`si-${idx}`);
   if (el) el.classList.add('selected');
-
-  // 플레이어
   const vid = document.getElementById('main-video');
   const empty = document.getElementById('player-empty');
   vid.src = s.url;
   vid.style.display = 'block';
   empty.style.display = 'none';
-
-  // 우측 패널
   document.getElementById('detail-title').value = s.title || '';
   document.getElementById('title-save-btn').style.display = 'none';
   document.getElementById('title-saved').style.display = 'none';
-
-  // 타임라인
   const tl = document.getElementById('detail-timeline');
   if (s.candidates && s.candidates.length) {
     tl.innerHTML = s.candidates.map((c, i) => `
@@ -1044,13 +1076,13 @@ function showToast(msg, type='info') {
   if (existing) existing.remove();
   const toast = document.createElement('div');
   toast.id = 'pipeline-toast';
-  const color = type === 'error' ? '#e55' : 'var(--accent)';
+  const color = type === 'error' ? 'var(--error)' : 'var(--accent)';
   toast.style.cssText = `
     position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-    background:var(--surface);border:1px solid ${color};color:${color};
-    padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;
-    z-index:9998;box-shadow:0 4px 16px rgba(0,0,0,0.4);
-    animation:fadeIn .2s ease;
+    background:var(--s2);border:1px solid ${color};color:${color};
+    padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;
+    z-index:9998;box-shadow:0 8px 24px rgba(0,0,0,0.5);
+    animation:fadeIn .2s ease;white-space:nowrap;
   `;
   toast.textContent = msg;
   document.body.appendChild(toast);
@@ -1062,27 +1094,18 @@ async function runCollect() {
   const btn = event?.target;
   await _pipelinePost('/api/collect', { clear_existing: clear }, btn);
 }
-
-async function runTranscribe() {
-  await _pipelinePost('/api/transcribe', null, event?.target);
-}
-
-async function runAnalyze() {
-  await _pipelinePost('/api/analyze', null, event?.target);
-}
-
-async function runEdit() {
-  await _pipelinePost('/api/edit', { template_id: 1 }, event?.target);
-}
+async function runTranscribe() { await _pipelinePost('/api/transcribe', null, event?.target); }
+async function runAnalyze()    { await _pipelinePost('/api/analyze', null, event?.target); }
+async function runEdit()       { await _pipelinePost('/api/edit', { template_id: 1 }, event?.target); }
 
 // ── 탭 전환 ───────────────────────────────────────────────
 function switchTab(tab) {
   document.getElementById('panel-raws').style.display   = tab === 'raws'   ? 'flex' : 'none';
   document.getElementById('panel-shorts').style.display = tab === 'shorts' ? 'flex' : 'none';
-  document.getElementById('tab-raws').style.background   = tab === 'raws'   ? 'var(--accent)' : 'var(--surface2)';
-  document.getElementById('tab-raws').style.color        = tab === 'raws'   ? '#000' : 'var(--muted)';
-  document.getElementById('tab-shorts').style.background = tab === 'shorts' ? 'var(--accent)' : 'var(--surface2)';
-  document.getElementById('tab-shorts').style.color      = tab === 'shorts' ? '#000' : 'var(--muted)';
+  const rBtn = document.getElementById('tab-raws');
+  const sBtn = document.getElementById('tab-shorts');
+  rBtn.className = 'tab-btn' + (tab === 'raws'   ? ' active' : '');
+  sBtn.className = 'tab-btn' + (tab === 'shorts' ? ' active' : '');
   if (tab === 'raws')   loadRaws();
   if (tab === 'shorts') loadShorts();
 }
@@ -1100,9 +1123,11 @@ async function loadRaws() {
     return;
   }
   container.innerHTML = _raws.map((r, i) => `
-    <div class="short-item" id="ri-${i}" onclick="selectRaw(${i})" style="cursor:pointer;padding:10px 12px;border-bottom:1px solid var(--border);">
-      <div class="short-title" style="font-size:12px;font-weight:600;">${r.title}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:2px;">${r.filename} · ${r.category}</div>
+    <div class="short-item" id="ri-${i}" onclick="selectRaw(${i})">
+      <div class="short-info" style="padding:2px 0;">
+        <div class="vi-title">${r.title}</div>
+        <div class="vi-sub">${r.filename} · ${r.category}</div>
+      </div>
     </div>
   `).join('');
 }
@@ -1124,7 +1149,6 @@ async function loadBackgrounds() {
     const d = await r.json();
     _availableBgs = d.backgrounds || [];
     const sel = document.getElementById('render-bg-image');
-    // 기존 옵션(단색)은 유지하고 이미지 옵션 추가
     sel.innerHTML = '<option value="">단색 배경 (템플릿 색상)</option>';
     _availableBgs.forEach(name => {
       const opt = document.createElement('option');
@@ -1136,15 +1160,11 @@ async function loadBackgrounds() {
 }
 
 function onBgImageChange() {
-  // canvas에서 선택된 배경 이미지 미리 로드
   const sel = document.getElementById('render-bg-image').value;
   if (sel) _loadBgImage(sel);
   updateCanvas();
 }
-
-function getSelectedBgImage() {
-  return document.getElementById('render-bg-image')?.value || null;
-}
+function getSelectedBgImage() { return document.getElementById('render-bg-image')?.value || null; }
 
 // ── raw 영상 선택 ─────────────────────────────────────────
 function selectRaw(idx) {
@@ -1155,18 +1175,15 @@ function selectRaw(idx) {
   _selectedRaw = _raws[idx];
   const r = _selectedRaw;
 
-  // 실제 재생용 video (player-wrap 안)
   const vid = document.getElementById('raw-video');
   vid.src = r.url;
   vid.style.display = 'block';
   document.getElementById('raw-player-empty').style.display = 'none';
 
-  // canvas 피드용 hidden video
   const hidVid = document.getElementById('raw-video-hidden');
   hidVid.src = r.url;
   hidVid.muted = true;
 
-  // 렌더링 패널 표시
   document.getElementById('render-panel').style.display = 'block';
   document.getElementById('render-filename').textContent = r.filename;
   const parts = r.title.split(' / ');
@@ -1174,46 +1191,34 @@ function selectRaw(idx) {
   document.getElementById('render-title2').value = parts[1] || '';
   document.getElementById('render-status').textContent = '';
 
-  // 카테고리에 맞는 배경 이미지 자동 선택
   const sel = document.getElementById('render-bg-image');
   if (sel && _availableBgs.includes(r.category)) {
     sel.value = r.category;
     _loadBgImage(r.category);
-  } else if (sel) {
-    sel.value = '';
-  }
+  } else if (sel) { sel.value = ''; }
 
-  // hidden video 로드 후 canvas 루프 시작
-  hidVid.onloadeddata = () => {
-    hidVid.play().catch(() => {});
-    startCanvasLoop();
-  };
+  hidVid.onloadeddata = () => { hidVid.play().catch(() => {}); startCanvasLoop(); };
 }
 
 // ── Canvas 실시간 드로우 ──────────────────────────────────
-const CV_W = 135, CV_H = 240;
+const CV_W = 120, CV_H = 214;
 const FULL_W = 1080, FULL_H = 1920;
 const VID_H_FULL = 810, VID_Y_FULL = 555;
 const SCALE = CV_W / FULL_W;
 const VID_Y_PX = Math.round(VID_Y_FULL * SCALE);
 const VID_H_PX = Math.round(VID_H_FULL * SCALE);
 
-// 카테고리별 배경 이미지 캐시 (URL → Image 객체)
 const _bgImgCache = {};
 function _loadBgImage(category) {
   if (_bgImgCache[category]) return _bgImgCache[category];
   const img = new Image();
   img.src = `/static/backgrounds/${category}.png`;
   img.onload  = () => { _bgImgCache[category] = img; };
-  img.onerror = () => { _bgImgCache[category] = null; };  // 이미지 없음
-  _bgImgCache[category] = img;  // 로딩 중 객체도 저장
+  img.onerror = () => { _bgImgCache[category] = null; };
+  _bgImgCache[category] = img;
   return img;
 }
-
-// 카테고리 선택 시 미리 로드
-function _prefetchBgImages() {
-  ['sports','economy','politics'].forEach(_loadBgImage);
-}
+function _prefetchBgImages() { ['sports','economy','politics'].forEach(_loadBgImage); }
 _prefetchBgImages();
 
 function startCanvasLoop() {
@@ -1228,7 +1233,6 @@ function startCanvasLoop() {
     const cat = _selectedRaw?.category || 'economy';
     const colors = (TMPL_COLORS[cat] || TMPL_COLORS.economy)[tmplId] || {bg:'#0a0f0a', div:'#00E676'};
 
-    // 배경: 드롭다운 선택 우선, 없으면 카테고리 자동
     const selectedBg = document.getElementById('render-bg-image')?.value || '';
     const bgKey = selectedBg || cat;
     const bgImg = _bgImgCache[bgKey];
@@ -1239,17 +1243,12 @@ function startCanvasLoop() {
       ctx.fillRect(0, 0, CV_W, CV_H);
     }
 
-    // 영상 프레임 (video 영역만)
-    if (vid.readyState >= 2) {
-      ctx.drawImage(vid, 0, VID_Y_PX, CV_W, VID_H_PX);
-    }
+    if (vid.readyState >= 2) ctx.drawImage(vid, 0, VID_Y_PX, CV_W, VID_H_PX);
 
-    // 구분선
     ctx.fillStyle = colors.div;
     ctx.fillRect(0, VID_Y_PX, CV_W, Math.max(1, Math.round(4 * SCALE)));
     ctx.fillRect(0, VID_Y_PX + VID_H_PX - Math.max(1, Math.round(4 * SCALE)), CV_W, Math.max(1, Math.round(4 * SCALE)));
 
-    // 제목
     const t1 = document.getElementById('render-title1')?.value || '';
     const t2 = document.getElementById('render-title2')?.value || '';
     const c1 = document.getElementById('style-title1-color')?.value || '#FFD700';
@@ -1259,10 +1258,7 @@ function startCanvasLoop() {
     const lines = [t1, t2].filter(l => l.trim());
     if (lines.length) drawTitleCanvas(ctx, lines, [c1, c2], yExtra, sizeScale);
 
-    // 자막 샘플
-    if (document.getElementById('render-subtitles')?.checked) {
-      drawSubSample(ctx, colors);
-    }
+    if (document.getElementById('render-subtitles')?.checked) drawSubSample(ctx, colors);
 
     _canvasRafId = requestAnimationFrame(draw);
   }
@@ -1279,7 +1275,6 @@ function drawTitleCanvas(ctx, lines, colors, yExtra, sizeScale) {
   const lineH = sz + Math.round(20 * SCALE);
   const yCenter = Math.round((VID_Y_FULL / 2 + 140 + yExtra) * SCALE);
   const startY  = yCenter - (lines.length * lineH) / 2;
-
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   lines.forEach((line, i) => {
@@ -1291,69 +1286,54 @@ function drawTitleCanvas(ctx, lines, colors, yExtra, sizeScale) {
     ctx.fillStyle = colors[i] || '#FFFFFF';
     ctx.fillText(line, CV_W / 2, startY + i * lineH);
   });
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 }
 
 function drawSubSample(ctx, colors) {
-  const sz = Math.round(parseInt(document.getElementById('style-sub-size')?.value || 28) * SCALE);
+  const sz = Math.round(parseInt(document.getElementById('style-sub-size')?.value || 52) * SCALE);
   const marginV = Math.round(parseInt(document.getElementById('style-sub-y')?.value || 20) * SCALE);
-  const color   = document.getElementById('style-sub-color')?.value || '#FFFFFF';
-  const y = CV_H - VID_Y_PX - marginV - sz - 4;  // video 영역 하단 기준
+  const color = document.getElementById('style-sub-color')?.value || '#FFFFFF';
   const sampleY = VID_Y_PX + VID_H_PX - marginV - sz - 4;
-
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.font = `bold ${sz}px 'Malgun Gothic', sans-serif`;
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  const tw = ctx.measureText('자막 샘플 텍스트').width + 8;
+  const tw = ctx.measureText('자막 샘플').width + 8;
   ctx.fillRect(CV_W/2 - tw/2, sampleY - 2, tw, sz + 4);
-  ctx.shadowColor = 'rgba(0,0,0,0.9)';
-  ctx.shadowBlur = 2;
+  ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 2;
   ctx.fillStyle = color;
-  ctx.fillText('자막 샘플 텍스트', CV_W/2, sampleY);
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
+  ctx.fillText('자막 샘플', CV_W/2, sampleY);
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 }
 
-function updateCanvas() { /* RAF 루프가 자동으로 반영 */ }
+function updateCanvas() { /* RAF 루프가 자동 반영 */ }
 
-// ── 정밀 미리보기 (FFmpeg 1-frame PNG) ───────────────────
+// ── 정밀 미리보기 ─────────────────────────────────────────
 async function runFramePreview() {
   const filename = document.getElementById('render-filename').textContent.trim();
   if (!filename) { showToast('먼저 왼쪽에서 영상을 선택하세요', 'error'); return; }
   const btn = document.getElementById('btn-frame-preview');
-  btn.textContent = '생성 중...';
-  btn.disabled = true;
+  btn.textContent = '생성 중...'; btn.disabled = true;
   try {
     const resp = await fetch('/api/preview', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        filename,
-        title: getTitle(),
-        style: getStyleParams(),
-        seek: 2.0,
-        bg_image: getSelectedBgImage() || null,
-      })
+      body: JSON.stringify({ filename, title: getTitle(), style: getStyleParams(), seek: 2.0, bg_image: getSelectedBgImage() || null })
     });
     if (!resp.ok) throw new Error(await resp.text());
     const blob = await resp.blob();
     const url  = URL.createObjectURL(blob);
     const modal = document.createElement('div');
-    modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer;';
-    modal.title = '클릭하면 닫힙니다';
+    modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer;';
     modal.onclick = () => { modal.remove(); URL.revokeObjectURL(url); };
     const img = document.createElement('img');
     img.src = url;
-    img.style = 'max-height:92vh;max-width:92vw;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.8);';
+    img.style = 'max-height:92vh;max-width:92vw;border-radius:12px;box-shadow:0 16px 64px rgba(0,0,0,0.8);';
     modal.appendChild(img);
     document.body.appendChild(modal);
   } catch(e) {
-    alert('미리보기 오류: ' + e.message);
+    showToast('미리보기 오류: ' + e.message, 'error');
   } finally {
-    btn.textContent = '🔍 정밀 미리보기';
-    btn.disabled = false;
+    btn.textContent = '🔍 정밀 미리보기'; btn.disabled = false;
   }
 }
 
@@ -1362,14 +1342,13 @@ function getTitle() {
   const t2 = document.getElementById('render-title2').value.trim();
   return t1 && t2 ? `${t1}\n${t2}` : (t1 || t2 || '');
 }
-
 function getStyleParams() {
   return {
     title1_color:         document.getElementById('style-title1-color').value,
     title2_color:         document.getElementById('style-title2-color').value,
     title_y_extra:        parseInt(document.getElementById('style-title-y').value) || 0,
     title_fontsize_scale: parseFloat(document.getElementById('style-title-size').value) || 1.0,
-    sub_fontsize:         parseInt(document.getElementById('style-sub-size').value) || 28,
+    sub_fontsize:         parseInt(document.getElementById('style-sub-size').value) || 52,
     sub_color:            document.getElementById('style-sub-color').value,
     sub_margin_v:         parseInt(document.getElementById('style-sub-y').value) || 20,
   };
@@ -1381,7 +1360,6 @@ async function runRender() {
   const subtitles = document.getElementById('render-subtitles').checked;
   const tid       = parseInt(document.getElementById('render-template').value) || 1;
   if (!filename) return;
-
   document.getElementById('render-status').textContent = '렌더링 요청 중...';
   const r = await fetch('/api/render', {
     method: 'POST',
@@ -1389,7 +1367,7 @@ async function runRender() {
     body: JSON.stringify({ filename, title: getTitle(), subtitles, template_id: tid, style: getStyleParams(), bg_image: getSelectedBgImage() || null })
   });
   if (r.ok) {
-    document.getElementById('render-status').textContent = '✓ 렌더링 시작됨 — 완성 쇼츠 탭에서 확인하세요';
+    document.getElementById('render-status').textContent = '✓ 렌더링 시작됨';
     startPolling();
   } else {
     document.getElementById('render-status').textContent = '오류가 발생했습니다.';
@@ -1408,39 +1386,28 @@ async function saveTitle() {
     return el && el.classList.contains('selected');
   });
   if (!selected) return;
-
   const newTitle = document.getElementById('detail-title').value.trim();
   if (!newTitle) return;
-
   const r = await fetch('/api/update-title', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ filename: selected.filename, intro_text: newTitle })
   });
-
   if (r.ok) {
-    // 로컬 캐시도 업데이트
     selected.title = newTitle;
     const idx = shorts.indexOf(selected);
     const titleEl = document.querySelector(`#si-${idx} .short-title`);
     if (titleEl) titleEl.textContent = newTitle;
-
     document.getElementById('title-save-btn').style.display = 'none';
     document.getElementById('title-saved').textContent = '✓ 저장됨 — 재렌더링 중...';
     document.getElementById('title-saved').style.display = 'inline';
-
-    // 저장 후 재렌더링 자동 실행
-    const tid = parseInt(document.getElementById('template-select').value) || 1;
+    const tid = parseInt(document.getElementById('render-template')?.value) || 1;
     const rr = await fetch('/api/rerender', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ template_id: tid })
     });
-
-    if (rr.ok) {
-      document.getElementById('title-saved').textContent = '✓ 재렌더링 시작됨';
-      startPolling();
-    }
+    if (rr.ok) { document.getElementById('title-saved').textContent = '✓ 재렌더링 시작됨'; startPolling(); }
   }
 }
 
@@ -1458,84 +1425,60 @@ let _srtStem = null;
 
 async function openSrtEditor() {
   const filename = document.getElementById('render-filename').textContent.trim();
-  if (!filename) { alert('먼저 영상을 선택하세요.'); return; }
-
+  if (!filename) { showToast('먼저 영상을 선택하세요.', 'error'); return; }
   _srtStem = filename.replace('_raw.mp4', '');
   const btn = event.target;
-  btn.textContent = '로딩 중...';
-  btn.disabled = true;
-
+  btn.textContent = '로딩 중...'; btn.disabled = true;
   try {
     const r = await fetch(`/api/srt/${_srtStem}`);
-    if (!r.ok) {
-      const msg = await r.text();
-      throw new Error(msg);
-    }
+    if (!r.ok) throw new Error(await r.text());
     const data = await r.json();
     renderSrtModal(data.entries);
   } catch(e) {
-    alert('자막 불러오기 실패: ' + e.message);
+    showToast('자막 불러오기 실패: ' + e.message, 'error');
   } finally {
-    btn.textContent = '✏️ 자막 편집';
-    btn.disabled = false;
+    btn.textContent = '✏️ 편집'; btn.disabled = false;
   }
 }
 
 function renderSrtModal(entries) {
   const existing = document.getElementById('srt-modal');
   if (existing) existing.remove();
-
   const modal = document.createElement('div');
   modal.id = 'srt-modal';
-  modal.style.cssText = `
-    position:fixed;inset:0;background:rgba(0,0,0,0.75);
-    display:flex;align-items:center;justify-content:center;z-index:9999;
-  `;
-
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
   const panel = document.createElement('div');
   panel.style.cssText = `
-    background:var(--surface);border-radius:10px;padding:0;
+    background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:0;
     width:560px;max-width:95vw;max-height:88vh;
     display:flex;flex-direction:column;overflow:hidden;
-    box-shadow:0 12px 48px rgba(0,0,0,0.6);
+    box-shadow:0 24px 80px rgba(0,0,0,0.7);
   `;
-
-  // 헤더
   const header = document.createElement('div');
-  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0;';
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0;';
   header.innerHTML = `
     <div style="font-size:14px;font-weight:700;color:var(--text);">자막 편집</div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <button onclick="addSrtEntry()" style="padding:5px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;cursor:pointer;">+ 추가</button>
-      <button onclick="saveSrt()" style="padding:5px 14px;background:var(--accent);color:#000;border:none;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">저장</button>
-      <button onclick="document.getElementById('srt-modal').remove()" style="padding:5px 10px;background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:12px;cursor:pointer;">✕</button>
+      <button onclick="addSrtEntry()" style="padding:6px 14px;background:var(--s3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;cursor:pointer;font-family:inherit;">+ 추가</button>
+      <button onclick="saveSrt()" style="padding:6px 16px;background:var(--accent-g);background:linear-gradient(135deg,#7c5cfc,#5c9afc);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;">저장</button>
+      <button onclick="document.getElementById('srt-modal').remove()" style="padding:6px 10px;background:none;border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:13px;cursor:pointer;">✕</button>
     </div>
   `;
-
-  // 안내
   const hint = document.createElement('div');
-  hint.style.cssText = 'padding:8px 18px;font-size:11px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0;';
-  hint.textContent = '시간 형식: 00:00:00,000 --> 00:00:00,000 / 텍스트 수정 후 저장하면 다음 렌더링에 반영됩니다.';
-
-  // 엔트리 목록
+  hint.style.cssText = 'padding:8px 20px;font-size:11px;color:var(--muted);background:var(--s2);border-bottom:1px solid var(--border);flex-shrink:0;';
+  hint.textContent = '시간 형식: 00:00:00,000 --> 00:00:00,000 / 텍스트 수정 후 저장';
   const list = document.createElement('div');
   list.id = 'srt-entry-list';
-  list.style.cssText = 'overflow-y:auto;flex:1;padding:12px 18px;display:flex;flex-direction:column;gap:8px;';
-
+  list.style.cssText = 'overflow-y:auto;flex:1;padding:14px 20px;display:flex;flex-direction:column;gap:8px;';
   entries.forEach((e, i) => list.appendChild(makeSrtEntry(e, i)));
-
-  // 저장 상태
   const status = document.createElement('div');
   status.id = 'srt-save-status';
-  status.style.cssText = 'padding:8px 18px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);flex-shrink:0;min-height:28px;';
-
+  status.style.cssText = 'padding:10px 20px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);flex-shrink:0;min-height:36px;';
   panel.appendChild(header);
   panel.appendChild(hint);
   panel.appendChild(list);
   panel.appendChild(status);
   modal.appendChild(panel);
-
-  // 모달 바깥 클릭 시 닫기
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   document.body.appendChild(modal);
 }
@@ -1544,19 +1487,16 @@ function makeSrtEntry(entry, idx) {
   const div = document.createElement('div');
   div.className = 'srt-entry';
   div.dataset.idx = idx;
-  div.style.cssText = 'background:var(--surface2);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;position:relative;';
   div.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;">
       <span style="font-size:10px;color:var(--muted);min-width:16px;">${entry.index}</span>
       <input class="srt-times" value="${entry.times}"
-        style="flex:1;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;
-               color:var(--muted);font-size:11px;font-family:monospace;">
+        style="flex:1;padding:5px 8px;background:var(--s1);border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:11px;font-family:monospace;outline:none;">
       <button onclick="this.closest('.srt-entry').remove()" title="삭제"
-        style="padding:2px 8px;background:none;border:1px solid var(--border);border-radius:5px;color:#e55;font-size:12px;cursor:pointer;flex-shrink:0;">✕</button>
+        style="padding:3px 8px;background:none;border:1px solid var(--border2);border-radius:6px;color:var(--error);font-size:12px;cursor:pointer;flex-shrink:0;">✕</button>
     </div>
     <textarea class="srt-text" rows="2"
-      style="width:100%;padding:6px 8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;
-             color:var(--text);font-size:13px;resize:vertical;box-sizing:border-box;">${entry.text}</textarea>
+      style="width:100%;padding:7px 8px;background:var(--s1);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;outline:none;">${entry.text}</textarea>
   `;
   return div;
 }
@@ -1591,11 +1531,11 @@ async function saveSrt() {
       body: JSON.stringify({ stem: _srtStem, entries }),
     });
     if (!r.ok) throw new Error(await r.text());
-    status.textContent = `✓ ${entries.length}개 저장 완료 — 렌더링 시 적용됩니다.`;
-    status.style.color = 'var(--accent)';
+    status.textContent = `✓ ${entries.length}개 저장 완료`;
+    status.style.color = 'var(--success)';
   } catch(e) {
     status.textContent = '저장 실패: ' + e.message;
-    status.style.color = '#e55';
+    status.style.color = 'var(--error)';
   }
 }
 </script>

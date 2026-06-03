@@ -3,9 +3,16 @@
 import os
 import json
 import subprocess
-import requests
+import sys
 import cv2
+
+os.environ["GLOG_minloglevel"] = "3"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import mediapipe as mp
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from llm.gemini_client import call_gemini
 
 # local/editor/ → local/ → edit_tool/
 LOCAL_DIR     = os.path.dirname(os.path.dirname(__file__))
@@ -36,9 +43,6 @@ MIN_SEGMENT_SEC    = 5
 MAX_TOTAL_SEC      = 120
 FACE_SAMPLE_FRAMES = 10
 
-OLLAMA_URL   = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "gemma3:27b"
-
 _SUBTITLE_PROMPT = """당신은 유튜브 쇼츠 자막 전문가다.
 
 핵심 원칙:
@@ -60,20 +64,12 @@ _SUBTITLE_PROMPT = """당신은 유튜브 쇼츠 자막 전문가다.
 
 
 def _reformat_subtitles_llm(texts: list) -> list:
-    """Whisper 자막 텍스트를 쇼츠용으로 LLM 리포맷. 실패 시 원본 반환."""
+    """Whisper 자막 텍스트를 쇼츠용으로 Gemini 리포맷. 실패 시 원본 반환."""
     if not texts:
         return texts
     try:
         prompt = _SUBTITLE_PROMPT.format(texts=json.dumps(texts, ensure_ascii=False))
-        payload = {
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"num_predict": 1024, "temperature": 0.3},
-        }
-        res = requests.post(OLLAMA_URL, json=payload, timeout=120)
-        res.raise_for_status()
-        raw = res.json()["response"].strip()
+        raw = call_gemini(prompt, max_tokens=1024).strip()
         if "```" in raw:
             raw = raw.split("```")[1]
             if raw.startswith("json"):

@@ -2,7 +2,7 @@
 
 import os
 import json
-import requests
+from llm.gemini_client import call_gemini
 
 # local/llm/ → local/ → edit_tool/
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -10,9 +10,6 @@ TRANSCRIPT_DIR = os.path.join(BASE_DIR, "outputs", "transcripts")
 ANALYSIS_DIR = os.path.join(BASE_DIR, "outputs", "analysis")
 
 os.makedirs(ANALYSIS_DIR, exist_ok=True)
-
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "gemma3:27b"
 
 CATEGORY_PROMPTS = {
     "economy": """
@@ -120,14 +117,7 @@ CHUNK_SUMMARY_PROMPT = """
 class Analyzer:
 
     def __init__(self):
-        self._check_ollama()
-
-    def _check_ollama(self):
-        try:
-            requests.get("http://localhost:11434", timeout=3)
-            print("[Analyzer] Ollama 연결 확인")
-        except Exception:
-            raise RuntimeError("Ollama가 실행중이 아닙니다. 'ollama serve' 먼저 실행하세요.")
+        print("[Analyzer] Gemini API 사용")
 
     def _build_segments_text(self, segments, max_segments=80):
         if len(segments) <= max_segments:
@@ -148,23 +138,9 @@ class Analyzer:
             chunk_text = self._format_segments(chunk)
             prompt = CHUNK_SUMMARY_PROMPT.format(segments_text=chunk_text)
             print(f"  [Analyzer] 청크 {idx+1}/{len(chunks)} 요약 중...")
-            summary = self._call_ollama(prompt, max_tokens=256)
+            summary = call_gemini(prompt, max_tokens=512)
             summaries.append(summary.strip())
         return "\n\n".join(summaries)
-
-    def _call_ollama(self, prompt, max_tokens=512):
-        payload = {
-            "model": MODEL,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "num_predict": max_tokens,
-                "temperature": 0.3
-            }
-        }
-        res = requests.post(OLLAMA_URL, json=payload, timeout=None)
-        res.raise_for_status()
-        return res.json()["response"]
 
     def _parse_response(self, response):
         try:
@@ -239,8 +215,8 @@ class Analyzer:
             segments_text=segments_text,
         )
 
-        max_tokens = 2048 if multi else 1024
-        response = self._call_ollama(prompt, max_tokens=max_tokens)
+        max_tokens = 8192 if multi else 4096
+        response = call_gemini(prompt, max_tokens=max_tokens)
         result = self._parse_response(response)
 
         if not result:

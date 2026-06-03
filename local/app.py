@@ -4,6 +4,12 @@
 import sys
 import os
 
+# MediaPipe / TFLite / gRPC verbose 로그 억제 (import 전에 설정해야 효과 있음)
+os.environ.setdefault("GLOG_minloglevel", "3")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+os.environ.setdefault("GRPC_VERBOSITY", "ERROR")
+os.environ.setdefault("MEDIAPIPE_DISABLE_GPU", "1")
+
 # local 디렉토리를 Python 경로에 추가
 LOCAL_DIR = os.path.dirname(os.path.abspath(__file__))
 if LOCAL_DIR not in sys.path:
@@ -229,6 +235,7 @@ def _run_analyze():
             analyzer.analyze(str(t), category_map[str(t)])
 
         set_status("idle", f"분석 완료 — {len(transcripts)}개", 100)
+        _run_edit_video(template_id=1)
     except Exception as e:
         set_status("error", f"분석 오류: {e}", 0)
 
