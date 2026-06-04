@@ -28,17 +28,17 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 # ── 경로 ──────────────────────────────────────────────────────
-BASE_DIR       = Path(__file__).parent          # local/
-ROOT_DIR       = BASE_DIR.parent                # edit_tool/
-DOWNLOAD_DIR   = ROOT_DIR / "downloads"
-TRANSCRIPT_DIR = ROOT_DIR / "outputs" / "transcripts"
-ANALYSIS_DIR   = ROOT_DIR / "outputs" / "analysis"
-SHORTS_DIR     = ROOT_DIR / "outputs" / "shorts"
-RAW_DIR        = ROOT_DIR / "outputs" / "raw"
-STATIC_DIR     = BASE_DIR / "static"            # local/static (로컬 전용)
-CATEGORY_MAP_PATH = ROOT_DIR / "outputs" / "category_map.json"
+LOCAL_DIR      = Path(__file__).parent          # local/
+DOWNLOAD_DIR   = LOCAL_DIR / "downloads"
+TRANSCRIPT_DIR = LOCAL_DIR / "outputs" / "transcripts"
+ANALYSIS_DIR   = LOCAL_DIR / "outputs" / "analysis"
+SHORTS_DIR     = LOCAL_DIR / "outputs" / "shorts"
+RAW_DIR        = LOCAL_DIR / "outputs" / "raw"
+TEMP_DIR       = LOCAL_DIR / "temp"
+STATIC_DIR     = LOCAL_DIR / "static"           # local/static (배경, 로고)
+CATEGORY_MAP_PATH = LOCAL_DIR / "outputs" / "category_map.json"
 
-for d in [DOWNLOAD_DIR, TRANSCRIPT_DIR, ANALYSIS_DIR, SHORTS_DIR, RAW_DIR, STATIC_DIR]:
+for d in [DOWNLOAD_DIR, TRANSCRIPT_DIR, ANALYSIS_DIR, SHORTS_DIR, RAW_DIR, TEMP_DIR, STATIC_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # ── 파이프라인 임포트 ─────────────────────────────────────────
@@ -53,17 +53,34 @@ app.mount("/raw",    StaticFiles(directory=str(RAW_DIR)),    name="raw")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # ── 진행 상태 관리 ────────────────────────────────────────────
+import time
+
 pipeline_status = {
-    "step":     "idle",   # idle | collecting | transcribing | analyzing | editing | done | error
+    "step":     "idle",   # idle | collecting | transcribing | analyzing | editing | done | error | paused
     "message":  "",
     "progress": 0,        # 0~100
+    "paused":   False,
+    "current_item": "",   # 현재 처리 중인 항목
+    "total_items": 0,
+    "done_items": 0,
 }
 
-def set_status(step, message, progress=0):
+def set_status(step, message, progress=0, current_item="", total_items=0, done_items=0):
     pipeline_status["step"]     = step
     pipeline_status["message"]  = message
     pipeline_status["progress"] = progress
+    if current_item:
+        pipeline_status["current_item"] = current_item
+    if total_items:
+        pipeline_status["total_items"] = total_items
+    if done_items is not None:
+        pipeline_status["done_items"] = done_items
     print(f"[{step.upper()}] {message}")
+
+def check_paused():
+    """일시 중지 상태면 대기, 재개되면 계속 진행"""
+    while pipeline_status["paused"]:
+        time.sleep(0.5)
 
 # ── 헬퍼 ─────────────────────────────────────────────────────
 def load_category_map() -> dict:
@@ -86,7 +103,7 @@ def archive_shorts():
     shorts = list(SHORTS_DIR.glob("*.mp4"))
     if not shorts:
         return
-    archive_dir = BASE_DIR / "outputs" / "archive" / datetime.now().strftime("%Y%m%d")
+    archive_dir = LOCAL_DIR / "outputs" / "archive" / datetime.now().strftime("%Y%m%d")
     archive_dir.mkdir(parents=True, exist_ok=True)
     for f in shorts:
         shutil.move(str(f), str(archive_dir / f.name))
@@ -137,6 +154,24 @@ def index():
 @app.get("/api/status")
 def get_status():
     return pipeline_status
+
+@app.post("/api/pause")
+def pause_pipeline():
+    if pipeline_status["step"] in ("idle", "done", "error"):
+        raise HTTPException(400, "실행 중인 작업이 없습니다.")
+    pipeline_status["paused"] = True
+    pipeline_status["message"] = "일시 중지됨"
+    print("[PAUSE] 파이프라인 일시 중지")
+    return {"ok": True, "paused": True}
+
+@app.post("/api/resume")
+def resume_pipeline():
+    if not pipeline_status["paused"]:
+        raise HTTPException(400, "일시 중지 상태가 아닙니다.")
+    pipeline_status["paused"] = False
+    pipeline_status["message"] = "재개됨"
+    print("[RESUME] 파이프라인 재개")
+    return {"ok": True, "paused": False}
 
 @app.get("/api/shorts")
 def list_shorts():
@@ -197,13 +232,16 @@ def _run_transcribe():
             set_status("idle", f"모든 자막이 이미 있습니다 ({len(all_videos)}개)", 100)
             return
 
-        set_status("transcribing", f"Whisper 실행 중 ({len(videos)}/{len(all_videos)}개)...", 10)
+        set_status("transcribing", f"Whisper 실행 중 ({len(videos)}/{len(all_videos)}개)...", 10,
+                   total_items=len(videos), done_items=0)
         transcriber = Transcriber()
         for i, v in enumerate(videos):
-            set_status("transcribing", f"자막 생성 중: {v.name}", int(10 + (i / len(videos)) * 85))
+            check_paused()  # 일시 중지 확인
+            set_status("transcribing", f"자막 생성 중: {v.name}", int(10 + (i / len(videos)) * 85),
+                       current_item=v.name, done_items=i)
             transcriber.transcribe(str(v))
 
-        set_status("idle", f"자막 생성 완료 — {len(videos)}개", 100)
+        set_status("idle", f"자막 생성 완료 — {len(videos)}개", 100, done_items=len(videos))
     except Exception as e:
         set_status("error", f"자막 오류: {e}", 0)
 
@@ -228,13 +266,16 @@ def _run_analyze():
             for t in transcripts
         }
 
-        set_status("analyzing", f"LLM 분석 중 (총 {len(transcripts)}개)...", 10)
+        set_status("analyzing", f"LLM 분석 중 (총 {len(transcripts)}개)...", 10,
+                   total_items=len(transcripts), done_items=0)
         analyzer = Analyzer()
         for i, t in enumerate(transcripts):
-            set_status("analyzing", f"분석 중: {t.name}", int((i / len(transcripts)) * 90))
+            check_paused()  # 일시 중지 확인
+            set_status("analyzing", f"분석 중: {t.name}", int((i / len(transcripts)) * 90),
+                       current_item=t.name, done_items=i)
             analyzer.analyze(str(t), category_map[str(t)])
 
-        set_status("idle", f"분석 완료 — {len(transcripts)}개", 100)
+        set_status("idle", f"분석 완료 — {len(transcripts)}개", 100, done_items=len(transcripts))
         _run_edit_video(template_id=1)
     except Exception as e:
         set_status("error", f"분석 오류: {e}", 0)
@@ -276,14 +317,18 @@ def _run_edit_video(template_id: int):
             set_status("error", "분석 결과가 없습니다.", 0)
             return
 
-        set_status("editing", f"영상 편집 중 (총 {len(analyses)}개)...", 10)
+        set_status("editing", f"영상 편집 중 (총 {len(analyses)}개)...", 10,
+                   total_items=len(analyses), done_items=0)
         editor = Editor(template_id=template_id)
         for i, a in enumerate(analyses):
-            set_status("editing", f"영상 편집: {a.name}", int((i / len(analyses)) * 90))
+            check_paused()  # 일시 중지 확인
+            set_status("editing", f"영상 편집: {a.name}", int((i / len(analyses)) * 90),
+                       current_item=a.name, done_items=i)
+            # Stage 1만: raw 영상 생성 (크롭/편집)
             editor.edit_video(str(a))
 
         raws = list(RAW_DIR.glob("*.mp4"))
-        set_status("done", f"영상 편집 완료 — raw {len(raws)}개 생성", 100)
+        set_status("done", f"영상 편집 완료 — raw {len(raws)}개 생성", 100, done_items=len(analyses))
     except Exception as e:
         set_status("error", f"편집 오류: {e}", 0)
 

@@ -5,10 +5,10 @@ import json
 import yt_dlp
 from datetime import datetime
 
-# local/collector/ → local/ → edit_tool/
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
-METADATA_DIR = os.path.join(BASE_DIR, "outputs")
+# local/collector/ → local/
+LOCAL_DIR = os.path.dirname(os.path.dirname(__file__))
+DOWNLOAD_DIR = os.path.join(LOCAL_DIR, "downloads")
+METADATA_DIR = os.path.join(LOCAL_DIR, "outputs")
 
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 os.makedirs(METADATA_DIR, exist_ok=True)

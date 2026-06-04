@@ -13,16 +13,16 @@ import mediapipe as mp
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from llm.gemini_client import call_gemini
+from tts.tts import TTS
 
-# local/editor/ → local/ → edit_tool/
+# local/editor/ → local/
 LOCAL_DIR     = os.path.dirname(os.path.dirname(__file__))
-BASE_DIR      = os.path.dirname(LOCAL_DIR)
-DOWNLOAD_DIR  = os.path.join(BASE_DIR, "downloads")
-ANALYSIS_DIR  = os.path.join(BASE_DIR, "outputs", "analysis")
-TRANSCRIPT_DIR= os.path.join(BASE_DIR, "outputs", "transcripts")
-SHORTS_DIR    = os.path.join(BASE_DIR, "outputs", "shorts")
-RAW_DIR       = os.path.join(BASE_DIR, "outputs", "raw")
-TEMP_DIR      = os.path.join(BASE_DIR, "temp")
+DOWNLOAD_DIR  = os.path.join(LOCAL_DIR, "downloads")
+ANALYSIS_DIR  = os.path.join(LOCAL_DIR, "outputs", "analysis")
+TRANSCRIPT_DIR= os.path.join(LOCAL_DIR, "outputs", "transcripts")
+SHORTS_DIR    = os.path.join(LOCAL_DIR, "outputs", "shorts")
+RAW_DIR       = os.path.join(LOCAL_DIR, "outputs", "raw")
+TEMP_DIR      = os.path.join(LOCAL_DIR, "temp")
 STATIC_DIR    = os.path.join(LOCAL_DIR, "static")  # local/static (배경, 로고)
 
 for _d in [SHORTS_DIR, RAW_DIR, TEMP_DIR]:
@@ -99,9 +99,7 @@ class EditorBase:
 
     def __init__(self, template_id: int = None):
         self._check_ffmpeg()
-        self.face_detection = mp.solutions.face_detection.FaceDetection(
-            model_selection=1, min_detection_confidence=0.5
-        )
+        self._init_face_detector()
         self.font = self._resolve_font()
         templates = self.__class__.TEMPLATES
         if template_id is not None and template_id in templates:
@@ -111,6 +109,28 @@ class EditorBase:
         print(f"[Editor] 템플릿: {self.template['name']}")
 
     # ── 내부 유틸 ─────────────────────────────────────────────
+
+    def _init_face_detector(self):
+        model_path = os.path.join(LOCAL_DIR, "models", "face_detector.tflite")
+        if not os.path.exists(model_path):
+            print(f"[Editor] 얼굴 감지 모델 없음, center crop 사용")
+            self._face_detector = None
+            return
+        try:
+            BaseOptions = mp.tasks.BaseOptions
+            FaceDetector = mp.tasks.vision.FaceDetector
+            FaceDetectorOptions = mp.tasks.vision.FaceDetectorOptions
+            VisionRunningMode = mp.tasks.vision.RunningMode
+            options = FaceDetectorOptions(
+                base_options=BaseOptions(model_asset_path=model_path),
+                running_mode=VisionRunningMode.IMAGE,
+                min_detection_confidence=0.5,
+            )
+            self._face_detector = FaceDetector.create_from_options(options)
+            print("[Editor] 얼굴 감지 모델 로드 완료")
+        except Exception as e:
+            print(f"[Editor] 얼굴 감지 초기화 실패: {e}")
+            self._face_detector = None
 
     def _check_ffmpeg(self):
         r = subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -154,6 +174,24 @@ class EditorBase:
         cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", video_path]
         return float(json.loads(subprocess.run(cmd, capture_output=True, text=True).stdout)["format"]["duration"])
 
+    def _get_audio_duration(self, audio_path):
+        """오디오 파일 길이 반환"""
+        try:
+            cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", audio_path]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            return float(json.loads(result.stdout)["format"]["duration"])
+        except:
+            return 0
+
+    def _generate_narration(self, text: str, category: str) -> str | None:
+        """TTS로 나레이션 생성"""
+        try:
+            tts = TTS()
+            return tts.generate_intro(text, category)
+        except Exception as e:
+            print(f"  [TTS] 나레이션 생성 실패: {e}")
+            return None
+
     def _get_video_info(self, video_path):
         cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0",
                "-show_entries", "stream=width,height", "-of", "json", video_path]
@@ -167,6 +205,9 @@ class EditorBase:
             crop_w = src_w
             crop_h = int(src_w * VIDEO_H / VIDEO_W)
 
+        if self._face_detector is None:
+            return (src_w - crop_w) // 2, src_h // 8, crop_w, crop_h
+
         cap = cv2.VideoCapture(video_path)
         fps = cap.get(cv2.CAP_PROP_FPS) or 30
         cap.set(cv2.CAP_PROP_POS_FRAMES, int(start * fps))
@@ -176,12 +217,13 @@ class EditorBase:
             ret, frame = cap.read()
             if not ret:
                 break
-            res = self.face_detection.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            if res.detections:
-                for d in res.detections:
-                    bb = d.location_data.relative_bounding_box
-                    cx_list.append(int((bb.xmin + bb.width  / 2) * src_w))
-                    cy_list.append(int((bb.ymin + bb.height / 2) * src_h))
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+            result = self._face_detector.detect(mp_image)
+            for det in result.detections:
+                bb = det.bounding_box
+                cx_list.append(int(bb.origin_x + bb.width  / 2))
+                cy_list.append(int(bb.origin_y + bb.height / 2))
         cap.release()
 
         if cx_list:
@@ -425,10 +467,16 @@ class EditorBase:
 
         transcript_path = analysis.get("transcript_path", "")
         candidates      = analysis.get("candidates", [])
+        category        = analysis.get("category", "")
 
         if not candidates:
             print(f"[Editor] 후보 없음: {analysis_path}")
             return None
+
+        # 스포츠는 시간순 정렬 (하이라이트는 시간순이 자연스러움)
+        if category == "sports":
+            candidates = sorted(candidates, key=lambda x: x.get("start", 0))
+            print(f"[Editor] 스포츠 카테고리 → 시간순 정렬")
 
         video_path = self._find_video_path(transcript_path)
         if not video_path:
@@ -514,15 +562,34 @@ class EditorBase:
                       subtitles: bool = False,
                       style: dict = None,
                       bg_image: str = None) -> str | None:
-        """Stage 2: raw 영상 + 배경/제목(+자막) → outputs/shorts/ 저장"""
+        """Stage 2: raw 영상 + 배경/제목(+자막) → outputs/shorts/ 저장
+        경제/정치의 경우 나레이션 버전(_shorts.mp4)과 일반 버전(_shorts_plain.mp4) 둘 다 생성
+        """
         with open(analysis_path, "r", encoding="utf-8") as f:
             analysis = json.load(f)
 
         title    = title_override if title_override is not None else analysis.get("intro_text", "")
         category = analysis.get("category", "")
+        intro_summary = analysis.get("intro_summary", "")
+
+        # 경제/정치 카테고리에서 나레이션 생성
+        narration_path = None
+        narration_duration = 0
+        if intro_summary and category in ("economy", "politics"):
+            narration_path = self._generate_narration(intro_summary, category)
+            if narration_path:
+                narration_duration = self._get_audio_duration(narration_path)
+                print(f"  [TTS] 나레이션 생성: {narration_duration:.1f}초")
 
         base_name   = os.path.splitext(os.path.basename(raw_path))[0].replace("_raw", "")
-        output_path = os.path.join(SHORTS_DIR, f"{base_name}_shorts.mp4")
+
+        # 나레이션이 있으면 두 버전 생성, 없으면 기본 버전만
+        if narration_path and narration_duration > 0:
+            output_path = os.path.join(SHORTS_DIR, f"{base_name}_shorts_narr.mp4")
+            output_path_plain = os.path.join(SHORTS_DIR, f"{base_name}_shorts.mp4")
+        else:
+            output_path = os.path.join(SHORTS_DIR, f"{base_name}_shorts.mp4")
+            output_path_plain = None
 
         sub_entries  = self._generate_sub_entries(analysis_path) if subtitles else []
         sub_filters  = self._build_sub_drawtext_filters(sub_entries, style)
@@ -561,10 +628,26 @@ class EditorBase:
             inputs = ["-i", raw_path, "-i", bg_path]
             if has_logo:
                 inputs += ["-i", logo_path]
+
+            # 나레이션 오디오 믹스
+            audio_map = "0:a?"
+            if narration_path and narration_duration > 0:
+                narr_idx = len(inputs) // 2  # 현재 입력 수
+                inputs += ["-i", narration_path]
+                # 나레이션 동안 원본 볼륨 낮추고, 나레이션과 믹스
+                dur = narration_duration + 0.5
+                fc += (
+                    f";[0:a]volume=enable='lte(t,{dur})':volume=0.2,"
+                    f"volume=enable='gt(t,{dur})':volume=1.0[orig];"
+                    f"[{narr_idx}:a]apad=pad_dur=0.5[narr];"
+                    f"[orig][narr]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+                )
+                audio_map = "[aout]"
+
             cmd = (
                 ["ffmpeg", "-y"] + inputs +
                 ["-filter_complex", fc,
-                 "-map", "[out]", "-map", "0:a?",
+                 "-map", "[out]", "-map", audio_map,
                  "-c:v", "libx264", "-preset", "fast", "-crf", "23",
                  "-c:a", "aac", "-b:a", "128k",
                  output_path]
@@ -573,16 +656,71 @@ class EditorBase:
             vf = self._build_overlay_vf(title, style=style)
             if sub_str:
                 vf += f",{sub_str}"
-            cmd = [
-                "ffmpeg", "-y", "-i", raw_path,
-                "-vf", vf,
-                "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-                "-c:a", "aac", "-b:a", "128k",
-                output_path
-            ]
+
+            # 나레이션 오디오 믹스 (배경 없는 경우)
+            if narration_path and narration_duration > 0:
+                dur = narration_duration + 0.5
+                af = (
+                    f"[0:a]volume=enable='lte(t,{dur})':volume=0.2,"
+                    f"volume=enable='gt(t,{dur})':volume=1.0[orig];"
+                    f"[1:a]apad=pad_dur=0.5[narr];"
+                    f"[orig][narr]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+                )
+                cmd = [
+                    "ffmpeg", "-y", "-i", raw_path, "-i", narration_path,
+                    "-filter_complex", f"{af}",
+                    "-vf", vf,
+                    "-map", "0:v", "-map", "[aout]",
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                    "-c:a", "aac", "-b:a", "128k",
+                    output_path
+                ]
+            else:
+                cmd = [
+                    "ffmpeg", "-y", "-i", raw_path,
+                    "-vf", vf,
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                    "-c:a", "aac", "-b:a", "128k",
+                    output_path
+                ]
 
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         print(f"  [Stage 2] 완료 → {os.path.basename(output_path)}")
+
+        # 나레이션이 있으면 나레이션 없는 버전도 생성
+        if output_path_plain:
+            print(f"  [Stage 2] 나레이션 없는 버전 생성 중...")
+            if os.path.exists(bg_path):
+                # 배경 이미지 있는 경우 - 나레이션 없이
+                fc_plain = (
+                    f"[1]scale={CANVAS_W}:{CANVAS_H},setsar=1[bg];"
+                    f"[0]setsar=1[vid];"
+                    f"[bg][vid]overlay=0:{VIDEO_Y}[base];"
+                    f"{overlay_str}"
+                )
+                inputs_plain = ["-i", raw_path, "-i", bg_path]
+                if has_logo:
+                    inputs_plain += ["-i", logo_path]
+                cmd_plain = (
+                    ["ffmpeg", "-y"] + inputs_plain +
+                    ["-filter_complex", fc_plain,
+                     "-map", "[out]", "-map", "0:a?",
+                     "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                     "-c:a", "aac", "-b:a", "128k",
+                     output_path_plain]
+                )
+            else:
+                # 배경 이미지 없는 경우
+                cmd_plain = [
+                    "ffmpeg", "-y", "-i", raw_path,
+                    "-vf", vf,
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                    "-c:a", "aac", "-b:a", "128k",
+                    output_path_plain
+                ]
+            subprocess.run(cmd_plain, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print(f"  [Stage 2] 완료 → {os.path.basename(output_path_plain)}")
+
         return output_path
 
     def preview_frame(self, raw_path, analysis_path,

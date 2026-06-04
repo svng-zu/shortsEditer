@@ -5,10 +5,10 @@ import subprocess
 import json
 from faster_whisper import WhisperModel
 
-# local/transcriber/ → local/ → edit_tool/
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
-TRANSCRIPT_DIR = os.path.join(BASE_DIR, "outputs", "transcripts")
+# local/transcriber/ → local/
+LOCAL_DIR = os.path.dirname(os.path.dirname(__file__))
+DOWNLOAD_DIR = os.path.join(LOCAL_DIR, "downloads")
+TRANSCRIPT_DIR = os.path.join(LOCAL_DIR, "outputs", "transcripts")
 
 os.makedirs(TRANSCRIPT_DIR, exist_ok=True)
 

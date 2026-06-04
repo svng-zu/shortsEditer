@@ -4,10 +4,10 @@ import os
 import json
 from llm.gemini_client import call_gemini
 
-# local/llm/ → local/ → edit_tool/
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-TRANSCRIPT_DIR = os.path.join(BASE_DIR, "outputs", "transcripts")
-ANALYSIS_DIR = os.path.join(BASE_DIR, "outputs", "analysis")
+# local/llm/ → local/
+LOCAL_DIR = os.path.dirname(os.path.dirname(__file__))
+TRANSCRIPT_DIR = os.path.join(LOCAL_DIR, "outputs", "transcripts")
+ANALYSIS_DIR = os.path.join(LOCAL_DIR, "outputs", "analysis")
 
 os.makedirs(ANALYSIS_DIR, exist_ok=True)
 
@@ -81,6 +81,7 @@ MULTI_TOPIC_PROMPT = """
   "topics": [
     {{
       "intro_text": "첫줄은 핵심 키워드(12자 이내)\\n둘째줄은 수치·날짜 또는 부제(12자 이내)",
+      "intro_summary": "TTS 나레이션용 한 줄 요약 (30자 이내). 시청자가 맥락을 이해할 수 있는 도입 멘트. 예: '오늘 코스피가 3% 급락했습니다' 또는 '여야가 선거법 개정안을 두고 충돌했습니다'",
       "candidates": [
         {{
           "start": 시작시간(초),
@@ -99,6 +100,7 @@ MULTI_TOPIC_PROMPT = """
 - 주제 간 내용이 겹치면 안 됨 (각 주제는 다른 뉴스 기사)
 - 각 주제의 candidates: 최대 3개, 각 구간 5초 이상
 - edit_order는 각 topic 내에서 1부터 시작
+- intro_summary는 시청자에게 맥락을 전달하는 짧고 명확한 문장 (뉴스 앵커처럼)
 """
 
 MULTI_TOPIC_CATEGORIES = {"economy", "politics"}
@@ -187,6 +189,7 @@ class Analyzer:
                     "transcript_path": transcript_path,
                     "category": category,
                     "intro_text": topic.get("intro_text", ""),
+                    "intro_summary": topic.get("intro_summary", ""),  # TTS 나레이션용
                     "candidates": candidates,
                 }, f, ensure_ascii=False, indent=2)
             print(f"[Analyzer] 토픽 {i} 저장 → {os.path.basename(save_path)}")

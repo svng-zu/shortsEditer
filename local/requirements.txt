@@ -17,5 +17,8 @@ mediapipe>=0.10.0
 # LLM (Ollama 연동)
 requests>=2.31.0
 
+# TTS (나레이션)
+edge-tts>=6.1.0
+
 # Utilities
 httpx>=0.26.0

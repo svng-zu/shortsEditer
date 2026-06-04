@@ -4,9 +4,9 @@ import os
 from google import genai
 from google.genai import types
 
-# local/llm/ → local/ → edit_tool/
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-_KEY_FILE = os.path.join(BASE_DIR, "gemini_api_key")
+# local/llm/ → local/
+LOCAL_DIR = os.path.dirname(os.path.dirname(__file__))
+_KEY_FILE = os.path.join(LOCAL_DIR, "gemini_api_key")
 
 def _load_key():
     if os.path.exists(_KEY_FILE):

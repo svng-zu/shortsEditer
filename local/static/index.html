@@ -164,9 +164,9 @@ header{
   flex:1;overflow-y:auto;padding:12px 16px 16px;
   display:flex;flex-direction:column;gap:6px;
 }
-.steps-wrap::-webkit-scrollbar{width:4px;}
-.steps-wrap::-webkit-scrollbar-track{background:transparent;}
-.steps-wrap::-webkit-scrollbar-thumb{background:var(--s3);border-radius:2px;}
+.steps-wrap::-webkit-scrollbar{width:6px;}
+.steps-wrap::-webkit-scrollbar-track{background:var(--s1);border-radius:3px;}
+.steps-wrap::-webkit-scrollbar-thumb{background:var(--accent);border-radius:3px;}
 
 .step-card{
   background:var(--s2);
@@ -177,6 +177,7 @@ header{
   flex-direction:column;
   gap:10px;
   transition:border-color .2s;
+  flex-shrink:0;
 }
 .step-card:hover{border-color:var(--border2);}
 .step-head{display:flex;align-items:center;gap:10px;}
@@ -191,18 +192,52 @@ header{
 
 /* step file list */
 .step-file-list{
-  display:flex;flex-direction:column;gap:2px;
-  max-height:80px;overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  max-height:150px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding-right:4px;
+  width:100%;
+  box-sizing:border-box;
 }
-.step-file-list::-webkit-scrollbar{width:3px;}
-.step-file-list::-webkit-scrollbar-thumb{background:var(--s3);}
-.sfl-empty{font-size:10px;color:var(--muted);padding:2px 0;}
+.step-file-list::-webkit-scrollbar{width:8px;}
+.step-file-list::-webkit-scrollbar-track{background:var(--s3);border-radius:4px;}
+.step-file-list::-webkit-scrollbar-thumb{background:var(--accent);border-radius:4px;min-height:30px;}
+.step-file-list::-webkit-scrollbar-thumb:hover{background:#9d7fff;}
+.sfl-empty{font-size:12px;color:var(--muted);padding:6px 0;}
 .sfl-item{
-  font-size:10px;color:var(--muted);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  padding:1px 0;
+  font-size:13px;
+  line-height:1.4;
+  color:#fff !important;
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  max-width:100%;
+  padding:8px 10px;
+  margin-bottom:4px;
+  background:#222230 !important;
+  border-radius:4px;
+  border:none;
+  border-left:3px solid #444;
+  font-weight:500;
+  font-family:-apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+  opacity:1 !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  box-shadow:none !important;
+  filter:none !important;
+  transform:none !important;
 }
-.sfl-item.done{color:var(--success);}
+.sfl-item:hover{background:#2a2a3a !important;color:#fff !important;}
+.sfl-item.done{
+  color:#4ade80 !important;
+  border-left-color:#22c55e;
+  background:#1e2e1e !important;
+  font-weight:600;
+}
 
 .step-btn{
   width:100%;padding:8px 0;border-radius:var(--radius-sm);
@@ -587,6 +622,41 @@ header{
 .e-icon{font-size:28px;opacity:.4;}
 .empty-state p{font-size:11px;text-align:center;line-height:1.6;opacity:.6;}
 
+/* 진행 상태 + 중지/재개 버튼 */
+.progress-info{
+  display:flex;align-items:center;gap:8px;
+  background:var(--s2);border:1px solid var(--border);
+  border-radius:8px;padding:6px 12px;
+  font-size:11px;color:var(--muted);
+}
+.progress-info #progress-text{
+  font-weight:700;color:var(--accent);
+}
+.pause-controls{
+  display:flex;gap:6px;
+}
+.pause-btn,.resume-btn{
+  padding:6px 14px;
+  border-radius:8px;
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+  font-family:inherit;
+  transition:all .18s;
+}
+.pause-btn{
+  background:rgba(245,158,11,0.15);
+  border:1px solid rgba(245,158,11,0.4);
+  color:var(--warn);
+}
+.pause-btn:hover{background:rgba(245,158,11,0.25);}
+.resume-btn{
+  background:rgba(34,197,94,0.15);
+  border:1px solid rgba(34,197,94,0.4);
+  color:var(--success);
+}
+.resume-btn:hover{background:rgba(34,197,94,0.25);}
+
 /* 토스트 / 애니메이션 */
 @keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
@@ -604,6 +674,19 @@ header{
   <div class="logo">ShortsAI</div>
   <div class="header-sep"></div>
   <span class="logo-sub">AI 쇼츠 자동 생성 파이프라인</span>
+
+  <!-- 진행 상태 표시 -->
+  <div class="progress-info" id="progress-info" style="display:none;">
+    <span id="progress-text">0/0</span>
+    <span id="progress-current" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+  </div>
+
+  <!-- 중지/재개 버튼 -->
+  <div class="pause-controls" id="pause-controls" style="display:none;">
+    <button class="pause-btn" id="btn-pause" onclick="pausePipeline()">⏸ 중지</button>
+    <button class="resume-btn" id="btn-resume" onclick="resumePipeline()" style="display:none;">▶ 재개</button>
+  </div>
+
   <div class="header-status">
     <div class="status-dot" id="status-dot"></div>
     <span id="status-msg">대기 중</span>
@@ -912,19 +995,52 @@ function updateStatusUI(s) {
   const dot = document.getElementById('status-dot');
   const msg = document.getElementById('status-msg');
   const fill = document.getElementById('progress-fill');
+  const progressInfo = document.getElementById('progress-info');
+  const progressText = document.getElementById('progress-text');
+  const progressCurrent = document.getElementById('progress-current');
+  const pauseControls = document.getElementById('pause-controls');
+  const btnPause = document.getElementById('btn-pause');
+  const btnResume = document.getElementById('btn-resume');
 
   dot.className = 'status-dot';
   const running = ['collecting','transcribing','analyzing','editing'].includes(s.step);
-  if (running)           dot.classList.add('running');
-  else if (s.step === 'done')  dot.classList.add('done');
-  else if (s.step === 'error') dot.classList.add('error');
+  const paused = s.paused;
 
-  msg.textContent = s.message || '대기 중';
+  if (paused) {
+    dot.style.background = 'var(--warn)';
+  } else if (running) {
+    dot.classList.add('running');
+  } else if (s.step === 'done') {
+    dot.classList.add('done');
+  } else if (s.step === 'error') {
+    dot.classList.add('error');
+  }
+
+  msg.textContent = paused ? `⏸ 일시 중지 (${s.message})` : (s.message || '대기 중');
   fill.style.width = s.progress + '%';
 
+  // 진행 상태 표시
+  if (running || paused) {
+    progressInfo.style.display = 'flex';
+    pauseControls.style.display = 'flex';
+    if (s.total_items > 0) {
+      progressText.textContent = `${s.done_items || 0}/${s.total_items}`;
+    }
+    if (s.current_item) {
+      progressCurrent.textContent = s.current_item;
+      progressCurrent.title = s.current_item;
+    }
+    // 중지/재개 버튼 상태
+    btnPause.style.display = paused ? 'none' : 'block';
+    btnResume.style.display = paused ? 'block' : 'none';
+  } else {
+    progressInfo.style.display = 'none';
+    pauseControls.style.display = 'none';
+  }
+
   document.querySelectorAll('.step-btn.primary').forEach(btn => {
-    btn.disabled = running;
-    btn.style.opacity = running ? '0.45' : '';
+    btn.disabled = running || paused;
+    btn.style.opacity = (running || paused) ? '0.45' : '';
   });
 }
 
@@ -1087,6 +1203,38 @@ function showToast(msg, type='info') {
   toast.textContent = msg;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3500);
+}
+
+// ── 일시 중지 / 재개 ────────────────────────────────────────
+async function pausePipeline() {
+  try {
+    const r = await fetch('/api/pause', { method: 'POST' });
+    if (r.ok) {
+      showToast('⏸ 파이프라인 일시 중지됨');
+      await fetchStatus();
+    } else {
+      const data = await r.json().catch(() => ({}));
+      showToast(data.detail || '중지 실패', 'error');
+    }
+  } catch(e) {
+    showToast('서버 연결 실패', 'error');
+  }
+}
+
+async function resumePipeline() {
+  try {
+    const r = await fetch('/api/resume', { method: 'POST' });
+    if (r.ok) {
+      showToast('▶ 파이프라인 재개됨');
+      await fetchStatus();
+      startPolling();
+    } else {
+      const data = await r.json().catch(() => ({}));
+      showToast(data.detail || '재개 실패', 'error');
+    }
+  } catch(e) {
+    showToast('서버 연결 실패', 'error');
+  }
 }
 
 async function runCollect() {
