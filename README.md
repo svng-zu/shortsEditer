@@ -1,6 +1,7 @@
 # ShortsAI - YouTube 쇼츠 자동 생성 파이프라인
 
 YouTube 영상에서 자동으로 쇼츠를 생성하는 파이프라인입니다.
+![Uploading ChatGPT Image 2026년 6월 4일 오후 05_46_09.png…]()
 
 ## 버전 선택
 
