@@ -1,6 +1,8 @@
 # ShortsAI - YouTube 쇼츠 자동 생성 파이프라인
 
 YouTube 영상에서 자동으로 쇼츠를 생성하는 파이프라인입니다.
+
+### 예시 화면 구성
 <img width="1536" height="1024" alt="ChatGPT Image 2026년 6월 4일 오후 05_46_09" src="https://github.com/user-attachments/assets/b2fba8e4-1c94-4c6a-b433-3c9dcdde7a43" />
 
 ## 버전 선택
