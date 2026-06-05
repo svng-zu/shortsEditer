@@ -36,6 +36,7 @@ class StyleParams(BaseModel):
     sub_fontsize: int = 28
     sub_color: str = "#FFFFFF"
     sub_margin_v: int = 20
+    font_name: str = "NanumSquareRoundEB"
 
 
 class RenderRequest(BaseModel):

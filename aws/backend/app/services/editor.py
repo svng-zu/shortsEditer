@@ -19,8 +19,9 @@ DEFAULT_EDITOR = EconomyEditor
 class Editor:
     """에디터 디스패처"""
 
-    def __init__(self, template_id: int = None):
+    def __init__(self, template_id: int = None, session_dirs=None):
         self._template_id = template_id
+        self._session_dirs = session_dirs
 
     def _get_editor(self, analysis_path: str) -> EditorBase:
         """분석 파일에서 카테고리를 읽어 적절한 에디터 반환"""
@@ -31,7 +32,7 @@ class Editor:
             category = ""
         EditorClass = CATEGORY_EDITORS.get(category, DEFAULT_EDITOR)
         print(f"[Dispatcher] category='{category}' → {EditorClass.__name__}")
-        return EditorClass(template_id=self._template_id)
+        return EditorClass(template_id=self._template_id, session_dirs=self._session_dirs)
 
     def edit(self, analysis_path: str):
         return self._get_editor(analysis_path).edit(analysis_path)

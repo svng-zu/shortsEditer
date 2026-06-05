@@ -1,6 +1,11 @@
 version: '3.8'
-
 services:
+  bgutil:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    ports:
+      - "4416:4416"
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -8,32 +13,44 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - AWS_REGION=${AWS_REGION:-us-east-1}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID:-anthropic.claude-3-sonnet-20240229-v1:0}
+      - AWS_REGION=${AWS_REGION:-ap-northeast-2}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - TRANSCRIBE_LANGUAGE_CODE=${TRANSCRIBE_LANGUAGE_CODE:-ko-KR}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - WHISPER_MODEL=${WHISPER_MODEL:-medium}
+      - WHISPER_LANGUAGE=${WHISPER_LANGUAGE:-ko}
       - DEBUG=${DEBUG:-false}
+      - CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:5173","http://localhost:3000"]}
+      - YOUTUBE_CLIENT_ID=${YOUTUBE_CLIENT_ID:-}
+      - YOUTUBE_CLIENT_SECRET=${YOUTUBE_CLIENT_SECRET:-}
+      - YOUTUBE_REDIRECT_URI=${YOUTUBE_REDIRECT_URI:-}
+      - BGUTIL_URL=http://bgutil:4416
     volumes:
       - ./data:/app/data
       - ./static:/app/static
+      - whisper_cache:/root/.cache/whisper
+      - ~/.cache/yt-dlp:/root/.cache/yt-dlp:ro
+    depends_on:
+      - bgutil
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-
+      retries: 5
+      start_period: 60s
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
     depends_on:
       - backend
+      - bgutil
     restart: unless-stopped
 
 volumes:
-  data:
+  whisper_cache:

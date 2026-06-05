@@ -3,8 +3,9 @@
 
 import os
 import json
-import boto3
-from botocore.exceptions import ClientError
+#import boto3
+#from botocore.exceptions import ClientError
+import google.generativeai as genai
 
 from app.config import settings
 
@@ -110,40 +111,24 @@ CHUNK_SUMMARY_PROMPT = """
 형식: [시작s ~ 끝s] 핵심 요약
 """
 
-
 class Analyzer:
-    """AWS Bedrock Claude 기반 LLM 분석기"""
+    """Gemini 2.5 Flash 기반 LLM 분석기"""
 
     def __init__(self):
-        self.bedrock_client = boto3.client(
-            "bedrock-runtime",
-            region_name=settings.AWS_REGION,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        self.model = genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            generation_config={
+                "temperature": 0.3,
+                "max_output_tokens": 2048,
+            }
         )
-        self.model_id = settings.BEDROCK_MODEL_ID
-        print(f"[Analyzer] AWS Bedrock 초기화 완료: {self.model_id}")
+        print(f"[Analyzer] Gemini 2.5 Flash 초기화 완료")
 
     def _call_bedrock(self, prompt: str, max_tokens: int = 1024) -> str:
-        """Bedrock Claude API 호출"""
-        body = json.dumps({
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": max_tokens,
-            "temperature": 0.3,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ]
-        })
-
-        response = self.bedrock_client.invoke_model(
-            modelId=self.model_id,
-            body=body,
-            contentType="application/json",
-            accept="application/json"
-        )
-
-        response_body = json.loads(response["body"].read())
-        return response_body["content"][0]["text"]
+        """Gemini API 호출 (메서드명 유지로 하위 코드 변경 없음)"""
+        response = self.model.generate_content(prompt)
+        return response.text
 
     def _build_segments_text(self, segments, max_segments=80):
         """세그먼트 텍스트 구성"""
@@ -185,11 +170,11 @@ class Analyzer:
             print(f"[Analyzer] 원본 응답:\n{response}")
             return {}
 
-    def _save_single(self, result, transcript_path, category, base_name):
+    def _save_single(self, result, transcript_path, category, base_name, analysis_dir):
         """단일 토픽 결과 저장"""
         candidates = result.get("candidates", [])
         candidates.sort(key=lambda x: x.get("edit_order", 99))
-        save_path = settings.ANALYSIS_DIR / f"{base_name}.json"
+        save_path = analysis_dir / f"{base_name}.json"
         with open(save_path, "w", encoding="utf-8") as f:
             json.dump({
                 "transcript_path": transcript_path,
@@ -200,7 +185,7 @@ class Analyzer:
         print(f"[Analyzer] 저장 → {save_path.name}")
         return [str(save_path)]
 
-    def _save_topics(self, result, transcript_path, category, base_name):
+    def _save_topics(self, result, transcript_path, category, base_name, analysis_dir):
         """멀티 토픽 결과 저장"""
         topics = result.get("topics", [])
         if not topics:
@@ -212,7 +197,7 @@ class Analyzer:
                 continue
             candidates.sort(key=lambda x: x.get("edit_order", 99))
             suffix = f"_t{i}" if len(topics) > 1 else ""
-            save_path = settings.ANALYSIS_DIR / f"{base_name}{suffix}.json"
+            save_path = analysis_dir / f"{base_name}{suffix}.json"
             with open(save_path, "w", encoding="utf-8") as f:
                 json.dump({
                     "transcript_path": transcript_path,
@@ -224,8 +209,14 @@ class Analyzer:
             saved.append(str(save_path))
         return saved
 
-    def analyze(self, transcript_path: str, category: str) -> dict:
+    def analyze(self, transcript_path: str, category: str, analysis_dir=None) -> dict:
         """자막 분석 실행"""
+        from pathlib import Path
+        if analysis_dir is None:
+            analysis_dir = settings.ANALYSIS_DIR
+        analysis_dir = Path(analysis_dir)
+        analysis_dir.mkdir(parents=True, exist_ok=True)
+
         with open(transcript_path, "r", encoding="utf-8") as f:
             transcript = json.load(f)
 
@@ -256,9 +247,9 @@ class Analyzer:
 
         base_name = os.path.splitext(os.path.basename(transcript_path))[0]
         if multi:
-            saved = self._save_topics(result, transcript_path, category, base_name)
+            saved = self._save_topics(result, transcript_path, category, base_name, analysis_dir)
         else:
-            saved = self._save_single(result, transcript_path, category, base_name)
+            saved = self._save_single(result, transcript_path, category, base_name, analysis_dir)
 
         print(f"[Analyzer] 완료 — {len(saved)}개 파일 생성")
         return result

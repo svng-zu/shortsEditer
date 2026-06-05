@@ -25,7 +25,7 @@ MIN_SEGMENT_SEC = 5
 MAX_TOTAL_SEC = 120
 FACE_SAMPLE_FRAMES = 10
 
-TEMP_DIR = settings.ANALYSIS_DIR.parent / "temp"
+TEMP_DIR = settings.BASE_DIR / "data" / "temp"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -43,11 +43,13 @@ class EditorBase:
     TEMPLATES: dict = {}
     MAX_TOTAL_SEC: int = MAX_TOTAL_SEC
 
-    def __init__(self, template_id: int = None):
+    def __init__(self, template_id: int = None, session_dirs=None):
         self._check_ffmpeg()
         self.face_detection = mp.solutions.face_detection.FaceDetection(
             model_selection=1, min_detection_confidence=0.5
         )
+        # 세션 경로 (없으면 기본 settings 경로 사용)
+        self._sd = session_dirs
         self.font = self._resolve_font()
         templates = self.__class__.TEMPLATES
         if template_id is not None and template_id in templates:
@@ -62,15 +64,22 @@ class EditorBase:
         if r.returncode != 0:
             raise RuntimeError("FFmpeg가 설치되어 있지 않습니다.")
 
-    def _resolve_font(self):
-        for p in [
-            "/usr/share/fonts/truetype/nanum/NanumSquareRoundEB.ttf",
-            "/usr/share/fonts/truetype/nanum/NanumSquareRoundB.ttf",
-            "/usr/share/fonts/truetype/nanum/NanumSquareB.ttf",
-            "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+    FONT_MAP = {
+        "NanumSquareRoundEB": "/usr/share/fonts/truetype/nanum/NanumSquareRoundEB.ttf",
+        "NanumSquareRoundB":  "/usr/share/fonts/truetype/nanum/NanumSquareRoundB.ttf",
+        "NanumSquareB":       "/usr/share/fonts/truetype/nanum/NanumSquareB.ttf",
+        "NanumGothicBold":    "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+    }
+
+    def _resolve_font(self, font_name: str = None):
+        candidates = []
+        if font_name and font_name in self.FONT_MAP:
+            candidates.append(self.FONT_MAP[font_name])
+        candidates += list(self.FONT_MAP.values()) + [
             "C:/Windows/Fonts/malgunbd.ttf",
             "C:/Windows/Fonts/malgun.ttf",
-        ]:
+        ]
+        for p in candidates:
             if os.path.exists(p):
                 print(f"[Editor] 폰트: {p}")
                 return p
@@ -88,9 +97,10 @@ class EditorBase:
 
     def _find_video_path(self, transcript_path):
         base = os.path.splitext(os.path.basename(transcript_path))[0]
-        for f in os.listdir(settings.DOWNLOAD_DIR):
+        download_dir = self._sd.download_dir if self._sd else settings.DOWNLOAD_DIR
+        for f in os.listdir(download_dir):
             if f.endswith(".mp4") and base in f:
-                return str(settings.DOWNLOAD_DIR / f)
+                return str(download_dir / f)
         return None
 
     def _get_video_duration(self, video_path):
@@ -248,7 +258,7 @@ class EditorBase:
         return entries
 
     @staticmethod
-    def _split_subtitle_line(text, max_chars=16):
+    def _split_subtitle_line(text, max_chars=20):
         if len(text) <= max_chars:
             return [text]
         mid = len(text) // 2
@@ -262,10 +272,10 @@ class EditorBase:
         if not entries:
             return []
         s = style or {}
-        fontsize = min(s.get("sub_fontsize", 52), 80)
-        margin_v = s.get("sub_margin_v", 30)
+        fontsize = min(s.get("sub_fontsize", 68), 88)
+        margin_v = s.get("sub_margin_v", 110)
         font_opt = f":fontfile='{self.font}'" if self.font else ""
-        line_h = int(fontsize * 1.45)
+        line_h = int(fontsize * 1.35)
         base_y = VIDEO_Y + VIDEO_H - margin_v
 
         filters = []
@@ -273,10 +283,11 @@ class EditorBase:
             raw_lines = [l for l in text.replace("\\n", "\n").split("\n") if l.strip()]
             lines = []
             for l in raw_lines:
-                lines.extend(self._split_subtitle_line(l))
+                lines.extend(self._split_subtitle_line(l, max_chars=20))
             if not lines:
                 continue
-            n = len(lines)
+            n = min(len(lines), 2)
+            lines = lines[:n]
             enable = f"between(t,{t_start:.3f},{t_end:.3f})"
             for i, line in enumerate(lines):
                 y = base_y - (n - i) * line_h
@@ -284,7 +295,8 @@ class EditorBase:
                 filters.append(
                     f"drawtext=text='{esc}'{font_opt}"
                     f":fontsize={fontsize}:fontcolor=white"
-                    f":box=1:boxcolor=black@0.5:boxborderw=14"
+                    f":borderw=4:bordercolor=black@0.95"
+                    f":shadowx=3:shadowy=3:shadowcolor=black@0.7"
                     f":x=(w-text_w)/2:y={y}"
                     f":enable='{enable}'"
                 )
@@ -425,7 +437,8 @@ class EditorBase:
             return None
 
         base_name = os.path.splitext(os.path.basename(analysis_path))[0]
-        raw_path = str(settings.RAW_DIR / f"{base_name}_raw.mp4")
+        raw_dir = self._sd.raw_dir if self._sd else settings.RAW_DIR
+        raw_path = str(raw_dir / f"{base_name}_raw.mp4")
         self._concat_raw(parts, raw_path)
 
         analysis["raw_segments"] = raw_segments
@@ -445,6 +458,9 @@ class EditorBase:
                       subtitles: bool = False,
                       style: dict = None,
                       bg_image: str = None) -> str:
+        # style의 font_name으로 폰트 갱신
+        if style and style.get("font_name"):
+            self.font = self._resolve_font(style["font_name"])
         with open(analysis_path, "r", encoding="utf-8") as f:
             analysis = json.load(f)
 
@@ -452,7 +468,8 @@ class EditorBase:
         category = analysis.get("category", "")
 
         base_name = os.path.splitext(os.path.basename(raw_path))[0].replace("_raw", "")
-        output_path = str(settings.SHORTS_DIR / f"{base_name}_shorts.mp4")
+        shorts_dir = self._sd.shorts_dir if self._sd else settings.SHORTS_DIR
+        output_path = str(shorts_dir / f"{base_name}_shorts.mp4")
 
         sub_entries = self._generate_sub_entries(analysis_path) if subtitles else []
         sub_filters = self._build_sub_drawtext_filters(sub_entries, style)
@@ -500,22 +517,45 @@ class EditorBase:
                  output_path]
             )
         else:
-            vf = self._build_overlay_vf(title, style=style)
-            if sub_str:
-                vf += f",{sub_str}"
-            cmd = [
-                "ffmpeg", "-y", "-i", raw_path,
-                "-vf", vf,
-                "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-                "-c:a", "aac", "-b:a", "128k",
-                output_path
-            ]
+            # 블러 배경: raw 영상을 확대/블러해서 배경으로 사용
+            text_filters = self._build_text_filters(title, style=style)
+            all_filters = text_filters + sub_filters
+            all_str = ",".join(all_filters) if all_filters else "setsar=1"
+            mid_label = "prelogo" if has_logo else "out"
+
+            fc = (
+                f"[0:v]split=2[orig][blurin];"
+                f"[blurin]scale={CANVAS_W}:{CANVAS_H}:force_original_aspect_ratio=increase,"
+                f"crop={CANVAS_W}:{CANVAS_H},"
+                f"boxblur=luma_radius=25:luma_power=3[blurbg];"
+                f"[orig]setsar=1[fg];"
+                f"[blurbg][fg]overlay=0:{VIDEO_Y}[base];"
+                f"[base]{all_str}[{mid_label}]"
+            )
+            inputs = ["-i", raw_path]
+            if has_logo:
+                fc += (
+                    f";[1]scale=200:-1[logo]"
+                    f";[prelogo][logo]overlay=W-w-16:{VIDEO_Y+16}[out]"
+                )
+                inputs += ["-i", logo_path]
+
+            cmd = (
+                ["ffmpeg", "-y"] + inputs +
+                ["-filter_complex", fc,
+                 "-map", "[out]", "-map", "0:a?",
+                 "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                 "-c:a", "aac", "-b:a", "128k",
+                 output_path]
+            )
 
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         print(f"  [Stage 2] 완료 → {os.path.basename(output_path)}")
         return output_path
 
     def preview_frame(self, raw_path, analysis_path, title=None, style=None, seek=2.0, bg_image=None):
+        if style and style.get("font_name"):
+            self.font = self._resolve_font(style["font_name"])
         with open(analysis_path, "r", encoding="utf-8") as f:
             analysis = json.load(f)
 
@@ -570,7 +610,8 @@ class EditorBase:
         with open(analysis_path, "r", encoding="utf-8") as f:
             analysis = json.load(f)
         base_name = os.path.splitext(os.path.basename(analysis_path))[0]
-        raw_path = str(settings.RAW_DIR / f"{base_name}_raw.mp4")
+        raw_dir = self._sd.raw_dir if self._sd else settings.RAW_DIR
+        raw_path = str(raw_dir / f"{base_name}_raw.mp4")
         if not os.path.exists(raw_path):
             print(f"[Editor] raw 파일 없음: {raw_path}")
             return None

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getSessionId } from './session'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -6,6 +7,7 @@ const client = axios.create({
   baseURL: API_BASE,
   headers: {
     'Content-Type': 'application/json',
+    'X-Session-ID': getSessionId(),
   },
 })
 
@@ -55,6 +57,7 @@ export interface StyleParams {
   sub_fontsize: number
   sub_color: string
   sub_margin_v: number
+  font_name: string
 }
 
 export const api = {
@@ -151,6 +154,41 @@ export const api = {
 
   async rerender(templateId: number = 1): Promise<void> {
     await client.post('/api/rerender', { template_id: templateId })
+  },
+
+  // YouTube
+  async getYouTubeAuthStatus(): Promise<{ authenticated: boolean; configured: boolean }> {
+    const { data } = await client.get('/api/youtube/auth-status')
+    return data
+  },
+
+  async getYouTubeAuthUrl(): Promise<{ url: string }> {
+    const { data } = await client.get('/api/youtube/auth-url')
+    return data
+  },
+
+  async uploadToYouTube(
+    filename: string,
+    title: string,
+    description: string,
+    privacy: 'public' | 'unlisted' | 'private'
+  ): Promise<{ ok: boolean; message: string }> {
+    const { data } = await client.post('/api/youtube/upload', {
+      filename,
+      title,
+      description,
+      privacy,
+    })
+    return data
+  },
+
+  async getYouTubeUploadStatus(): Promise<{
+    running: boolean
+    result: { video_id: string; url: string } | null
+    error: string | null
+  }> {
+    const { data } = await client.get('/api/youtube/upload-status')
+    return data
   },
 
   // Backgrounds

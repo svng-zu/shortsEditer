@@ -11,9 +11,6 @@ __pycache__/
 *.env
 hf_token
 ollama_private_key
-gemini_api_key
-*_api_key
-*_private_key
 
 # 데이터 파일 (용량 큼)
 downloads/

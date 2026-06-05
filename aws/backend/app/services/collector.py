@@ -1,12 +1,40 @@
 # backend/app/services/collector.py
-"""YouTube 영상 수집 서비스"""
+"""YouTube 영상 수집 서비스
+
+우회 전략 우선순위:
+  1. yt-dlp OAuth2 토큰 (~/.cache/yt-dlp/oauth2_token.json)
+  2. 쿠키 파일 (data/cookies_master.txt)
+  3. Invidious API (인스턴스가 살아있을 때)
+"""
 
 import os
+import shutil
 import json
+import random
+import xml.etree.ElementTree as ET
+import requests
+from pathlib import Path
 import yt_dlp
 
 from app.config import settings
 
+# ---------------------------------------------------------------------------
+# Invidious 인스턴스 (보조 수단 — 현재 대부분 불안정)
+# ---------------------------------------------------------------------------
+INVIDIOUS_INSTANCES = [
+    "https://inv.nadeko.net",
+    "https://invidious.nerdvpn.de",
+    "https://inv.thepixora.com",
+    "https://invidious.f5.si",
+    "https://invidious.tiekoetter.com",
+]
+
+_SESSION = requests.Session()
+_SESSION.headers.update({"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) Chrome/120.0"})
+
+# ---------------------------------------------------------------------------
+# 채널 / 카테고리 설정
+# ---------------------------------------------------------------------------
 CHANNEL_LIMIT = {
     "sports": 6,
     "economy": 3,
@@ -16,91 +44,236 @@ CHANNEL_LIMIT = {
 CATEGORY_CHANNELS = {
     "economy": [
         "https://www.youtube.com/@SBSBiz2021",
-        "https://www.youtube.com/@hkwowtv"
+        "https://www.youtube.com/@hkwowtv",
     ],
     "politics": [
         "https://www.youtube.com/@MBCNEWS11",
-        "https://www.youtube.com/@JTBC_news"
+        "https://www.youtube.com/@JTBC_news",
     ],
     "sports": [
         "https://www.youtube.com/@SPOTV",
-        "https://www.youtube.com/@KBO1982"
-    ]
+        "https://www.youtube.com/@KBO1982",
+    ],
 }
 
+# ---------------------------------------------------------------------------
+# 인증 파일 경로
+# ---------------------------------------------------------------------------
+COOKIES_MASTER = str(settings.BASE_DIR / "data" / "cookies_master.txt")
+COOKIES_WORK   = str(settings.BASE_DIR / "data" / "cookies_work.txt")
+# yt-dlp-youtube-oauth2 플러그인이 캐시에 저장하는 경로
+OAUTH_TOKEN    = str(Path.home() / ".cache" / "yt-dlp" / "youtube-oauth2" / "token_data.json")
 
-class YoutubeCollector:
-    """YouTube 영상 수집기"""
 
-    def __init__(self):
-        self.ydl_extract_opts = {
-            "quiet": True,
-            "extract_flat": True,
-            "playlistend": 10
+def _prepare_cookies() -> str | None:
+    if os.path.exists(COOKIES_MASTER):
+        shutil.copy2(COOKIES_MASTER, COOKIES_WORK)
+        return COOKIES_WORK
+    legacy = str(settings.BASE_DIR / "data" / "cookies.txt")
+    if os.path.exists(legacy):
+        return legacy
+    return None
+
+
+def _has_oauth() -> bool:
+    return os.path.exists(OAUTH_TOKEN)
+
+
+BGUTIL_URL = os.environ.get("BGUTIL_URL", "http://127.0.0.1:4416")
+
+
+def _bgutil_alive() -> bool:
+    """bgutil POT 서버 생존 여부 확인"""
+    try:
+        r = _SESSION.get(f"{BGUTIL_URL}/ping", timeout=3)
+        return r.status_code == 200
+    except Exception:
+        return False
+
+
+def _auth_opts() -> dict:
+    """OAuth2 > 쿠키 순으로 인증 옵션 반환"""
+    if _has_oauth():
+        print("[Auth] OAuth2 토큰 사용")
+        opts: dict = {
+            "username": "oauth2",
+            "password": "",
+            "js_runtimes": {"node": {}},  # n-challenge 해결용
         }
-        self.download_dir = str(settings.DOWNLOAD_DIR)
+        # bgutil POT 서버가 살아있으면 extractor_args에 추가
+        if _bgutil_alive():
+            print(f"[Auth] bgutil POT 서버 사용: {BGUTIL_URL}")
+            opts["extractor_args"] = {
+                "youtubepot-bgutilhttp": {"base_url": [BGUTIL_URL]}
+            }
+        return opts
+    cookies = _prepare_cookies()
+    if cookies:
+        print("[Auth] 쿠키 파일 사용")
+        return {
+            "cookiefile": cookies,
+            "extractor_args": {"youtube": {"player_client": ["web"]}},
+        }
+    print("[Auth] 인증 수단 없음 — 차단될 수 있음")
+    return {}
 
-    def get_latest_videos(self, channel_url):
-        """채널의 최신 영상 목록 조회"""
-        videos = []
 
-        with yt_dlp.YoutubeDL(self.ydl_extract_opts) as ydl:
-            info = ydl.extract_info(channel_url + "/videos", download=False)
-            entries = info.get("entries", [])
+# ---------------------------------------------------------------------------
+# 채널 영상 목록 조회
+# ---------------------------------------------------------------------------
 
-            for entry in entries:
-                if not entry:
+def _channel_id_from_rss(channel_url: str) -> str | None:
+    """YouTube RSS에서 channelId 추출 (인증 불필요)"""
+    # handle → RSS URL: resolveurl을 거치지 않고 직접 RSS 시도
+    # 먼저 Invidious resolveurl로 channel ID 얻기
+    insts = INVIDIOUS_INSTANCES.copy()
+    random.shuffle(insts)
+    for inst in insts:
+        try:
+            r = _SESSION.get(
+                f"{inst}/api/v1/resolveurl",
+                params={"url": channel_url},
+                timeout=10,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                cid = data.get("ucid") or data.get("id") or data.get("browseId")
+                if cid:
+                    return cid
+        except Exception:
+            continue
+    return None
+
+
+def _videos_from_rss(channel_id: str) -> list[dict]:
+    """YouTube RSS 피드로 최신 영상 목록 조회 (duration 없음)"""
+    url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+    r = _SESSION.get(url, timeout=10)
+    r.raise_for_status()
+
+    ns = {
+        "atom": "http://www.w3.org/2005/Atom",
+        "yt": "http://www.youtube.com/xml/schemas/2015",
+        "media": "http://search.yahoo.com/mrss/",
+    }
+    root = ET.fromstring(r.text)
+    channel_name = (root.find("atom:title", ns) or root).text or ""
+
+    videos = []
+    for entry in root.findall("atom:entry", ns):
+        vid = entry.find("yt:videoId", ns)
+        title = entry.find("atom:title", ns)
+        published = entry.find("atom:published", ns)
+        if vid is None:
+            continue
+        videos.append({
+            "video_id":  vid.text,
+            "title":     title.text if title is not None else "",
+            "video_url": f"https://youtube.com/watch?v={vid.text}",
+            "duration":  None,  # RSS에 duration 없음
+            "channel":   channel_name,
+            "upload_date": (published.text or "")[:10] if published is not None else "",
+        })
+    return videos
+
+
+def _get_duration_via_yt_dlp(video_id: str) -> int | None:
+    """yt-dlp로 영상 duration만 가져오기 (인증 있을 때)"""
+    opts = {
+        **_auth_opts(),
+        "quiet": True,
+        "skip_download": True,
+        "no_warnings": True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(
+                f"https://youtube.com/watch?v={video_id}", download=False
+            )
+            return info.get("duration")
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# YoutubeCollector
+# ---------------------------------------------------------------------------
+class YoutubeCollector:
+    """YouTube 영상 수집기
+
+    영상 목록: Invidious resolveurl → YouTube RSS
+    다운로드: yt-dlp (OAuth2 > 쿠키 인증)
+    """
+
+    def __init__(self, download_dir: str | None = None):
+        self.download_dir = download_dir or str(settings.DOWNLOAD_DIR)
+
+    def get_latest_videos(self, channel_url: str) -> list[dict]:
+        """채널 최신 영상 목록 조회"""
+        channel_id = _channel_id_from_rss(channel_url)
+        if not channel_id:
+            raise RuntimeError(f"채널 ID 조회 실패: {channel_url}")
+
+        print(f"[Collector] 채널 ID: {channel_id}")
+        videos = _videos_from_rss(channel_id)
+        print(f"[Collector] RSS에서 {len(videos)}개 발견")
+
+        # duration 필터링: OAuth/쿠키가 있으면 메타데이터 조회, 없으면 생략
+        if _has_oauth() or _prepare_cookies():
+            filtered = []
+            for v in videos:
+                dur = _get_duration_via_yt_dlp(v["video_id"])
+                if dur is None:
                     continue
-
-                duration = entry.get("duration")
-
-                if duration is None:  # shorts 제외
+                if dur < 180:  # 3분 미만 제외
                     continue
-                if duration < 180:    # 3분 이하 제외
-                    continue
+                v["duration"] = dur
+                filtered.append(v)
+            print(f"[Collector] duration 필터 후 {len(filtered)}개")
+            return filtered
+        else:
+            # 인증 없음 → duration 필터 없이 전체 반환 (다운로드에서 실패할 수 있음)
+            print("[Collector] 인증 없음 — duration 필터 건너뜀")
+            return videos
 
-                videos.append({
-                    "title": entry.get("title"),
-                    "video_url": f"https://youtube.com/watch?v={entry.get('id')}",
-                    "duration": duration,
-                    "channel": entry.get("channel"),
-                    "upload_date": entry.get("upload_date")
-                })
-
-        return videos
-
-    def download_video(self, url, quality="1080"):
-        """영상 다운로드"""
+    def download_video(self, video_url: str, quality: str = "1080") -> dict:
+        """영상 다운로드 (yt-dlp + 인증)"""
         ydl_opts = {
+            **_auth_opts(),
             "format": (
                 f"bestvideo[height>={quality}][height<=2160][ext=mp4][vcodec^=avc]"
                 f"+bestaudio[ext=m4a]"
-                f"/bestvideo[height>={quality}][height<=2160][ext=mp4]"
-                f"+bestaudio[ext=m4a]"
+                f"/bestvideo[height>={quality}][height<=2160][ext=mp4]+bestaudio[ext=m4a]"
                 f"/best[ext=mp4]"
             ),
             "outtmpl": f"{self.download_dir}/%(title)s.%(ext)s",
             "merge_output_format": "mp4",
             "noplaylist": True,
-            "postprocessors": [{
-                "key": "FFmpegVideoConvertor",
-                "preferedformat": "mp4"
-            }]
+            "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
+            "quiet": True,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            file_path = ydl.prepare_filename(info)
-
+            info = ydl.extract_info(video_url, download=True)
             return {
-                "title": info.get("title"),
-                "filepath": file_path,
+                "title":    info.get("title"),
+                "filepath": ydl.prepare_filename(info),
                 "duration": info.get("duration"),
-                "channel": info.get("channel")
+                "channel":  info.get("channel"),
             }
 
-    def run(self):
+    def run(self) -> list:
         """전체 수집 실행"""
+        # 인증 상태 사전 확인
+        if not _has_oauth() and not _prepare_cookies():
+            print(
+                "\n[경고] 인증 수단 없음!\n"
+                "  OAuth2: 로컬에서 `yt-dlp --username oauth2 --password '' <url>` 실행 후\n"
+                "         ~/.cache/yt-dlp/oauth2_token.json 을 EC2로 복사하세요.\n"
+                "  쿠키: 브라우저에서 내보낸 cookies.txt를\n"
+                "        data/cookies_master.txt 로 저장하세요.\n"
+            )
+
         all_results = []
 
         for category, channels in CATEGORY_CHANNELS.items():
@@ -120,20 +293,18 @@ class YoutubeCollector:
 
                         video["category"] = category
                         print(f"  TITLE: {video['title']}")
-                        print(f"  URL: {video['video_url']}")
-                        print(f"  DURATION: {video['duration']}")
-
+                        print(f"  URL:   {video['video_url']}")
+                        print(f"  DUR:   {video.get('duration', '?')}s")
                         print(f"  다운로드 시작...")
+
                         result = self.download_video(video["video_url"])
                         video["filepath"] = result["filepath"]
-
                         all_results.append(video)
                         channel_count += 1
 
                 except Exception as e:
                     print(f"ERROR: {e}")
 
-        # 메타데이터 저장
         save_path = settings.ANALYSIS_DIR.parent / "collected_videos.json"
         with open(save_path, "w", encoding="utf-8") as f:
             json.dump(all_results, f, ensure_ascii=False, indent=2)
