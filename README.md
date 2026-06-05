@@ -1,7 +1,7 @@
 # ShortsAI - YouTube 쇼츠 자동 생성 파이프라인
 
 YouTube 영상에서 자동으로 쇼츠를 생성하는 파이프라인입니다.
-
+[고릴라 AI](https://gorilai.duckdns.org/)
 ## 버전 선택
 
 | 버전 | 경로 | 자막 생성 | LLM 분석 | 용도 |
