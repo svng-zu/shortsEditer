@@ -1,15 +1,37 @@
 import axios from 'axios'
-import { getSessionId } from './session'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
-const client = axios.create({
-  baseURL: API_BASE,
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Session-ID': getSessionId(),
-  },
+const SESSION_KEY = 'gorila_session_id'
+
+export function getSessionId(): string {
+  let id = localStorage.getItem(SESSION_KEY)
+  if (!id) {
+    id = crypto.randomUUID()
+    localStorage.setItem(SESSION_KEY, id)
+  }
+  return id
+}
+
+export function setSessionId(id: string) {
+  localStorage.setItem(SESSION_KEY, id.trim())
+  window.location.reload()
+}
+
+const client = axios.create({ baseURL: API_BASE })
+
+// 요청마다 최신 세션 ID를 헤더에 주입
+client.interceptors.request.use(config => {
+  config.headers['X-Session-ID'] = getSessionId()
+  // FormData는 Content-Type을 axios가 자동 설정(multipart)하도록 두기
+  if (!(config.data instanceof FormData)) {
+    config.headers['Content-Type'] = 'application/json'
+  }
+  return config
 })
+
+// Pipeline.tsx 등에서 파일 업로드 시 직접 사용
+export { client as apiClient }
 
 export interface PipelineStatus {
   step: 'idle' | 'collecting' | 'transcribing' | 'analyzing' | 'editing' | 'done' | 'error'
@@ -57,7 +79,7 @@ export interface StyleParams {
   sub_fontsize: number
   sub_color: string
   sub_margin_v: number
-  font_name: string
+  font_name?: string
 }
 
 export const api = {
@@ -119,7 +141,9 @@ export const api = {
     subtitles: boolean,
     templateId: number,
     style: StyleParams,
-    bgImage?: string
+    bgImage?: string,
+    narration?: boolean,
+    narrationVoice?: string,
   ): Promise<void> {
     await client.post('/api/render', {
       filename,
@@ -128,6 +152,8 @@ export const api = {
       template_id: templateId,
       style,
       bg_image: bgImage,
+      narration: narration ?? false,
+      narration_voice: narrationVoice ?? 'female',
     })
   },
 
@@ -154,6 +180,23 @@ export const api = {
 
   async rerender(templateId: number = 1): Promise<void> {
     await client.post('/api/rerender', { template_id: templateId })
+  },
+
+  async downloadUrl(url: string, category: string): Promise<void> {
+    await client.post('/api/download-url', { url, category })
+  },
+
+  async getDownloadUrlStatus(): Promise<{ status: string; message: string; filename: string | null; error: string | null }> {
+    const { data } = await client.get('/api/download-url-status')
+    return data
+  },
+
+  async pause(): Promise<void> {
+    await client.post('/api/pause')
+  },
+
+  async resume(): Promise<void> {
+    await client.post('/api/resume')
   },
 
   // YouTube
