@@ -395,6 +395,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [subSize,   setSubSize]     = useState(52)
   const [subColor,  setSubColor]    = useState('#FFFFFF')
   const [subY,      setSubY]        = useState(20)
+  const [channelName, setChannelName] = useState('')
   const [bgOptions, setBgOptions]   = useState<string[]>([])
   const [bgImage,   setBgImage]     = useState('')
   const [templateId, setTemplateId] = useState(1)
@@ -430,7 +431,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   useEffect(() => {
     if (!raw) return
     const parts = raw.title.split(' / ')
-    setTitle1(parts[0] || ''); setTitle2(parts[1] || ''); setRenderMsg('')
+    setTitle1(parts[0] || ''); setTitle2(parts[1] || ''); setChannelName(''); setRenderMsg('')
     if (bgOptions.includes(raw.category)) { setBgImage(raw.category); loadBg(raw.category) }
     else setBgImage('')
   }, [raw?.filename])
@@ -477,7 +478,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
       ctx.clearRect(0, 0, CV_W, CV_H)
       const cat = raw.category || 'economy'
       const colors = (TMPL_COLORS[cat] || TMPL_COLORS.economy)[templateId] || { bg: '#0a0f0a', div: '#00E676' }
-      const bgImg = bgCache[bgImage || cat]
+      const bgImg = bgCache[bgImage]
       if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) ctx.drawImage(bgImg, 0, 0, CV_W, CV_H)
       else { ctx.fillStyle = colors.bg; ctx.fillRect(0, 0, CV_W, CV_H) }
 
@@ -516,11 +517,23 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(CV_W/2-tw/2,sY-2,tw,sz+4)
         ctx.fillStyle = subColor; ctx.fillText('자막 샘플', CV_W/2, sY)
       }
+      const channel = channelName.trim()
+      if (channel) {
+        const sz = Math.round(36*SCALE)
+        const bottomH = CV_H - (VID_Y_PX + VID_H_PX)
+        const cY = VID_Y_PX + VID_H_PX + Math.round((bottomH - sz) / 2)
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top'
+        ctx.font = `bold ${sz}px 'Malgun Gothic',sans-serif`
+        ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2
+        ctx.fillStyle = 'rgba(255,255,255,0.75)'
+        ctx.fillText(channel, CV_W/2, cY)
+        ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
+      }
       rafRef.current = requestAnimationFrame(draw)
     }
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleScale, subtitles, subSize, subColor, subY, bgImage, templateId, brightness, contrast, saturation])
+  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleScale, subtitles, subSize, subColor, subY, channelName, bgImage, templateId, brightness, contrast, saturation])
 
   // 음량 조절 — 미리듣기 영상에 즉시 반영 (HTML 비디오는 0~1 범위만 지원하므로 100%까지만 미리듣기 가능, 그 이상은 렌더링 결과로 확인)
   useEffect(() => {
@@ -531,6 +544,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const getStyle = (): StyleParams => ({
     title1_color: t1Color, title2_color: t2Color, title_y_extra: titleY,
     title_fontsize_scale: titleScale, sub_fontsize: subSize, sub_color: subColor, sub_margin_v: subY,
+    channel_name: channelName.trim(),
     font_name: 'NanumSquareRoundEB',
     brightness, contrast, saturation, volume,
   })
@@ -539,7 +553,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const handlePreview = useCallback(async () => {
     if (!raw) return
     try {
-      const blob = await api.preview(raw.filename, getTitle(), getStyle(), 2.0, bgImage||undefined)
+      const blob = await api.preview(raw.filename, getTitle(), getStyle(), 2.0, bgImage)
       const url = URL.createObjectURL(blob)
       const modal = document.createElement('div')
       modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer;'
@@ -554,7 +568,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     if (!raw || isRendering) return
     setIsRendering(true); setRenderMsg('')
     try {
-      await api.render(raw.filename, getTitle(), subtitles, templateId, getStyle(), bgImage||undefined, narration, narrVoice)
+      await api.render(raw.filename, getTitle(), subtitles, templateId, getStyle(), bgImage, narration, narrVoice)
       setRenderMsg(narration ? '✓ 나레이션 버전 렌더링 시작' : '✓ 렌더링 시작 — 완성 쇼츠 탭에서 확인')
       onStartPolling()
     } catch { setRenderMsg('오류가 발생했습니다') }
@@ -566,7 +580,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   if (isMobile) {
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface)' }}>
-        <video ref={hidVidRef} style={{ display: 'none' }} playsInline />
+        <video ref={hidVidRef} style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }} playsInline />
         {!raw
           ? <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: 8 }}>
               <div style={{ fontSize: 40, opacity: 0.15 }}>🎬</div>
@@ -638,6 +652,12 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                       <Slider label="하단 여백" value={subY} display={`${subY}px`} min={5} max={120} step={5} onChange={setSubY} />
                     </div>
                   )}
+                </div>
+
+                {/* 출처 채널명 */}
+                <div>
+                  <div className="section-label">출처 채널명 (영상 하단)</div>
+                  <input value={channelName} onChange={e => setChannelName(e.target.value)} placeholder="예: 채널명 / 출처: ○○뉴스" className="input-field" />
                 </div>
 
                 {/* 배경 */}
@@ -810,6 +830,12 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                     <Slider label="하단 여백" value={subY} display={`${subY}px`} min={5} max={120} step={5} onChange={setSubY} />
                   </div>
                 )}
+              </div>
+
+              {/* 출처 채널명 */}
+              <div>
+                <div className="section-label">출처 채널명 (영상 하단)</div>
+                <input value={channelName} onChange={e => setChannelName(e.target.value)} placeholder="예: 채널명 / 출처: ○○뉴스" className="input-field" />
               </div>
 
               {/* 배경 */}

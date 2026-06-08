@@ -144,6 +144,7 @@ export interface StyleParams {
   sub_fontsize: number
   sub_color: string
   sub_margin_v: number
+  channel_name?: string
   font_name?: string
   brightness?: number
   contrast?: number
@@ -162,6 +163,16 @@ export const api = {
 
   async login(email: string, password: string): Promise<AuthResponse> {
     const { data } = await client.post('/api/auth/login', { email, password })
+    return data
+  },
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const { data } = await client.post('/api/auth/forgot-password', { email })
+    return data
+  },
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const { data } = await client.post('/api/auth/reset-password', { token, new_password: newPassword })
     return data
   },
 
@@ -212,6 +223,10 @@ export const api = {
 
   async deleteRaw(filename: string): Promise<void> {
     await client.delete(`/api/raws/${filename}`)
+  },
+
+  async deleteDownload(filename: string): Promise<void> {
+    await client.delete(`/api/downloads/${encodeURIComponent(filename)}`)
   },
 
   async updateTitle(filename: string, introText: string): Promise<void> {

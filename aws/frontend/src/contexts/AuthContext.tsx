@@ -5,16 +5,19 @@ import {
   AUTH_TOKEN_KEY, AUTH_ERROR_KEY,
 } from '../services/api'
 
-type AuthModalMode = 'login' | 'signup'
+type AuthModalMode = 'login' | 'signup' | 'forgot' | 'reset'
 
 interface AuthContextValue {
   user: AuthUser | null
   loading: boolean
   error: string | null
+  message: string | null
   clearError: () => void
   login: (email: string, password: string) => Promise<void>
   signup: (email: string, password: string, name?: string) => Promise<void>
   loginWithGoogle: () => void
+  forgotPassword: (email: string) => Promise<void>
+  resetPassword: (newPassword: string) => Promise<void>
   logout: () => void
   showAuthModal: boolean
   authModalMode: AuthModalMode
@@ -28,21 +31,34 @@ function clearAuthHash() {
   window.history.replaceState(null, '', window.location.pathname + window.location.search)
 }
 
+function consumeResetTokenFromUrl(): string | null {
+  const url = new URL(window.location.href)
+  const token = url.searchParams.get('reset_token')
+  if (!token) return null
+  url.searchParams.delete('reset_token')
+  window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+  return token
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [authModalMode, setAuthModalMode] = useState<AuthModalMode>('login')
+  const [resetToken, setResetToken] = useState<string | null>(null)
 
   const openAuthModal = useCallback((mode: AuthModalMode = 'login') => {
     setAuthModalMode(mode)
     setError(null)
+    setMessage(null)
     setShowAuthModal(true)
   }, [])
   const closeAuthModal = useCallback(() => {
     setShowAuthModal(false)
     setError(null)
+    setMessage(null)
   }, [])
 
   const loadMe = useCallback(async () => {
@@ -57,6 +73,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 구글 로그인 콜백 리다이렉트(#auth_token=... / #auth_error=...) 처리.
   // 팝업으로 열렸다면 결과를 localStorage에 남기고 닫는다 — 메인 창은 storage 이벤트로 감지한다.
+  // 비밀번호 재설정 메일의 링크(?reset_token=...)로 들어온 경우 재설정 모달을 연다
+  useEffect(() => {
+    const token = consumeResetTokenFromUrl()
+    if (token) {
+      setResetToken(token)
+      setAuthModalMode('reset')
+      setShowAuthModal(true)
+    }
+  }, [])
+
   useEffect(() => {
     const hash = window.location.hash
     if (hash.startsWith('#auth_token=')) {
@@ -129,6 +155,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const forgotPassword = useCallback(async (email: string) => {
+    setError(null)
+    setMessage(null)
+    try {
+      const res = await api.forgotPassword(email)
+      setMessage(res.message)
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '요청 처리 중 오류가 발생했습니다.')
+      throw e
+    }
+  }, [])
+
+  const resetPassword = useCallback(async (newPassword: string) => {
+    if (!resetToken) {
+      setError('재설정 링크가 유효하지 않습니다. 다시 요청해주세요.')
+      throw new Error('missing reset token')
+    }
+    setError(null)
+    setMessage(null)
+    try {
+      const res = await api.resetPassword(resetToken, newPassword)
+      setMessage(res.message)
+      setResetToken(null)
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '비밀번호 재설정에 실패했습니다.')
+      throw e
+    }
+  }, [resetToken])
+
   const loginWithGoogle = useCallback(() => {
     setError(null)
     api.getGoogleLoginUrl()
@@ -146,7 +201,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user, loading, error, clearError, login, signup, loginWithGoogle, logout,
+      user, loading, error, message, clearError, login, signup, loginWithGoogle,
+      forgotPassword, resetPassword, logout,
       showAuthModal, authModalMode, openAuthModal, closeAuthModal,
     }}>
       {children}

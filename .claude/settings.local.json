@@ -8,7 +8,14 @@
       "Bash(wsl -e bash -c \"cd /home/user/edit_tool && source venv/bin/activate && python3 -c 'from editor.editor import Editor; print\\(\\\\\"OK\\\\\"\\)' 2>&1\")",
       "Bash(wsl -e bash -c \"cd /home/user/edit_tool && source venv/bin/activate && python3 -c 'from llm.analyzer import Analyzer; print\\(\\\\\"OK\\\\\"\\)' 2>&1\")",
       "Bash(wsl -e bash -c \"cd /home/user/edit_tool && source venv/bin/activate && python3 -c 'from editor.editor import Editor; from app import app; print\\(\\\\\"OK\\\\\"\\)' 2>&1\")",
-      "Bash(kill 1857 1859)"
+      "Bash(kill 1857 1859)",
+      "Bash(mkdir -p /home/ubuntu/chromedata)",
+      "Bash(rm -rf /home/ubuntu/chromedata/*)",
+      "Read(//home/ubuntu/**)",
+      "Bash(timeout 20 chromium-browser --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --remote-debugging-port=9333 --user-data-dir=/home/ubuntu/chromedata about:blank)",
+      "Bash(curl -s http://localhost:9333/json/version)",
+      "Bash(kill %1)",
+      "Bash(wait)"
     ]
   }
 }

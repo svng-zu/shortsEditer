@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     GOOGLE_AUTH_CLIENT_SECRET: str = ""
     GOOGLE_AUTH_REDIRECT_URI: str = "http://localhost/api/auth/google/callback"
 
+    # 비밀번호 재설정 메일 (AWS SES)
+    FRONTEND_URL: str = "https://gorilai.duckdns.org"
+    SES_SENDER_EMAIL: str = ""
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30
+
     # Whisper
     WHISPER_MODEL: str = "medium"
     WHISPER_LANGUAGE: str = "ko"

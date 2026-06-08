@@ -2,6 +2,8 @@
 """쇼츠 CRUD API"""
 
 import json
+import subprocess
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 
@@ -103,6 +105,47 @@ async def serve_raw(session_id: str, filename: str):
     return FileResponse(str(path), media_type="video/mp4")
 
 
+@router.get("/media/downloads/{session_id}/{filename}")
+async def serve_download(session_id: str, filename: str):
+    from app.session import make_session
+    s = make_session(session_id)
+    # S3 우선 서빙
+    s3_key = s.s3_key("downloads", filename)
+    url = get_s3().presigned_url(s3_key)
+    if url:
+        return RedirectResponse(url)
+    # 로컬 폴백
+    path = s.download_dir / filename
+    if not path.exists():
+        raise HTTPException(404, "파일 없음")
+    return FileResponse(str(path), media_type="video/mp4")
+
+
+def _thumb_path(session: SessionDirs, filename: str) -> Path:
+    thumbs_dir = session.download_dir / ".thumbs"
+    thumbs_dir.mkdir(parents=True, exist_ok=True)
+    return thumbs_dir / f"{Path(filename).stem}.jpg"
+
+
+@router.get("/media/downloads/{session_id}/{filename}/thumbnail")
+async def serve_download_thumbnail(session_id: str, filename: str):
+    """다운로드된 영상의 미리보기 이미지 — 1초 지점 프레임을 ffmpeg로 추출해 캐싱"""
+    from app.session import make_session
+    s = make_session(session_id)
+    thumb_path = _thumb_path(s, filename)
+    if not thumb_path.exists():
+        video_path = s.download_dir / filename
+        if not video_path.exists():
+            raise HTTPException(404, "파일 없음")
+        subprocess.run(
+            ["ffmpeg", "-y", "-ss", "1", "-i", str(video_path), "-frames:v", "1", "-vf", "scale=240:-1", str(thumb_path)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30,
+        )
+    if not thumb_path.exists():
+        raise HTTPException(404, "썸네일 생성 실패")
+    return FileResponse(str(thumb_path), media_type="image/jpeg")
+
+
 @router.delete("/shorts/{filename}")
 async def delete_short(filename: str, session: SessionDirs = Depends(get_session)):
     path = session.shorts_dir / filename
@@ -120,6 +163,17 @@ async def delete_raw(filename: str, session: SessionDirs = Depends(get_session))
         raise HTTPException(404, "파일 없음")
     path.unlink()
     get_s3().delete(session.s3_key("raw", filename))
+    return {"ok": True}
+
+
+@router.delete("/downloads/{filename}")
+async def delete_download(filename: str, session: SessionDirs = Depends(get_session)):
+    path = session.download_dir / filename
+    if not path.exists():
+        raise HTTPException(404, "파일 없음")
+    path.unlink()
+    get_s3().delete(session.s3_key("downloads", filename))
+    _thumb_path(session, filename).unlink(missing_ok=True)
     return {"ok": True}
 
 

@@ -25,3 +25,5 @@ class User(Base):
     session_id = Column(String, nullable=False)  # 연결된 SessionDirs 키
     is_admin = Column(Boolean, nullable=False, default=False, server_default="false")
     created_at = Column(DateTime, default=datetime.utcnow)
+    reset_token = Column(String, nullable=True)
+    reset_token_expires_at = Column(DateTime, nullable=True)

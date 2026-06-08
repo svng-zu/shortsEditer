@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { api, apiClient, PipelineStatus, FileCounts } from '../services/api'
+import { api, apiClient, getSessionId, PipelineStatus, FileCounts } from '../services/api'
 
 function isQuotaError(e: any): boolean {
   return e?.response?.status === 403 && e?.response?.data?.detail?.code === 'quota_exceeded'
@@ -148,23 +148,154 @@ export default function Pipeline({ status, fileCounts, isRunning, onStartPolling
       else throw e
     }
   }
-  const videoSet = new Set(fileCounts.videos)
-
   const steps = [
     { num: 1, activeSteps: ['collecting'],
-      title: '영상 수집', icon: '⬇️', files: fileCounts.downloads, nextSet: videoSet,
+      title: '영상 수집', icon: '⬇️', files: fileCounts.downloads,
       action: run(() => api.collect(clearExisting, collectLimit)), btnLabel: '채널 수집' },
     { num: 2, activeSteps: ['transcribing', 'analyzing', 'editing'],
-      title: '영상 편집', icon: '✂️', files: fileCounts.videos, nextSet: new Set<string>(),
+      title: '영상 편집', icon: '✂️', files: fileCounts.videos,
       action: run(() => api.process(1)), btnLabel: '편집 시작' },
   ]
 
   const counters = [
     { n: fileCounts.downloads.length,   label: '영상',  color: '#1a73e8' },
-    { n: fileCounts.transcripts.length, label: '자막',  color: '#34a853' },
-    { n: fileCounts.analyses.length,    label: '분석',  color: '#f9ab00' },
     { n: fileCounts.videos.length,      label: '편집',  color: '#ea4335' },
   ]
+
+  // 수집된 영상 관리 — 체크박스 선택 + 개별/일괄 삭제
+  const [selectedDownloads, setSelectedDownloads] = useState<Set<string>>(new Set())
+  const [deletingDownloads, setDeletingDownloads] = useState<Set<string>>(new Set())
+  const editedDownloads = new Set(fileCounts.videos)
+
+  // 목록이 바뀌면(새로고침/삭제) 더 이상 존재하지 않는 항목의 선택을 정리
+  useEffect(() => {
+    setSelectedDownloads(prev => {
+      const next = new Set([...prev].filter(name => fileCounts.downloads.includes(name)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [fileCounts.downloads])
+
+  const toggleDownloadSelect = (name: string) => {
+    setSelectedDownloads(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name); else next.add(name)
+      return next
+    })
+  }
+  const toggleSelectAllDownloads = () => {
+    setSelectedDownloads(prev =>
+      prev.size === fileCounts.downloads.length ? new Set() : new Set(fileCounts.downloads)
+    )
+  }
+  const removeDownload = async (name: string) => {
+    setDeletingDownloads(prev => new Set(prev).add(name))
+    try {
+      await api.deleteDownload(`${name}.mp4`)
+      setSelectedDownloads(prev => { const next = new Set(prev); next.delete(name); return next })
+      onRefresh()
+    } finally {
+      setDeletingDownloads(prev => { const next = new Set(prev); next.delete(name); return next })
+    }
+  }
+  const removeSelectedDownloads = async () => {
+    const names = [...selectedDownloads]
+    if (names.length === 0) return
+    setDeletingDownloads(new Set(names))
+    try {
+      await Promise.all(names.map(name => api.deleteDownload(`${name}.mp4`)))
+      setSelectedDownloads(new Set())
+      onRefresh()
+    } finally {
+      setDeletingDownloads(new Set())
+    }
+  }
+
+  // 수집된 영상 관리 카드 — 체크박스 | 썸네일 | 제목 | 상태 | 작업
+  const videoCollectionCard = fileCounts.downloads.length > 0 && (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--surface)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '12px 16px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>📼 수집된 영상</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>총 {fileCounts.downloads.length}개 영상이 수집되었습니다.</div>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={steps[0].action} className="btn-outlined" style={{ fontSize: 11, padding: '6px 12px', borderRadius: 8 }}>
+            ↻ 다시 수집
+          </button>
+          <button onClick={removeSelectedDownloads} disabled={selectedDownloads.size === 0} className="btn-outlined"
+            style={{
+              fontSize: 11, padding: '6px 12px', borderRadius: 8,
+              color: selectedDownloads.size > 0 ? 'var(--error)' : 'var(--muted)',
+              borderColor: selectedDownloads.size > 0 ? 'var(--error)' : 'var(--border)',
+              cursor: selectedDownloads.size > 0 ? 'pointer' : 'default',
+            }}>
+            🗑 선택 삭제{selectedDownloads.size > 0 ? ` (${selectedDownloads.size})` : ''}
+          </button>
+        </div>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: 'var(--surface2)' }}>
+              <th style={{ width: 36, padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
+                <input type="checkbox"
+                  checked={selectedDownloads.size > 0 && selectedDownloads.size === fileCounts.downloads.length}
+                  onChange={toggleSelectAllDownloads}
+                  style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+              </th>
+              <th style={{ width: 132, padding: '8px 10px', textAlign: 'left', color: 'var(--text2)', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>썸네일</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: 'var(--text2)', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>제목</th>
+              <th style={{ width: 64, padding: '8px 10px', textAlign: 'center', color: 'var(--text2)', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>상태</th>
+              <th style={{ width: 64, padding: '8px 10px', textAlign: 'center', color: 'var(--text2)', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>작업</th>
+            </tr>
+          </thead>
+          <tbody>
+            {fileCounts.downloads.map(name => {
+              const done = editedDownloads.has(name)
+              const deleting = deletingDownloads.has(name)
+              return (
+                <tr key={name} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                    <input type="checkbox" checked={selectedDownloads.has(name)} onChange={() => toggleDownloadSelect(name)}
+                      style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+                  </td>
+                  <td style={{ padding: '6px 10px' }}>
+                    <div style={{ width: 112, height: 198, borderRadius: 8, overflow: 'hidden', background: '#000' }}>
+                      {/* fileCounts.downloads는 확장자 없는 stem이라 썸네일 URL에는 .mp4를 붙여줘야 함 — 서버에서 ffmpeg로 추출한 정지 이미지를 사용 */}
+                      <img src={`/api/media/downloads/${getSessionId()}/${encodeURIComponent(`${name}.mp4`)}/thumbnail`} loading="lazy" alt={name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    </div>
+                  </td>
+                  <td style={{ padding: '6px 10px', maxWidth: 0 }}>
+                    <div title={name} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>{name}</div>
+                  </td>
+                  <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20,
+                      background: done ? '#e6f4ea' : '#f1f3f4',
+                      color: done ? '#34a853' : 'var(--muted)',
+                    }}>
+                      {done ? '완료' : '대기'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                    <button onClick={() => removeDownload(name)} disabled={deleting}
+                      style={{
+                        fontSize: 11, padding: '4px 10px', borderRadius: 6,
+                        background: 'var(--surface2)', color: 'var(--error)', border: '1px solid var(--border)',
+                        cursor: deleting ? 'default' : 'pointer', opacity: deleting ? 0.5 : 1,
+                      }}>
+                      {deleting ? '...' : '삭제'}
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 
   if (isMobile) {
     return (
@@ -211,10 +342,65 @@ export default function Pipeline({ status, fileCounts, isRunning, onStartPolling
               </div>
             ))}
           </div>
+
+        </div>
+
+        {/* ── 검색창(구글 스타일) — URL로 영상 가져오기 ── */}
+        <div style={{ background: 'white', padding: '20px 16px 18px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', letterSpacing: 0.4 }}>🔍 YouTube 영상으로 쇼츠 만들기</div>
+
+          <div style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 6,
+            padding: '4px 4px 4px 16px', borderRadius: 999,
+            border: '1px solid var(--border)', boxShadow: '0 2px 12px rgba(32,33,36,0.08)',
+            background: 'white',
+          }}>
+            <span style={{ fontSize: 15 }}>🔗</span>
+            <input
+              value={urlInput} onChange={e => setUrlInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !urlLoading) handleUrlDownload() }}
+              placeholder="YouTube 영상 URL을 붙여넣으세요"
+              style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, padding: '11px 0', color: 'var(--text)' }}
+            />
+            <button onClick={handleUrlDownload} disabled={urlLoading || !urlInput.trim()} className={urlInput.trim() ? 'btn-primary' : 'btn-outlined'}
+              style={{ borderRadius: 999, padding: '10px 16px', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>
+              {urlLoading ? <div className="spinner spinner-sm" style={{ borderTopColor: urlInput.trim() ? 'white' : 'var(--primary)' }} /> : '⬇ 다운로드'}
+            </button>
+          </div>
+
+          <select value={urlCategory} onChange={e => setUrlCategory(e.target.value)}
+            style={{ width: '100%', border: '1px solid var(--border)', background: 'var(--surface2)', borderRadius: 999, padding: '9px 16px', fontSize: 12, fontWeight: 600, color: 'var(--text2)', cursor: 'pointer', outline: 'none', textAlign: 'center', textAlignLast: 'center' }}>
+            {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+
+          {urlStatus && (
+            <div style={{ fontSize: 12, fontWeight: 600, color: urlStatus.startsWith('✓') ? 'var(--success)' : urlStatus.startsWith('오류') ? 'var(--error)' : 'var(--primary)' }}>
+              {urlStatus}
+            </div>
+          )}
+
+          {/* 파일 업로드 드래그존 */}
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) uploadFile(f) }}
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              width: '100%', border: `1.5px dashed ${dragOver ? 'var(--primary)' : 'var(--border)'}`,
+              borderRadius: 999, padding: '9px 14px', textAlign: 'center', cursor: 'pointer',
+              fontSize: 12, fontWeight: 600, color: dragOver ? 'var(--primary)' : 'var(--text2)',
+              background: dragOver ? 'var(--primary-bg)' : 'var(--surface2)', transition: 'all .15s',
+            }}>
+            <input ref={fileInputRef} type="file" accept=".mp4,.mkv,.mov,.avi" style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f) }} />
+            {uploading ? `📁 ${uploadPct}% 업로드 중...` : '📁 또는 영상 파일 직접 업로드 (드래그 가능)'}
+          </div>
+          {uploadMsg && <div style={{ fontSize: 12, fontWeight: 600, color: uploadMsg.startsWith('✓') ? 'var(--success)' : 'var(--error)' }}>{uploadMsg}</div>}
         </div>
 
         {/* 파이프라인 스텝 리스트 */}
         <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {videoCollectionCard}
           {steps.map(step => {
             const isActive = step.activeSteps.includes(status.step)
             const isDone   = step.files.length > 0
@@ -249,48 +435,9 @@ export default function Pipeline({ status, fileCounts, isRunning, onStartPolling
                 {/* Step 1: URL 입력 + 채널 관리 */}
                 {step.num === 1 && (
                   <div style={{ padding: '0 14px 12px', display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--border)' }}>
-                    <div style={{ paddingTop: 10 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 6 }}>YouTube URL 직접 입력</div>
-                      <input
-                        value={urlInput} onChange={e => setUrlInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && !urlLoading) handleUrlDownload() }}
-                        placeholder="https://youtube.com/watch?v=..."
-                        className="input-field" style={{ fontSize: 13, marginBottom: 6 }}
-                      />
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <select value={urlCategory} onChange={e => setUrlCategory(e.target.value)}
-                          style={{ flex: 1, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, color: 'var(--text)', background: 'white', outline: 'none' }}>
-                          {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                        </select>
-                        <button onClick={handleUrlDownload} disabled={urlLoading || !urlInput.trim()} className={urlInput.trim() ? 'btn-primary' : 'btn-outlined'}
-                          style={{ padding: '8px 16px', fontSize: 13, borderRadius: 8, whiteSpace: 'nowrap' }}>
-                          {urlLoading ? <div className="spinner spinner-sm" style={{ borderTopColor: urlInput.trim() ? 'white' : 'var(--primary)' }} /> : '⬇ 다운'}
-                        </button>
-                      </div>
-                      {urlStatus && (
-                        <div style={{ marginTop: 6, fontSize: 12, color: urlStatus.startsWith('✓') ? 'var(--success)' : urlStatus.startsWith('오류') ? 'var(--error)' : 'var(--primary)', fontWeight: 600 }}>
-                          {urlStatus}
-                        </div>
-                      )}
+                    <div style={{ paddingTop: 10, fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
+                      💡 URL로 바로 가져오려면 상단 검색창을 이용하세요. 여기서는 자동 수집할 채널과 옵션을 관리할 수 있어요.
                     </div>
-
-                    {/* 파일 업로드 */}
-                    <div
-                      onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-                      onDragLeave={() => setDragOver(false)}
-                      onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) uploadFile(f) }}
-                      onClick={() => fileInputRef.current?.click()}
-                      style={{
-                        border: `2px dashed ${dragOver ? 'var(--primary)' : 'var(--border)'}`,
-                        borderRadius: 10, padding: '12px', textAlign: 'center', cursor: 'pointer',
-                        fontSize: 13, color: dragOver ? 'var(--primary)' : 'var(--text2)',
-                        background: dragOver ? 'var(--primary-bg)' : 'var(--surface2)',
-                      }}>
-                      <input ref={fileInputRef} type="file" accept=".mp4,.mkv,.mov,.avi" style={{ display: 'none' }}
-                        onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f) }} />
-                      {uploading ? `${uploadPct}% 업로드 중...` : '📁 파일 선택 (MP4)'}
-                    </div>
-                    {uploadMsg && <div style={{ fontSize: 12, color: uploadMsg.startsWith('✓') ? 'var(--success)' : 'var(--error)', textAlign: 'center', fontWeight: 600 }}>{uploadMsg}</div>}
 
                     {/* 채널 관리 */}
                     <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
@@ -355,7 +502,7 @@ export default function Pipeline({ status, fileCounts, isRunning, onStartPolling
                 )}
 
                 {/* 실행 버튼 */}
-                <div style={{ padding: '10px 14px 14px' }}>
+                <div style={{ padding: '10px 28px 14px' }}>
                   <button onClick={step.action} className="btn-primary"
                     style={{ width: '100%', padding: '12px 0', fontSize: 14, borderRadius: 10, fontWeight: 700 }}>
                     {isActive
@@ -568,19 +715,25 @@ export default function Pipeline({ status, fileCounts, isRunning, onStartPolling
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, background: 'var(--border)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        {[
-          { n: fileCounts.downloads.length,   l: '영상' },
-          { n: fileCounts.transcripts.length, l: '자막' },
-          { n: fileCounts.analyses.length,    l: '분석' },
-          { n: fileCounts.videos.length,      l: '편집' },
-        ].map(({ n, l }) => (
-          <div key={l} style={{ background: 'var(--surface2)', padding: '8px 4px', textAlign: 'center' }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: n > 0 ? 'var(--primary)' : 'var(--muted)', lineHeight: 1.2 }}>{n}</div>
-            <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 1 }}>{l}</div>
+      <div style={{ display: 'flex', justifyContent: 'center', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+      <div style={{ width: '100%', maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 1, background: 'var(--border)' }}>
+        {counters.map(({ n, label }) => (
+          <div key={label} style={{ width: '100%', background: 'var(--surface2)' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 8, padding: '8px 4px' }}>
+              <span style={{ fontSize: 20, fontWeight: 700, color: n > 0 ? 'var(--primary)' : 'var(--muted)', lineHeight: 1.2 }}>{n}</span>
+              <span style={{ fontSize: 10, color: 'var(--text2)' }}>{label}</span>
+            </div>
           </div>
         ))}
       </div>
+      </div>
+
+      {/* 수집된 영상 관리 — 체크박스 | 썸네일 | 제목 | 상태 | 작업 */}
+      {videoCollectionCard && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 16px 0' }}>
+          <div style={{ width: '100%', maxWidth: 720 }}>{videoCollectionCard}</div>
+        </div>
+      )}
 
       {isRunning && (
         <div style={{ height: 3, background: '#e8eaed', flexShrink: 0 }}>
@@ -596,7 +749,7 @@ export default function Pipeline({ status, fileCounts, isRunning, onStartPolling
 
           return (
             <div key={step.num} style={{
-              flex: '1 1 100%', display: 'flex', flexDirection: 'column',
+              flex: '0 1 720px', width: '100%', display: 'flex', flexDirection: 'column',
               border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
               borderRadius: 10, overflow: 'hidden',
               background: isActive ? '#f8f9ff' : 'var(--surface)',
@@ -620,20 +773,7 @@ export default function Pipeline({ status, fileCounts, isRunning, onStartPolling
                 </div>
               </div>
 
-              {step.files.length > 0 && (
-                <div style={{ maxHeight: 84, overflowY: 'auto', borderTop: '1px solid var(--border)', background: 'var(--surface2)' }}>
-                  {step.files.map(name => {
-                    const done = step.nextSet.has(name)
-                    return (
-                      <div key={name} style={{ padding: '2px 12px', fontSize: 10, color: done ? 'var(--success)' : 'var(--text2)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {done ? '✓ ' : '  '}{name}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              <div style={{ padding: '12px 14px', marginTop: 'auto' }}>
+              <div style={{ padding: '12px 48px', marginTop: 'auto' }}>
                 <button onClick={step.action} className="btn-primary"
                   style={{ width: '100%', padding: '8px 0' }}>
                   {isActive ? <><div className="spinner spinner-sm" style={{ borderTopColor: 'white', marginRight: 6 }} />처리 중...</> : step.btnLabel}

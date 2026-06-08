@@ -48,6 +48,8 @@ services:
       - GOOGLE_AUTH_CLIENT_ID=${GOOGLE_AUTH_CLIENT_ID:-}
       - GOOGLE_AUTH_CLIENT_SECRET=${GOOGLE_AUTH_CLIENT_SECRET:-}
       - GOOGLE_AUTH_REDIRECT_URI=${GOOGLE_AUTH_REDIRECT_URI:-}
+      - FRONTEND_URL=${FRONTEND_URL:-https://gorilai.duckdns.org}
+      - SES_SENDER_EMAIL=${SES_SENDER_EMAIL:-}
     volumes:
       - ./data:/app/data
       - ./static:/app/static

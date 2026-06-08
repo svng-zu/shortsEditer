@@ -1,6 +1,7 @@
 # backend/app/services/auth_service.py
 """비밀번호 해시, JWT 발급/검증, 사용자 CRUD 헬퍼"""
 
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -40,6 +41,38 @@ def get_user_by_email(db: Session, email: str) -> User | None:
 
 def get_user_by_id(db: Session, user_id: str) -> User | None:
     return db.query(User).filter(User.id == user_id).first()
+
+
+def issue_password_reset_token(db: Session, user: User) -> str:
+    """비밀번호 재설정 토큰을 생성해 사용자에 저장하고 반환한다 (평문 토큰은 메일로만 전달)"""
+    token = secrets.token_urlsafe(32)
+    user.reset_token = token
+    user.reset_token_expires_at = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES
+    )
+    db.commit()
+    return token
+
+
+def get_user_by_reset_token(db: Session, token: str) -> User | None:
+    """토큰이 유효(존재 + 미만료)한 사용자만 반환"""
+    user = db.query(User).filter(User.reset_token == token).first()
+    if not user or not user.reset_token_expires_at:
+        return None
+    expires_at = user.reset_token_expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < datetime.now(timezone.utc):
+        return None
+    return user
+
+
+def reset_password_with_token(db: Session, user: User, new_password: str) -> None:
+    """새 비밀번호로 교체하고 재설정 토큰을 폐기한다"""
+    user.password_hash = hash_password(new_password)
+    user.reset_token = None
+    user.reset_token_expires_at = None
+    db.commit()
 
 
 def create_user(

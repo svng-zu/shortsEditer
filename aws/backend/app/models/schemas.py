@@ -39,6 +39,7 @@ class StyleParams(BaseModel):
     sub_fontsize: int = 28
     sub_color: str = "#FFFFFF"
     sub_margin_v: int = 20
+    channel_name: str = ""
     font_name: str = "NanumSquareRoundEB"
     brightness: float = 0.0
     contrast: float = 1.0
@@ -117,6 +118,19 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class MessageResponse(BaseModel):
+    message: str
 
 
 class UserResponse(BaseModel):

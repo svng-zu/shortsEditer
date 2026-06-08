@@ -222,6 +222,7 @@ class EditorBase:
 
     def _build_overlay_vf(self, title_text, style=None):
         t = self.template
+        s = style or {}
         filters = [f"pad={CANVAS_W}:{CANVAS_H}:0:{VIDEO_Y}:color={t['bg_color']}"]
         if t.get("top_bg_color"):
             filters.append(f"drawbox=x=0:y=0:w={CANVAS_W}:h={TOP_H}:color={t['top_bg_color']}:t=fill")
@@ -235,10 +236,24 @@ class EditorBase:
                 t["title_fontsize"], t["title_color"], t.get("title_border", "0xFFD700"),
                 style=style
             )
+        channel = (s.get("channel_name") or "").strip()
+        if channel:
+            esc = channel.replace("'", "\\'").replace(":", "\\:").replace("%", "\\%")
+            font_opt = f":fontfile='{self.font}'" if self.font else ""
+            ch_fontsize = 36
+            cy = VIDEO_Y + VIDEO_H + (BOTTOM_H - ch_fontsize) // 2
+            filters.append(
+                f"drawtext=text='{esc}'"
+                f"{font_opt}"
+                f":fontsize={ch_fontsize}:fontcolor=white@0.75"
+                f":borderw=2:bordercolor=black@0.6"
+                f":x=(w-text_w)/2:y={cy}"
+            )
         return ",".join(filters)
 
     def _build_text_filters(self, title_text, style=None):
         t = self.template
+        s = style or {}
         filters = []
         if t.get("divider"):
             dc = t["divider_color"]
@@ -249,6 +264,19 @@ class EditorBase:
                 title_text, TOP_H // 2 + 140,
                 t["title_fontsize"], t["title_color"], t.get("title_border", "0xFFD700"),
                 style=style
+            )
+        channel = (s.get("channel_name") or "").strip()
+        if channel:
+            esc = channel.replace("'", "\\'").replace(":", "\\:").replace("%", "\\%")
+            font_opt = f":fontfile='{self.font}'" if self.font else ""
+            ch_fontsize = 36
+            cy = VIDEO_Y + VIDEO_H + (BOTTOM_H - ch_fontsize) // 2
+            filters.append(
+                f"drawtext=text='{esc}'"
+                f"{font_opt}"
+                f":fontsize={ch_fontsize}:fontcolor=white@0.75"
+                f":borderw=2:bordercolor=black@0.6"
+                f":x=(w-text_w)/2:y={cy}"
             )
         return filters
 
@@ -384,7 +412,11 @@ class EditorBase:
                 f.write(f"{i}\n{_srt_time(s)} --> {_srt_time(e)}\n{text}\n\n")
         return True
 
-    def _resolve_bg_path(self, category: str, bg_image: str = None) -> str:
+    def _resolve_bg_path(self, category: str, bg_image: str = None) -> str | None:
+        # bg_image == "" → 사용자가 "단색 배경"을 명시적으로 선택한 것 (이미지 없이 단색으로)
+        # bg_image is None → 선택하지 않음 (카테고리 기본 배경 이미지 사용)
+        if bg_image == "":
+            return None
         stem = bg_image if bg_image else category
         return str(settings.STATIC_DIR / "backgrounds" / f"{stem}.png")
 
@@ -515,7 +547,7 @@ class EditorBase:
         volume = self._volume_value(style)
         af_opts = ["-af", f"volume={volume}"] if volume is not None else []
 
-        if os.path.exists(bg_path):
+        if bg_path and os.path.exists(bg_path):
             text_filters = self._build_text_filters(title, style=style)
             parts = [f for f in [",".join(text_filters), sub_str] if f]
             all_vf_str = ",".join(parts)
@@ -625,7 +657,7 @@ class EditorBase:
 
         color_f = self._color_filter_str(style)
 
-        if os.path.exists(bg_path):
+        if bg_path and os.path.exists(bg_path):
             text_filters = self._build_text_filters(title, style=style)
             text_str = ",".join(text_filters) if text_filters else "null"
             mid = "prelogo" if has_logo else "out"
