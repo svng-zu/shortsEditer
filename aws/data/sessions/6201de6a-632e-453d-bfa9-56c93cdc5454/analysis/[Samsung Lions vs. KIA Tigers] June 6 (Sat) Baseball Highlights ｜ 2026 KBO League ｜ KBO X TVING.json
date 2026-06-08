@@ -1,0 +1,61 @@
+{
+  "transcript_path": "/app/data/sessions/6201de6a-632e-453d-bfa9-56c93cdc5454/transcripts/[Samsung Lions vs. KIA Tigers] June 6 (Sat) Baseball Highlights ｜ 2026 KBO League ｜ KBO X TVING.json",
+  "category": "sports",
+  "intro_text": "삼성 vs 기아\n06.06 KBO 하이라이트",
+  "candidates": [
+    {
+      "start": 0.0,
+      "end": 10.0,
+      "reason": "경기 시작 알림 및 대결 팀 소개 (가장 먼저 나올 장면).",
+      "score": 10,
+      "edit_order": 1,
+      "connection_note": "시작"
+    },
+    {
+      "start": 304.18,
+      "end": 360.12,
+      "reason": "오선 선수 활약 (한국 선수 관련 하이라이트 및 활약 언급).",
+      "score": 8,
+      "edit_order": 2,
+      "connection_note": "경기 초반 분위기에서 자연스럽게 오선 선수의 활약으로 전환."
+    },
+    {
+      "start": 686.58,
+      "end": 703.5,
+      "reason": "기아 팀의 중요한 순간 (팀 활약 언급).",
+      "score": 7,
+      "edit_order": 3,
+      "connection_note": "오선 선수 활약 후, 기아 팀 전체의 흐름을 보여주는 장면으로 전환."
+    },
+    {
+      "start": 782.14,
+      "end": 871.76,
+      "reason": "주자 관련 극적인 플레이 (경기 결정적 장면 묘사 및 극적인 순간).",
+      "score": 9,
+      "edit_order": 4,
+      "connection_note": "기아 팀의 활약 후, 경기 흐름을 바꿀 수 있는 중요한 주자 플레이로 연결."
+    },
+    {
+      "start": 871.76,
+      "end": 926.68,
+      "reason": "박성 선수 활약 (한국 선수 관련 하이라이트, 경기 후반 결정적 장면).",
+      "score": 9,
+      "edit_order": 5,
+      "connection_note": "주자 플레이 이후, 경기의 승패를 가를 수 있는 박성 선수의 결정적 활약으로 마무리."
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 12.0,
+      "orig_start": 0,
+      "orig_end": 12.0
+    },
+    {
+      "raw_start": 12.0,
+      "raw_end": 59.0,
+      "orig_start": 302.18,
+      "orig_end": 349.18
+    }
+  ]
+}

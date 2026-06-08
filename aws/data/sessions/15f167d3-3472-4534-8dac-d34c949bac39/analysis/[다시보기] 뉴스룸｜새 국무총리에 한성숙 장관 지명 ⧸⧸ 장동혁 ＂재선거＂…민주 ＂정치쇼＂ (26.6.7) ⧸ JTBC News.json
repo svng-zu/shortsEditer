@@ -1,0 +1,48 @@
+{
+  "transcript_path": "/app/data/sessions/15f167d3-3472-4534-8dac-d34c949bac39/transcripts/[다시보기] 뉴스룸｜새 국무총리에 한성숙 장관 지명 ⧸⧸ 장동혁 ＂재선거＂…민주 ＂정치쇼＂ (26.6.7) ⧸ JTBC News.json",
+  "category": "politics",
+  "intro_text": "국무총리 지명\n한성숙 장관",
+  "candidates": [
+    {
+      "start": 10.0,
+      "end": 25.0,
+      "reason": "이재명 대통령의 새 국무총리 한성숙 장관 지명 발표 및 주요 발언으로, 핵심 쟁점을 요약하는 강한 발언이 예상됩니다.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 100.0,
+      "end": 115.0,
+      "reason": "대통령이 밝히는 국무총리 지명 배경 및 국정 운영에 대한 비전 제시 발언으로, 여론을 움직일 만한 주장이 포함될 수 있습니다.",
+      "score": 8,
+      "edit_order": 2
+    },
+    {
+      "start": 150.0,
+      "end": 165.0,
+      "reason": "김민 기자의 국무총리 지명 관련 핵심 쟁점 분석 또는 여론 동향 보도로, 논쟁적 발언이나 핵심 쟁점 요약이 기대됩니다.",
+      "score": 7,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 19.0,
+      "orig_start": 8.0,
+      "orig_end": 27.0
+    },
+    {
+      "raw_start": 19.0,
+      "raw_end": 38.0,
+      "orig_start": 98.0,
+      "orig_end": 117.0
+    },
+    {
+      "raw_start": 38.0,
+      "raw_end": 57.0,
+      "orig_start": 148.0,
+      "orig_end": 167.0
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 # backend/app/models/schemas.py
-from pydantic import BaseModel
+from datetime import datetime
+
+from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from enum import Enum
 
@@ -22,6 +24,7 @@ class PipelineStatus(BaseModel):
 
 class CollectRequest(BaseModel):
     clear_existing: bool = True
+    limit_per_channel: int = 3
 
 
 class EditRequest(BaseModel):
@@ -37,6 +40,10 @@ class StyleParams(BaseModel):
     sub_color: str = "#FFFFFF"
     sub_margin_v: int = 20
     font_name: str = "NanumSquareRoundEB"
+    brightness: float = 0.0
+    contrast: float = 1.0
+    saturation: float = 1.0
+    volume: float = 1.0
 
 
 class RenderRequest(BaseModel):
@@ -46,6 +53,8 @@ class RenderRequest(BaseModel):
     template_id: int = 1
     style: StyleParams = StyleParams()
     bg_image: Optional[str] = None
+    narration: bool = False
+    narration_voice: str = "female"
 
 
 class PreviewRequest(BaseModel):
@@ -94,3 +103,35 @@ class RawInfo(BaseModel):
     url: str
     title: str
     category: str
+
+
+# ── 사용자 계정 / 인증 ──────────────────────────────────────
+
+class SignupRequest(BaseModel):
+    email: EmailStr
+    password: str
+    name: Optional[str] = None
+    session_id: str  # 가입 시점에 브라우저가 갖고 있던 기존 세션 ID (데이터 연결용)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: Optional[str] = None
+    provider: str
+    is_admin: bool = False
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse

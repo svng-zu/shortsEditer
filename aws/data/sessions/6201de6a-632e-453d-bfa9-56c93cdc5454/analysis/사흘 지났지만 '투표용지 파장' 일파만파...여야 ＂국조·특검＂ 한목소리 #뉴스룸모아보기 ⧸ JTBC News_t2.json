@@ -1,0 +1,48 @@
+{
+  "transcript_path": "/app/data/sessions/6201de6a-632e-453d-bfa9-56c93cdc5454/transcripts/사흘 지났지만 '투표용지 파장' 일파만파...여야 ＂국조·특검＂ 한목소리 #뉴스룸모아보기 ⧸ JTBC News.json",
+  "category": "politics",
+  "intro_text": "김건희 명품백\n검찰 수사 본격화",
+  "candidates": [
+    {
+      "start": 120.44,
+      "end": 125.74,
+      "reason": "김건희 여사 명품백 수수 의혹에 대한 검찰 수사 본격화 소식을 전달하며 핵심 쟁점 제시.",
+      "score": 8,
+      "edit_order": 1
+    },
+    {
+      "start": 140.84,
+      "end": 146.94,
+      "reason": "야당이 명품백 수수를 '청탁금지법 위반'으로 규정하며 철저한 수사를 촉구하는 강한 발언.",
+      "score": 9,
+      "edit_order": 2
+    },
+    {
+      "start": 186.24,
+      "end": 192.34,
+      "reason": "대통령의 '법과 원칙' 발언과 야당의 '수사 외압' 의혹 제기를 대비시켜 논쟁적 상황을 요약.",
+      "score": 9,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 9.3,
+      "orig_start": 118.44,
+      "orig_end": 127.74
+    },
+    {
+      "raw_start": 9.3,
+      "raw_end": 19.4,
+      "orig_start": 138.84,
+      "orig_end": 148.94
+    },
+    {
+      "raw_start": 19.4,
+      "raw_end": 29.5,
+      "orig_start": 184.24,
+      "orig_end": 194.34
+    }
+  ]
+}

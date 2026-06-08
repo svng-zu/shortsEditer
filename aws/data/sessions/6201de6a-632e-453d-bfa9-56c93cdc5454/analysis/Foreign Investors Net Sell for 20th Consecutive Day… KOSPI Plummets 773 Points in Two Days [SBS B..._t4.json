@@ -1,0 +1,48 @@
+{
+  "transcript_path": "/app/data/sessions/6201de6a-632e-453d-bfa9-56c93cdc5454/transcripts/Foreign Investors Net Sell for 20th Consecutive Day… KOSPI Plummets 773 Points in Two Days [SBS B....json",
+  "category": "economy",
+  "intro_text": "새마을금고 위기\n서민 경제 불안",
+  "candidates": [
+    {
+      "start": 906.6,
+      "end": 913.6,
+      "reason": "새마을금고 관련 최근 이슈(부실 대출, 뱅크런 우려 등)를 언급하며 일반인에게 직접적인 영향을 미치는 생활 경제 이슈를 다룰 수 있습니다.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 925.0,
+      "end": 935.0,
+      "reason": "새마을금고 사태가 서민들의 예금, 대출에 미치는 영향 등 일반인이 체감할 수 있는 불안감을 설명할 가능성이 높습니다.",
+      "score": 8,
+      "edit_order": 2
+    },
+    {
+      "start": 950.0,
+      "end": 960.0,
+      "reason": "정부의 대응 방안이나 향후 새마을금고의 건전성 회복 전망 등 시청자에게 중요한 정보를 제공할 수 있습니다.",
+      "score": 8,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 11.0,
+      "orig_start": 904.6,
+      "orig_end": 915.6
+    },
+    {
+      "raw_start": 11.0,
+      "raw_end": 25.0,
+      "orig_start": 923.0,
+      "orig_end": 937.0
+    },
+    {
+      "raw_start": 25.0,
+      "raw_end": 39.0,
+      "orig_start": 948.0,
+      "orig_end": 962.0
+    }
+  ]
+}

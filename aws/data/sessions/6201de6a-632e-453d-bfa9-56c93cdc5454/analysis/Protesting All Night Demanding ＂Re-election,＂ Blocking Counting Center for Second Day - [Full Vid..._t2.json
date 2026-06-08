@@ -1,0 +1,48 @@
+{
+  "transcript_path": "/app/data/sessions/6201de6a-632e-453d-bfa9-56c93cdc5454/transcripts/Protesting All Night Demanding ＂Re-election,＂ Blocking Counting Center for Second Day - [Full Vid....json",
+  "category": "politics",
+  "intro_text": "정치권 입장 표명\n선거 결과 논란",
+  "candidates": [
+    {
+      "start": 480,
+      "end": 490,
+      "reason": "선거 결과에 대한 정치인의 강한 비판 또는 옹호 발언으로, 논쟁의 핵심 쟁점을 담고 있어 파급력이 큰 구간.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 550,
+      "end": 558,
+      "reason": "현 상황에 대한 정치권의 공식적인 입장 표명 또는 향후 대책 제시로, 여론의 방향을 제시할 수 있는 구간.",
+      "score": 8,
+      "edit_order": 2
+    },
+    {
+      "start": 1890,
+      "end": 1898,
+      "reason": "전국적인 파장을 일으킬 수 있는 정치권의 폭로성 발언 또는 중대 발표로, 핵심 쟁점을 한 문장으로 요약하여 전달하는 구간.",
+      "score": 10,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 14.0,
+      "orig_start": 478,
+      "orig_end": 492
+    },
+    {
+      "raw_start": 14.0,
+      "raw_end": 26.0,
+      "orig_start": 548,
+      "orig_end": 560
+    },
+    {
+      "raw_start": 26.0,
+      "raw_end": 38.0,
+      "orig_start": 1888,
+      "orig_end": 1900
+    }
+  ]
+}

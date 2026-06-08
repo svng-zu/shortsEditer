@@ -1,0 +1,48 @@
+{
+  "transcript_path": "/app/data/sessions/6201de6a-632e-453d-bfa9-56c93cdc5454/transcripts/사흘 지났지만 '투표용지 파장' 일파만파...여야 ＂국조·특검＂ 한목소리 #뉴스룸모아보기 ⧸ JTBC News.json",
+  "category": "politics",
+  "intro_text": "투표용지 파장\n국조·특검 한목소리",
+  "candidates": [
+    {
+      "start": 6.34,
+      "end": 12.04,
+      "reason": "사전투표 QR코드 논란의 핵심 쟁점을 명확히 제시하며 영상의 시작을 알리는 도입부.",
+      "score": 8,
+      "edit_order": 1
+    },
+    {
+      "start": 102.34,
+      "end": 107.44,
+      "reason": "여당인 국민의힘이 선관위 해명을 불신하며 국정조사와 특검을 주장하는 강한 발언.",
+      "score": 9,
+      "edit_order": 2
+    },
+    {
+      "start": 108.04,
+      "end": 113.84,
+      "reason": "야당인 민주당 역시 선관위 무능을 질타하며 국정조사와 특검을 촉구, 여야 한목소리 강조.",
+      "score": 9,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 9.7,
+      "orig_start": 4.34,
+      "orig_end": 14.04
+    },
+    {
+      "raw_start": 9.7,
+      "raw_end": 18.8,
+      "orig_start": 100.34,
+      "orig_end": 109.44
+    },
+    {
+      "raw_start": 18.8,
+      "raw_end": 28.6,
+      "orig_start": 106.04,
+      "orig_end": 115.84
+    }
+  ]
+}

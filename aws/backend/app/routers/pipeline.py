@@ -12,7 +12,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFi
 from pydantic import BaseModel
 
 from app.config import settings
-from app.session import get_session, make_session, SessionDirs
+from app.session import get_session, get_optional_user, make_session, SessionDirs
+from app.models.user import User
 from app.models.schemas import (
     CollectRequest, EditRequest, PipelineStatus, PipelineStep
 )
@@ -23,6 +24,69 @@ from app.services.editor import Editor
 from app.services.s3_manager import get_s3
 
 router = APIRouter()
+
+# ── 사용량 제한(쿼터) ──────────────────────────────────────────────
+# 결제 연동 전까지는 "수집된 영상 개수"로 무료 한도를 안내만 한다.
+
+def _quota_info(session: SessionDirs, user: User | None) -> dict:
+    is_admin = bool(user and user.is_admin)
+    limit = None if is_admin else (settings.FREE_MEMBER_VIDEO_LIMIT if user else settings.FREE_ANON_VIDEO_LIMIT)
+    used = len(list(session.download_dir.glob("*.mp4")))
+    return {"used": used, "limit": limit, "is_member": user is not None, "is_admin": is_admin}
+
+
+def check_collect_quota(session: SessionDirs, user: User | None) -> None:
+    if user and user.is_admin:
+        return
+    info = _quota_info(session, user)
+    if info["used"] >= info["limit"]:
+        raise HTTPException(403, detail={
+            "code": "quota_exceeded",
+            **info,
+            "message": f"무료 한도({info['limit']}개)에 도달했습니다.",
+        })
+
+
+@router.get("/quota")
+async def get_quota(session: SessionDirs = Depends(get_session), user: User | None = Depends(get_optional_user)):
+    return _quota_info(session, user)
+
+
+# ── 채널 관리 ─────────────────────────────────────────────────────
+
+class ChannelItem(BaseModel):
+    url: str
+    category: str = "economy"
+
+class ChannelDeleteRequest(BaseModel):
+    url: str
+
+def _load_channels(s: SessionDirs) -> list[dict]:
+    if not s.channels_path.exists():
+        return []
+    return json.loads(s.channels_path.read_text(encoding="utf-8"))
+
+def _save_channels(s: SessionDirs, channels: list[dict]):
+    s.channels_path.write_text(json.dumps(channels, ensure_ascii=False, indent=2), encoding="utf-8")
+
+@router.get("/channels")
+async def get_channels(session: SessionDirs = Depends(get_session)):
+    return {"channels": _load_channels(session)}
+
+@router.post("/channels")
+async def add_channel(item: ChannelItem, session: SessionDirs = Depends(get_session)):
+    channels = _load_channels(session)
+    if any(c["url"] == item.url for c in channels):
+        raise HTTPException(400, "이미 등록된 채널입니다.")
+    channels.append({"url": item.url, "category": item.category})
+    _save_channels(session, channels)
+    return {"ok": True, "channels": channels}
+
+@router.delete("/channels")
+async def remove_channel(req: ChannelDeleteRequest, session: SessionDirs = Depends(get_session)):
+    channels = [c for c in _load_channels(session) if c["url"] != req.url]
+    _save_channels(session, channels)
+    return {"ok": True, "channels": channels}
 
 # 세션별 파이프라인 상태
 _session_statuses: dict[str, PipelineStatus] = {}
@@ -102,7 +166,7 @@ def _run_oauth_background():
             print("[OAuth2]", line)
             if "google.com/device" in line:
                 url_m = re.search(r'(https://[^\s]+)', line)
-                code_m = re.search(r'([A-Z0-9]{4}-[A-Z0-9]{4})', line)
+                code_m = re.search(r'([A-Z0-9]{3,4}(?:-[A-Z0-9]{3,4}){1,3})', line)
                 if url_m:
                     _oauth_state["url"] = url_m.group(1)
                 if code_m:
@@ -139,7 +203,9 @@ async def oauth_status():
 
 
 @router.post("/upload-video")
-async def upload_video(file: UploadFile = File(...), session: SessionDirs = Depends(get_session)):
+async def upload_video(file: UploadFile = File(...), session: SessionDirs = Depends(get_session),
+                       user: User | None = Depends(get_optional_user)):
+    check_collect_quota(session, user)
     if not file.filename or not file.filename.lower().endswith((".mp4", ".mkv", ".mov", ".avi")):
         raise HTTPException(400, "MP4/MKV/MOV/AVI 파일만 업로드 가능합니다.")
     dest = session.download_dir / file.filename
@@ -256,7 +322,9 @@ class UrlDownloadRequest(BaseModel):
 
 @router.post("/download-url")
 async def download_url(req: UrlDownloadRequest, background_tasks: BackgroundTasks,
-                       session: SessionDirs = Depends(get_session)):
+                       session: SessionDirs = Depends(get_session),
+                       user: User | None = Depends(get_optional_user)):
+    check_collect_quota(session, user)
     _dl_states[session.session_id] = {"status": "starting", "message": "시작 중...", "filename": None, "error": None}
     background_tasks.add_task(_run_url_download, session.session_id, req.url, req.category)
     return {"ok": True}
@@ -285,16 +353,21 @@ async def list_files(session: SessionDirs = Depends(get_session)):
 
 # ── 1. 수집 ─────────────────────────────────────────────────────
 
-async def _run_collect(session_id: str, clear_existing: bool):
+async def _run_collect(session_id: str, clear_existing: bool, limit_per_channel: int = 3):
     s = make_session(session_id)
     try:
         if clear_existing:
             set_status(session_id, PipelineStep.COLLECTING, "기존 파일 삭제 중...", 5)
             await asyncio.to_thread(clear_pipeline_files, s)
 
-        set_status(session_id, PipelineStep.COLLECTING, "유튜브 채널 수집 중...", 15)
+        set_status(session_id, PipelineStep.COLLECTING, "유튜브 채널 수집 중...", 5)
         collector = YoutubeCollector(download_dir=str(s.download_dir))
-        results = await asyncio.to_thread(collector.run)
+        custom_channels = _load_channels(s)
+
+        def progress_cb(msg: str, pct: int):
+            set_status(session_id, PipelineStep.COLLECTING, msg, pct)
+
+        results = await asyncio.to_thread(collector.run, limit_per_channel, custom_channels or None, progress_cb)
 
         video_paths = {v["filepath"]: v["category"] for v in results if "filepath" in v}
         save_category_map(s, video_paths)
@@ -326,11 +399,13 @@ async def resume_pipeline(session: SessionDirs = Depends(get_session)):
 
 @router.post("/collect")
 async def collect(req: CollectRequest, background_tasks: BackgroundTasks,
-                  session: SessionDirs = Depends(get_session)):
+                  session: SessionDirs = Depends(get_session),
+                  user: User | None = Depends(get_optional_user)):
+    check_collect_quota(session, user)
     status = get_session_status(session.session_id)
     if status.step not in (PipelineStep.IDLE, PipelineStep.DONE, PipelineStep.ERROR):
         raise HTTPException(400, "파이프라인이 실행 중입니다.")
-    background_tasks.add_task(_run_collect, session.session_id, req.clear_existing)
+    background_tasks.add_task(_run_collect, session.session_id, req.clear_existing, req.limit_per_channel)
     return {"ok": True}
 
 
@@ -390,14 +465,25 @@ async def _run_analyze(session_id: str):
         set_status(session_id, PipelineStep.ANALYZING, f"LLM 분석 중 (총 {len(transcripts)}개)...", 10)
         analyzer = Analyzer()
         s3 = get_s3()
+        total_saved = 0
         for i, t in enumerate(transcripts):
             set_status(session_id, PipelineStep.ANALYZING, f"분석 중: {t.name}",
                        int((i / len(transcripts)) * 90))
+            before = set(s.analysis_dir.glob(f"{t.stem}*.json"))
             await asyncio.to_thread(analyzer.analyze, str(t), category_map[str(t)], s.analysis_dir)
-            for f in s.analysis_dir.glob(f"{t.stem}*.json"):
+            after = set(s.analysis_dir.glob(f"{t.stem}*.json"))
+            new_files = after - before
+            if not new_files:
+                print(f"[{session_id[:8]}][WARN] 분석 결과 없음: {t.name}")
+            for f in new_files:
                 s3.upload(str(f), s.s3_key("analysis", f.name))
+                total_saved += 1
 
-        set_status(session_id, PipelineStep.IDLE, f"분석 완료 — {len(transcripts)}개", 100)
+        analyses = list(s.analysis_dir.glob("*.json"))
+        if not analyses:
+            set_status(session_id, PipelineStep.ERROR, "분석 결과가 없습니다. Gemini 응답 파싱 실패를 확인하세요.", 0)
+            return
+        set_status(session_id, PipelineStep.IDLE, f"분석 완료 — {len(analyses)}개 파일 생성", 100)
     except Exception as e:
         set_status(session_id, PipelineStep.ERROR, f"분석 오류: {e}", 0)
 
@@ -444,4 +530,26 @@ async def edit(req: EditRequest, background_tasks: BackgroundTasks,
     if status.step not in (PipelineStep.IDLE, PipelineStep.DONE, PipelineStep.ERROR):
         raise HTTPException(400, "파이프라인이 실행 중입니다.")
     background_tasks.add_task(_run_edit, session.session_id, req.template_id)
+    return {"ok": True}
+
+
+# ── 통합: 자막 생성 + AI 분석 + 영상 편집 (한 번에 실행) ──────────
+
+async def _run_full_edit(session_id: str, template_id: int):
+    await _run_transcribe(session_id)
+    if get_session_status(session_id).step == PipelineStep.ERROR:
+        return
+    await _run_analyze(session_id)
+    if get_session_status(session_id).step == PipelineStep.ERROR:
+        return
+    await _run_edit(session_id, template_id)
+
+
+@router.post("/process")
+async def process_videos(req: EditRequest, background_tasks: BackgroundTasks,
+                         session: SessionDirs = Depends(get_session)):
+    status = get_session_status(session.session_id)
+    if status.step not in (PipelineStep.IDLE, PipelineStep.DONE, PipelineStep.ERROR):
+        raise HTTPException(400, "파이프라인이 실행 중입니다.")
+    background_tasks.add_task(_run_full_edit, session.session_id, req.template_id)
     return {"ok": True}

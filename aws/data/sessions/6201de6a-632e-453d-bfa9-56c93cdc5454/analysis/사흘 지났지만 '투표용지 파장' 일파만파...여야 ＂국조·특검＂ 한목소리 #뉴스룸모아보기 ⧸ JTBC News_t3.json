@@ -1,0 +1,48 @@
+{
+  "transcript_path": "/app/data/sessions/6201de6a-632e-453d-bfa9-56c93cdc5454/transcripts/사흘 지났지만 '투표용지 파장' 일파만파...여야 ＂국조·특검＂ 한목소리 #뉴스룸모아보기 ⧸ JTBC News.json",
+  "category": "politics",
+  "intro_text": "채상병 특검법\n거부권 재의결 임박",
+  "candidates": [
+    {
+      "start": 261.76,
+      "end": 267.86,
+      "reason": "채상병 특검법 거부권 행사와 국회 재의결 임박 상황을 명확히 제시하며 핵심 쟁점 요약.",
+      "score": 8,
+      "edit_order": 1
+    },
+    {
+      "start": 290.76,
+      "end": 296.86,
+      "reason": "야당이 여당 의원들에게 '국민의 명령'이라며 양심적인 표결을 촉구하는 논쟁적 발언.",
+      "score": 9,
+      "edit_order": 2
+    },
+    {
+      "start": 310.86,
+      "end": 316.96,
+      "reason": "여당 내부의 '이탈표' 가능성을 언급하며 정치적 긴장감과 여론의 주목도를 높이는 발언.",
+      "score": 9,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 10.1,
+      "orig_start": 259.76,
+      "orig_end": 269.86
+    },
+    {
+      "raw_start": 10.1,
+      "raw_end": 20.2,
+      "orig_start": 288.76,
+      "orig_end": 298.86
+    },
+    {
+      "raw_start": 20.2,
+      "raw_end": 30.3,
+      "orig_start": 308.86,
+      "orig_end": 318.96
+    }
+  ]
+}

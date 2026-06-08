@@ -109,6 +109,17 @@ async def delete_short(filename: str, session: SessionDirs = Depends(get_session
     if not path.exists():
         raise HTTPException(404, "파일 없음")
     path.unlink()
+    get_s3().delete(session.s3_key("shorts", filename))
+    return {"ok": True}
+
+
+@router.delete("/raws/{filename}")
+async def delete_raw(filename: str, session: SessionDirs = Depends(get_session)):
+    path = session.raw_dir / filename
+    if not path.exists():
+        raise HTTPException(404, "파일 없음")
+    path.unlink()
+    get_s3().delete(session.s3_key("raw", filename))
     return {"ok": True}
 
 

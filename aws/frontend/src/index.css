@@ -32,6 +32,26 @@ body {
 
 #root { height: 100vh; display: flex; flex-direction: column; }
 
+/* 모바일: body/root overflow 해제 → 자연 스크롤 허용, 폰트 확대 */
+@media (max-width: 767px) {
+  html, body {
+    height: auto !important;
+    overflow: auto !important;
+    font-size: 15px;
+  }
+  #root {
+    height: auto !important;
+    min-height: 100dvh;
+    overflow: visible !important;
+  }
+
+  /* 입력창·버튼 기본 크기 업 */
+  .input-field  { font-size: 15px !important; padding: 10px 14px !important; }
+  .btn-primary  { font-size: 15px !important; padding: 10px 20px !important; }
+  .btn-outlined { font-size: 15px !important; padding: 9px 20px !important; }
+  .section-label { font-size: 12px !important; }
+}
+
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #bdc1c6; border-radius: 3px; }
@@ -59,6 +79,17 @@ body {
 }
 
 .fade-in { animation: fadeIn 0.2s ease-out both; }
+
+/* 스크롤 진입 시 나타나는 reveal 애니메이션 (랜딩 페이지) */
+.reveal {
+  opacity: 0;
+  transform: translateY(36px);
+  transition: opacity .8s cubic-bezier(.2,.7,.3,1), transform .8s cubic-bezier(.2,.7,.3,1);
+}
+.reveal.in-view { opacity: 1; transform: translateY(0); }
+.reveal-delay-1.in-view { transition-delay: .12s; }
+.reveal-delay-2.in-view { transition-delay: .24s; }
+.reveal-delay-3.in-view { transition-delay: .36s; }
 
 .progress-bar {
   background: linear-gradient(90deg, var(--primary) 0%, #4285f4 50%, var(--primary) 100%);

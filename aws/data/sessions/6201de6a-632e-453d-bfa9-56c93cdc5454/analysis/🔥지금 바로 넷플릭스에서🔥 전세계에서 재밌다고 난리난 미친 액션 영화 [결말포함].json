@@ -1,0 +1,51 @@
+{
+  "transcript_path": "/app/data/sessions/6201de6a-632e-453d-bfa9-56c93cdc5454/transcripts/🔥지금 바로 넷플릭스에서🔥 전세계에서 재밌다고 난리난 미친 액션 영화 [결말포함].json",
+  "category": "sports",
+  "intro_text": "스포츠 영상 아님\n팀 정보 없음",
+  "candidates": [
+    {
+      "start": 0.0,
+      "end": 10.0,
+      "reason": "영상 제목이 '액션 영화'이므로 스포츠 경기 팀명 확인 불가. 첫 10초 구간을 할당했으나 스포츠 관련 정보 없음.",
+      "score": 1,
+      "edit_order": 1,
+      "connection_note": "시작"
+    },
+    {
+      "start": 244.12,
+      "end": 250.0,
+      "reason": "스포츠 영상이 아니므로 한국 선수 활약, 경기 결정적 장면 등 스포츠 관련 기준 적용 불가. 임의 구간 선택.",
+      "score": 1,
+      "edit_order": 2,
+      "connection_note": "영상 내용상 스포츠 관련 언급이 없어 임의로 다음 구간 선택"
+    },
+    {
+      "start": 621.88,
+      "end": 627.0,
+      "reason": "스포츠 영상이 아니므로 기록 경신, 이변, 극적인 순간 등 스포츠 관련 기준 적용 불가. 임의 구간 선택.",
+      "score": 1,
+      "edit_order": 3,
+      "connection_note": "영상 내용상 스포츠 관련 언급이 없어 임의로 다음 구간 선택"
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 12.0,
+      "orig_start": 0,
+      "orig_end": 12.0
+    },
+    {
+      "raw_start": 12.0,
+      "raw_end": 21.88,
+      "orig_start": 242.12,
+      "orig_end": 252.0
+    },
+    {
+      "raw_start": 21.88,
+      "raw_end": 31.0,
+      "orig_start": 619.88,
+      "orig_end": 629.0
+    }
+  ]
+}

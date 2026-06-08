@@ -236,8 +236,18 @@ class YoutubeCollector:
             print("[Collector] 인증 없음 — duration 필터 건너뜀")
             return videos
 
-    def download_video(self, video_url: str, quality: str = "1080") -> dict:
+    def download_video(self, video_url: str, quality: str = "1080",
+                       on_progress: callable = None) -> dict:
         """영상 다운로드 (yt-dlp + 인증)"""
+        hooks = []
+        if on_progress:
+            def _hook(d):
+                if d["status"] == "downloading":
+                    pct_str = d.get("_percent_str", "").strip()
+                    speed   = d.get("_speed_str", "").strip()
+                    on_progress(pct_str, speed)
+            hooks.append(_hook)
+
         ydl_opts = {
             **_auth_opts(),
             "format": (
@@ -251,6 +261,7 @@ class YoutubeCollector:
             "noplaylist": True,
             "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
             "quiet": True,
+            "progress_hooks": hooks,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -262,9 +273,12 @@ class YoutubeCollector:
                 "channel":  info.get("channel"),
             }
 
-    def run(self) -> list:
-        """전체 수집 실행"""
-        # 인증 상태 사전 확인
+    def run(self, limit_per_channel: int = None, custom_channels: list[dict] = None,
+            on_progress: callable = None) -> list:
+        """전체 수집 실행
+        custom_channels: [{"url": "...", "category": "..."}, ...] 형식
+        on_progress(message: str, progress: int): 진행 상황 콜백
+        """
         if not _has_oauth() and not _prepare_cookies():
             print(
                 "\n[경고] 인증 수단 없음!\n"
@@ -274,17 +288,35 @@ class YoutubeCollector:
                 "        data/cookies_master.txt 로 저장하세요.\n"
             )
 
+        # 사용자 채널이 있으면 카테고리별로 재구성, 없으면 기본값 사용
+        if custom_channels:
+            category_channels: dict[str, list] = {}
+            for item in custom_channels:
+                category_channels.setdefault(item["category"], []).append(item["url"])
+        else:
+            category_channels = CATEGORY_CHANNELS
+
+        # 전체 예상 다운로드 수 계산 (진행률 기준)
+        default_limit = limit_per_channel or 3
+        total_channels = sum(len(chs) for chs in category_channels.values())
+        total_expected = total_channels * default_limit
+        completed = 0
+
         all_results = []
 
-        for category, channels in CATEGORY_CHANNELS.items():
+        for category, channels in category_channels.items():
             print(f"\n========== {category.upper()} ==========")
-            limit = CHANNEL_LIMIT.get(category, 1)
+            limit = limit_per_channel if limit_per_channel is not None else CHANNEL_LIMIT.get(category, 1)
 
             for channel_url in channels:
+                ch_name = channel_url.split("@")[-1] if "@" in channel_url else channel_url
                 print(f"\n[CHANNEL] {channel_url} (최대 {limit}개)")
                 channel_count = 0
 
                 try:
+                    if on_progress:
+                        pct = int(completed / max(total_expected, 1) * 90) + 5
+                        on_progress(f"[{category}] {ch_name} 채널 목록 조회 중...", pct)
                     videos = self.get_latest_videos(channel_url)
 
                     for video in videos:
@@ -292,15 +324,31 @@ class YoutubeCollector:
                             break
 
                         video["category"] = category
+                        title_short = video["title"][:28] + ("…" if len(video["title"]) > 28 else "")
                         print(f"  TITLE: {video['title']}")
                         print(f"  URL:   {video['video_url']}")
                         print(f"  DUR:   {video.get('duration', '?')}s")
-                        print(f"  다운로드 시작...")
 
-                        result = self.download_video(video["video_url"])
+                        base_pct = int(completed / max(total_expected, 1) * 90) + 5
+
+                        if on_progress:
+                            on_progress(
+                                f"[{category}] {ch_name} · {title_short} 다운로드 중... ({completed+1}/{total_expected})",
+                                base_pct,
+                            )
+
+                        def _dl_hook(pct_str, speed, _bp=base_pct, _title=title_short, _cat=category, _ch=ch_name, _c=completed, _t=total_expected):
+                            if on_progress and pct_str:
+                                on_progress(
+                                    f"[{_cat}] {_ch} · {_title} {pct_str} {speed} ({_c+1}/{_t})",
+                                    _bp,
+                                )
+
+                        result = self.download_video(video["video_url"], on_progress=_dl_hook)
                         video["filepath"] = result["filepath"]
                         all_results.append(video)
                         channel_count += 1
+                        completed += 1
 
                 except Exception as e:
                     print(f"ERROR: {e}")

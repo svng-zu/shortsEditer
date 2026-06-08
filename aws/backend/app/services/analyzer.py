@@ -3,8 +3,7 @@
 
 import os
 import json
-#import boto3
-#from botocore.exceptions import ClientError
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import google.generativeai as genai
 
 from app.config import settings
@@ -120,14 +119,17 @@ class Analyzer:
             model_name="gemini-2.5-flash",
             generation_config={
                 "temperature": 0.3,
-                "max_output_tokens": 2048,
+                "max_output_tokens": 8192,
             }
         )
         print(f"[Analyzer] Gemini 2.5 Flash 초기화 완료")
 
-    def _call_bedrock(self, prompt: str, max_tokens: int = 1024) -> str:
+    def _call_bedrock(self, prompt: str, max_tokens: int = 8192) -> str:
         """Gemini API 호출 (메서드명 유지로 하위 코드 변경 없음)"""
-        response = self.model.generate_content(prompt)
+        response = self.model.generate_content(
+            prompt,
+            generation_config={"max_output_tokens": max_tokens, "temperature": 0.3},
+        )
         return response.text
 
     def _build_segments_text(self, segments, max_segments=80):
@@ -135,7 +137,7 @@ class Analyzer:
         if len(segments) <= max_segments:
             return self._format_segments(segments)
         print(f"[Analyzer] 세그먼트 {len(segments)}개 → 청크 요약 처리")
-        return self._summarize_chunks(segments, chunk_size=20)
+        return self._summarize_chunks(segments, chunk_size=30)
 
     def _format_segments(self, segments):
         """세그먼트를 문자열로 포맷"""
@@ -144,17 +146,37 @@ class Analyzer:
             lines.append(f"[{seg['start']}s ~ {seg['end']}s] {seg['text']}")
         return "\n".join(lines)
 
-    def _summarize_chunks(self, segments, chunk_size=20):
-        """긴 세그먼트를 청크로 나눠 요약"""
-        summaries = []
+    def _summarize_chunks(self, segments, chunk_size=30):
+        """긴 세그먼트를 청크로 나눠 병렬 요약. 총 50청크 초과 시 샘플링."""
+        MAX_CHUNKS = 50
         chunks = [segments[i:i+chunk_size] for i in range(0, len(segments), chunk_size)]
-        for idx, chunk in enumerate(chunks):
+
+        # 너무 긴 영상은 균등 샘플링 (시작/중간/끝 구간 보존)
+        if len(chunks) > MAX_CHUNKS:
+            step = len(chunks) / MAX_CHUNKS
+            chunks = [chunks[int(i * step)] for i in range(MAX_CHUNKS)]
+            print(f"  [Analyzer] 청크 샘플링: {len(chunks)}개 선택")
+
+        total = len(chunks)
+        summaries = [None] * total
+
+        def summarize_one(idx: int, chunk: list) -> tuple[int, str]:
             chunk_text = self._format_segments(chunk)
             prompt = CHUNK_SUMMARY_PROMPT.format(segments_text=chunk_text)
-            print(f"  [Analyzer] 청크 {idx+1}/{len(chunks)} 요약 중...")
-            summary = self._call_bedrock(prompt, max_tokens=256)
-            summaries.append(summary.strip())
-        return "\n\n".join(summaries)
+            print(f"  [Analyzer] 청크 {idx+1}/{total} 요약 중...")
+            return idx, self._call_bedrock(prompt, max_tokens=500).strip()
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(summarize_one, i, c): i for i, c in enumerate(chunks)}
+            for future in as_completed(futures):
+                idx, summary = future.result()
+                summaries[idx] = summary
+
+        combined = "\n\n".join(summaries)
+        # 최종 요약이 너무 길면 4000자로 자르기
+        if len(combined) > 4000:
+            combined = combined[:4000] + "\n...(이하 생략)"
+        return combined
 
     def _parse_response(self, response):
         """응답 JSON 파싱"""
@@ -238,7 +260,7 @@ class Analyzer:
             segments_text=segments_text,
         )
 
-        max_tokens = 2048 if multi else 1024
+        max_tokens = 8192 if multi else 4096
         response = self._call_bedrock(prompt, max_tokens=max_tokens)
         result = self._parse_response(response)
 

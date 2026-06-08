@@ -1,0 +1,48 @@
+{
+  "transcript_path": "/app/data/sessions/6201de6a-632e-453d-bfa9-56c93cdc5454/transcripts/Protesting All Night Demanding ＂Re-election,＂ Blocking Counting Center for Second Day - [Full Vid....json",
+  "category": "politics",
+  "intro_text": "선거 불복 시위\n개표소 봉쇄 이틀",
+  "candidates": [
+    {
+      "start": 60,
+      "end": 68,
+      "reason": "시위 주최 측의 '재선거' 요구 핵심 발언으로, 시위의 목적을 명확히 전달하여 여론의 주목을 끌 수 있는 구간.",
+      "score": 8,
+      "edit_order": 1
+    },
+    {
+      "start": 180,
+      "end": 190,
+      "reason": "시위대의 격렬한 구호와 요구 사항이 명확히 드러나 시위 현장의 긴박감과 핵심 주장을 전달하는 구간.",
+      "score": 9,
+      "edit_order": 2
+    },
+    {
+      "start": 230,
+      "end": 238,
+      "reason": "개표소 봉쇄 현장의 긴박한 상황과 시위대의 저항을 보여주어 시각적 충격과 논쟁을 유발할 수 있는 구간.",
+      "score": 9,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 12.0,
+      "orig_start": 58,
+      "orig_end": 70
+    },
+    {
+      "raw_start": 12.0,
+      "raw_end": 26.0,
+      "orig_start": 178,
+      "orig_end": 192
+    },
+    {
+      "raw_start": 26.0,
+      "raw_end": 38.0,
+      "orig_start": 228,
+      "orig_end": 240
+    }
+  ]
+}

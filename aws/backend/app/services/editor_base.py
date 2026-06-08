@@ -4,8 +4,8 @@
 import os
 import json
 import subprocess
+import uuid
 import cv2
-import mediapipe as mp
 from pathlib import Path
 
 from app.config import settings
@@ -45,8 +45,8 @@ class EditorBase:
 
     def __init__(self, template_id: int = None, session_dirs=None):
         self._check_ffmpeg()
-        self.face_detection = mp.solutions.face_detection.FaceDetection(
-            model_selection=1, min_detection_confidence=0.5
+        self._face_cascade = cv2.CascadeClassifier(
+            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
         )
         # 세션 경로 (없으면 기본 settings 경로 사용)
         self._sd = session_dirs
@@ -105,7 +105,11 @@ class EditorBase:
 
     def _get_video_duration(self, video_path):
         cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", video_path]
-        return float(json.loads(subprocess.run(cmd, capture_output=True, text=True).stdout)["format"]["duration"])
+        try:
+            out = subprocess.run(cmd, capture_output=True, text=True).stdout
+            return float(json.loads(out)["format"]["duration"])
+        except Exception as e:
+            raise RuntimeError(f"ffprobe duration 실패 ({os.path.basename(str(video_path))}): {e}")
 
     def _get_video_info(self, video_path):
         cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0",
@@ -129,12 +133,13 @@ class EditorBase:
             ret, frame = cap.read()
             if not ret:
                 break
-            res = self.face_detection.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            if res.detections:
-                for d in res.detections:
-                    bb = d.location_data.relative_bounding_box
-                    cx_list.append(int((bb.xmin + bb.width / 2) * src_w))
-                    cy_list.append(int((bb.ymin + bb.height / 2) * src_h))
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = self._face_cascade.detectMultiScale(
+                gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
+            )
+            for (x, y, w, h) in faces:
+                cx_list.append(x + w // 2)
+                cy_list.append(y + h // 2)
         cap.release()
 
         if cx_list:
@@ -192,6 +197,21 @@ class EditorBase:
                 f":x=(w-text_w)/2:y={start_y + i * line_h}"
             )
         return filters
+
+    def _color_filter_str(self, style=None):
+        """캡컷 스타일 색감 보정 — 기본값(변화 없음)이면 None을 반환해 필터 체인에 끼워 넣지 않는다."""
+        s = style or {}
+        b = s.get("brightness", 0.0)
+        c = s.get("contrast", 1.0)
+        sat = s.get("saturation", 1.0)
+        if b == 0.0 and c == 1.0 and sat == 1.0:
+            return None
+        return f"eq=brightness={b}:contrast={c}:saturation={sat}"
+
+    def _volume_value(self, style=None):
+        s = style or {}
+        v = s.get("volume", 1.0)
+        return v if v != 1.0 else None
 
     def _build_segment_vf(self, crop_w, crop_h, crop_x, crop_y):
         return (
@@ -387,6 +407,10 @@ class EditorBase:
             print(f"[Editor] 원본 영상 없음")
             return None
 
+        # 편집마다 고유 temp 디렉토리 사용 (동시 실행 충돌 방지)
+        job_temp = TEMP_DIR / uuid.uuid4().hex[:12]
+        job_temp.mkdir(parents=True, exist_ok=True)
+
         print(f"\n[Stage 1] {os.path.basename(video_path)}")
         src_w, src_h = self._get_video_info(video_path)
         video_duration = self._get_video_duration(video_path)
@@ -419,7 +443,7 @@ class EditorBase:
 
             cx, cy, cw, ch = self._detect_face_crop(video_path, buffered_start, src_w, src_h)
             vf = self._build_segment_vf(cw, ch, cx, cy)
-            seg_path = str(TEMP_DIR / f"seg_{edit_order}.mp4")
+            seg_path = str(job_temp / f"seg_{edit_order}.mp4")
             self._render_clip(video_path, buffered_start, duration, vf, seg_path)
             parts.append(seg_path)
 
@@ -445,10 +469,14 @@ class EditorBase:
         with open(analysis_path, "w", encoding="utf-8") as f:
             json.dump(analysis, f, ensure_ascii=False, indent=2)
 
-        for f_name in os.listdir(TEMP_DIR):
-            fp = TEMP_DIR / f_name
+        for f_name in os.listdir(job_temp):
+            fp = job_temp / f_name
             if fp.is_file():
                 fp.unlink()
+        try:
+            job_temp.rmdir()
+        except Exception:
+            pass
 
         print(f"  [Stage 1] 완료 → {os.path.basename(raw_path)}")
         return raw_path
@@ -457,7 +485,9 @@ class EditorBase:
                       title_override: str = None,
                       subtitles: bool = False,
                       style: dict = None,
-                      bg_image: str = None) -> str:
+                      bg_image: str = None,
+                      narration: bool = False,
+                      narration_voice: str = "female") -> str:
         # style의 font_name으로 폰트 갱신
         if style and style.get("font_name"):
             self.font = self._resolve_font(style["font_name"])
@@ -481,6 +511,10 @@ class EditorBase:
         logo_path = self._get_logo_path()
         has_logo = bool(logo_path and os.path.exists(logo_path))
 
+        color_f = self._color_filter_str(style)
+        volume = self._volume_value(style)
+        af_opts = ["-af", f"volume={volume}"] if volume is not None else []
+
         if os.path.exists(bg_path):
             text_filters = self._build_text_filters(title, style=style)
             parts = [f for f in [",".join(text_filters), sub_str] if f]
@@ -499,9 +533,10 @@ class EditorBase:
                     f";[prelogo][logo]overlay=W-w-16:{VIDEO_Y+16}[out]"
                 )
 
+            vid_chain = "setsar=1" + (f",{color_f}" if color_f else "")
             fc = (
                 f"[1]scale={CANVAS_W}:{CANVAS_H},setsar=1[bg];"
-                f"[0]setsar=1[vid];"
+                f"[0]{vid_chain}[vid];"
                 f"[bg][vid]overlay=0:{VIDEO_Y}[base];"
                 f"{overlay_str}"
             )
@@ -513,8 +548,8 @@ class EditorBase:
                 ["-filter_complex", fc,
                  "-map", "[out]", "-map", "0:a?",
                  "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-                 "-c:a", "aac", "-b:a", "128k",
-                 output_path]
+                 "-c:a", "aac", "-b:a", "128k"] + af_opts +
+                [output_path]
             )
         else:
             # 블러 배경: raw 영상을 확대/블러해서 배경으로 사용
@@ -522,9 +557,10 @@ class EditorBase:
             all_filters = text_filters + sub_filters
             all_str = ",".join(all_filters) if all_filters else "setsar=1"
             mid_label = "prelogo" if has_logo else "out"
+            color_pre = f"{color_f}," if color_f else ""
 
             fc = (
-                f"[0:v]split=2[orig][blurin];"
+                f"[0:v]{color_pre}split=2[orig][blurin];"
                 f"[blurin]scale={CANVAS_W}:{CANVAS_H}:force_original_aspect_ratio=increase,"
                 f"crop={CANVAS_W}:{CANVAS_H},"
                 f"boxblur=luma_radius=25:luma_power=3[blurbg];"
@@ -545,12 +581,31 @@ class EditorBase:
                 ["-filter_complex", fc,
                  "-map", "[out]", "-map", "0:a?",
                  "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-                 "-c:a", "aac", "-b:a", "128k",
-                 output_path]
+                 "-c:a", "aac", "-b:a", "128k"] + af_opts +
+                [output_path]
             )
 
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         print(f"  [Stage 2] 완료 → {os.path.basename(output_path)}")
+
+        # 나레이션 믹싱
+        if narration and title:
+            print(f"  [TTS] 나레이션 생성 중: '{title[:30]}'")
+            from app.services.tts import generate_narration, mix_narration
+            narr_path = output_path.replace("_shorts.mp4", "_narr.mp3")
+            mixed_path = output_path.replace("_shorts.mp4", "_shorts_narr.mp4")
+            if generate_narration(title, narr_path, narration_voice):
+                if mix_narration(output_path, narr_path, mixed_path):
+                    import shutil
+                    shutil.move(mixed_path, output_path)
+                    print(f"  [TTS] 믹싱 완료 → {os.path.basename(output_path)}")
+                try:
+                    Path(narr_path).unlink(missing_ok=True)
+                except Exception:
+                    pass
+            else:
+                print(f"  [TTS] 나레이션 생성 실패, 원본 유지")
+
         return output_path
 
     def preview_frame(self, raw_path, analysis_path, title=None, style=None, seek=2.0, bg_image=None):
@@ -568,6 +623,8 @@ class EditorBase:
         logo_path = self._get_logo_path()
         has_logo = bool(logo_path and os.path.exists(logo_path))
 
+        color_f = self._color_filter_str(style)
+
         if os.path.exists(bg_path):
             text_filters = self._build_text_filters(title, style=style)
             text_str = ",".join(text_filters) if text_filters else "null"
@@ -576,9 +633,10 @@ class EditorBase:
                 f";[2]scale=200:-1[logo];[prelogo][logo]overlay=W-w-16:{VIDEO_Y+16}[out]"
                 if has_logo else ""
             )
+            vid_chain = "setsar=1" + (f",{color_f}" if color_f else "")
             fc = (
                 f"[1]scale={CANVAS_W}:{CANVAS_H},setsar=1[bg];"
-                f"[0]setsar=1[vid];"
+                f"[0]{vid_chain}[vid];"
                 f"[bg][vid]overlay=0:{VIDEO_Y}[base];"
                 f"[base]{text_str}[{mid}]"
                 f"{logo_filter}"
@@ -593,6 +651,8 @@ class EditorBase:
             )
         else:
             vf = self._build_overlay_vf(title, style=style)
+            if color_f:
+                vf = f"{color_f},{vf}"
             cmd = [
                 "ffmpeg", "-y", "-ss", str(seek), "-i", raw_path,
                 "-vf", vf,

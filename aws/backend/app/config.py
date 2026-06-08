@@ -7,7 +7,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # App
-    APP_NAME: str = "ShortsAI"
+    APP_NAME: str = "고릴라AI"
     DEBUG: bool = False
 
     # AWS (IAM Role 사용 - 키 불필요)
@@ -21,6 +21,23 @@ class Settings(BaseSettings):
     YOUTUBE_CLIENT_ID: str = ""
     YOUTUBE_CLIENT_SECRET: str = ""
     YOUTUBE_REDIRECT_URI: str = "http://localhost/api/youtube/callback"
+
+    # 사용자 계정 DB (PostgreSQL)
+    DATABASE_URL: str = "postgresql+psycopg2://shortsai:shortsai@postgres:5432/shortsai"
+
+    # JWT 인증
+    JWT_SECRET_KEY: str = "change-me-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7일
+
+    # 사용량 제한 (수집 가능한 영상 개수) — 익명 체험 vs 회원 무료 한도
+    FREE_ANON_VIDEO_LIMIT: int = 2
+    FREE_MEMBER_VIDEO_LIMIT: int = 5
+
+    # 사용자 로그인용 Google OAuth2 (YouTube 업로드용과는 별도 클라이언트)
+    GOOGLE_AUTH_CLIENT_ID: str = ""
+    GOOGLE_AUTH_CLIENT_SECRET: str = ""
+    GOOGLE_AUTH_REDIRECT_URI: str = "http://localhost/api/auth/google/callback"
 
     # Whisper
     WHISPER_MODEL: str = "medium"

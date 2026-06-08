@@ -1,0 +1,79 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/한화의 불꽃🔥박준영과 5월 리그 최고 선발 KIA 황동하⚡이거 어떻게 안 보는데...💌 ｜ 야구에산다_제197구_풀버전.json",
+  "category": "sports",
+  "intro_text": "한화 vs KIA\n5월 최고 선발",
+  "candidates": [
+    {
+      "start": 135.0,
+      "end": 145.0,
+      "reason": "한화 박준영 선수의 결정적인 활약 장면",
+      "score": 9,
+      "edit_order": 1,
+      "connection_note": "시작"
+    },
+    {
+      "start": 310.0,
+      "end": 320.0,
+      "reason": "KIA 황동하 선발 투수의 압도적인 피칭 순간",
+      "score": 9,
+      "edit_order": 2,
+      "connection_note": "양 팀 핵심 선수들의 활약을 대비하여 자연스럽게 연결"
+    },
+    {
+      "start": 390.0,
+      "end": 400.0,
+      "reason": "경기의 흐름을 바꾼 결정적인 승부처 장면",
+      "score": 8,
+      "edit_order": 3,
+      "connection_note": "양 팀의 팽팽한 대결 속에서 승부의 균형을 깨는 장면으로 전환"
+    },
+    {
+      "start": 520.0,
+      "end": 530.0,
+      "reason": "예상을 뒤엎는 극적인 상황 또는 기록 경신 순간",
+      "score": 8,
+      "edit_order": 4,
+      "connection_note": "경기 후반부의 긴장감을 고조시키는 극적인 순간으로 이어짐"
+    },
+    {
+      "start": 730.0,
+      "end": 740.0,
+      "reason": "경기의 승패를 가른 마지막 결정적 장면",
+      "score": 10,
+      "edit_order": 5,
+      "connection_note": "경기의 대미를 장식하는 최종 하이라이트로 마무리"
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 14.0,
+      "orig_start": 133.0,
+      "orig_end": 147.0
+    },
+    {
+      "raw_start": 14.0,
+      "raw_end": 28.0,
+      "orig_start": 308.0,
+      "orig_end": 322.0
+    },
+    {
+      "raw_start": 28.0,
+      "raw_end": 42.0,
+      "orig_start": 388.0,
+      "orig_end": 402.0
+    },
+    {
+      "raw_start": 42.0,
+      "raw_end": 56.0,
+      "orig_start": 518.0,
+      "orig_end": 532.0
+    },
+    {
+      "raw_start": 56.0,
+      "raw_end": 59.0,
+      "orig_start": 728.0,
+      "orig_end": 731.0
+    }
+  ]
+}

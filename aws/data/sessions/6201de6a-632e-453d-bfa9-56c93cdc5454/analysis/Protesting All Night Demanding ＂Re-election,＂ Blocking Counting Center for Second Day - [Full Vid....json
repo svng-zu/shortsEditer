@@ -1,0 +1,36 @@
+{
+  "transcript_path": "/app/data/sessions/6201de6a-632e-453d-bfa9-56c93cdc5454/transcripts/Protesting All Night Demanding ＂Re-election,＂ Blocking Counting Center for Second Day - [Full Vid....json",
+  "category": "politics",
+  "intro_text": "재선거 요구 시위\n개표소 봉쇄 이틀째",
+  "candidates": [
+    {
+      "start": 249.0,
+      "end": 462.0,
+      "reason": "영상 제목과 '선관위' 키워드를 고려할 때, 선관위를 향한 시위대의 강한 비판 또는 재선거 요구 발언이 포함될 가능성이 높습니다. 여론을 흔들 만한 주장이 나올 수 있는 구간입니다.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 462.0,
+      "end": 623.0,
+      "reason": "'정치권은' 키워드를 통해 시위 상황에 대한 정치권의 입장 표명이나 논쟁적 발언이 예상됩니다. 핵심 쟁점에 대한 정치인의 강한 발언이 나올 수 있습니다.",
+      "score": 8,
+      "edit_order": 2
+    },
+    {
+      "start": 5.54,
+      "end": 49.08,
+      "reason": "영상 초반부로, 시위 현장의 생생한 분위기나 시위대의 핵심 요구사항을 강하게 전달하는 도입부일 가능성이 높습니다. 시위의 강도를 보여주는 인상적인 장면이 예상됩니다.",
+      "score": 7,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 120.0,
+      "orig_start": 247.0,
+      "orig_end": 367.0
+    }
+  ]
+}

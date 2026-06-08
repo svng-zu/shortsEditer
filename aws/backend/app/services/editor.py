@@ -41,10 +41,12 @@ class Editor:
         return self._get_editor(analysis_path).edit_video(analysis_path)
 
     def apply_overlay(self, raw_path: str, analysis_path: str,
-                      title_override=None, subtitles=False, style=None, bg_image=None):
+                      title_override=None, subtitles=False, style=None, bg_image=None,
+                      narration=False, narration_voice="female"):
         return self._get_editor(analysis_path).apply_overlay(
             raw_path, analysis_path,
-            title_override=title_override, subtitles=subtitles, style=style, bg_image=bg_image
+            title_override=title_override, subtitles=subtitles, style=style, bg_image=bg_image,
+            narration=narration, narration_voice=narration_voice,
         )
 
     def rerender(self, analysis_path: str, title_override=None, subtitles=False, style=None, bg_image=None):

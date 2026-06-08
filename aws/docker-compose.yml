@@ -6,10 +6,29 @@ services:
       - "4416:4416"
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=shortsai
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-shortsai}
+      - POSTGRES_DB=shortsai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shortsai -d shortsai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        BUILDKIT_SANDBOX_SECURITY: unconfined
+    security_opt:
+      - apparmor:unconfined
     ports:
       - "8000:8000"
     environment:
@@ -24,13 +43,21 @@ services:
       - YOUTUBE_CLIENT_SECRET=${YOUTUBE_CLIENT_SECRET:-}
       - YOUTUBE_REDIRECT_URI=${YOUTUBE_REDIRECT_URI:-}
       - BGUTIL_URL=http://bgutil:4416
+      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg2://shortsai:${POSTGRES_PASSWORD:-shortsai}@postgres:5432/shortsai}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
+      - GOOGLE_AUTH_CLIENT_ID=${GOOGLE_AUTH_CLIENT_ID:-}
+      - GOOGLE_AUTH_CLIENT_SECRET=${GOOGLE_AUTH_CLIENT_SECRET:-}
+      - GOOGLE_AUTH_REDIRECT_URI=${GOOGLE_AUTH_REDIRECT_URI:-}
     volumes:
       - ./data:/app/data
       - ./static:/app/static
       - whisper_cache:/root/.cache/whisper
-      - ~/.cache/yt-dlp:/root/.cache/yt-dlp:ro
+      - /home/ubuntu/.cache/yt-dlp:/root/.cache/yt-dlp:ro
     depends_on:
-      - bgutil
+      bgutil:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -42,6 +69,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    security_opt:
+      - apparmor:unconfined
     ports:
       - "80:80"
       - "443:443"
@@ -54,3 +83,4 @@ services:
 
 volumes:
   whisper_cache:
+  postgres_data:
