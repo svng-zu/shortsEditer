@@ -32,7 +32,7 @@ function ShortsStudio() {
   const [raws, setRaws]         = useState<RawInfo[]>([])
   const [selectedShort, setSelectedShort] = useState<ShortInfo | null>(null)
   const [selectedRaw, setSelectedRaw]     = useState<RawInfo | null>(null)
-  const [activeTab, setActiveTab] = useState<'downloads' | 'raws' | 'shorts'>('raws')
+  const [activeTab, setActiveTab] = useState<'raws' | 'shorts'>('raws')
   const [downloads, setDownloads] = useState<DownloadInfo[]>([])
   const [isPolling, setIsPolling] = useState(false)
   const [isPaused, setIsPaused]   = useState(false)
@@ -76,7 +76,7 @@ function ShortsStudio() {
 
   const shortsPanelProps = {
     activeTab, onTabChange: setActiveTab,
-    shorts, raws, downloads,
+    shorts, raws,
     selectedShort, selectedRaw,
     onSelectShort: (s: ShortInfo | null) => setSelectedShort(s),
     onSelectRaw:   (r: RawInfo | null)   => setSelectedRaw(r),
@@ -112,7 +112,7 @@ function ShortsStudio() {
             <Pipeline
               status={status} isRunning={isRunning}
               onStartPolling={startPolling} onRefresh={handleRefresh} isMobile
-              onQuotaError={onQuotaError}
+              onQuotaError={onQuotaError} downloads={downloads}
             />
           )}
           {mobileView === 'shorts' && <ShortsPanel {...shortsPanelProps} />}
@@ -159,7 +159,7 @@ function ShortsStudio() {
         <Pipeline
           status={status} isRunning={isRunning}
           onStartPolling={startPolling} onRefresh={handleRefresh} isMobile={false}
-          onQuotaError={onQuotaError}
+          onQuotaError={onQuotaError} downloads={downloads}
         />
         <div style={{ display: 'grid', height: '78vh', minHeight: 520 }}>
           <ShortsPanel {...shortsPanelProps} />

@@ -1,5 +1,11 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { api, apiClient, PipelineStatus, VideoInfo } from '../services/api'
+import { api, apiClient, PipelineStatus, VideoInfo, DownloadInfo } from '../services/api'
+
+const CATEGORIES_DL = [
+  { value: 'sports', label: '스포츠' },
+  { value: 'economy', label: '경제' },
+  { value: 'politics', label: '정치' },
+]
 
 function isQuotaError(e: any): boolean {
   return e?.response?.status === 403 && e?.response?.data?.detail?.code === 'quota_exceeded'
@@ -12,6 +18,7 @@ interface Props {
   onRefresh: () => void
   isMobile?: boolean
   onQuotaError: () => void
+  downloads: DownloadInfo[]
 }
 
 const CATEGORIES = [
@@ -27,7 +34,7 @@ function channelName(url: string): string {
   return m[1].replace(/^channel\//, '채널 ').replace(/^c\//, '').replace(/^user\//, '')
 }
 
-export default function Pipeline({ status, isRunning, onStartPolling, onRefresh, onQuotaError }: Props) {
+export default function Pipeline({ status, isRunning, onStartPolling, onRefresh, onQuotaError, downloads, isMobile = false }: Props) {
   const [dragOver, setDragOver]             = useState(false)
   const [collectLimit, setCollectLimit]     = useState(3)
   const [oauthState, setOauthState]         = useState<{status:string; url?:string; code?:string} | null>(null)
@@ -77,6 +84,41 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
   const handleRemoveChannel = async (url: string) => {
     await api.removeChannel(url)
     await loadChannels()
+  }
+
+  const [dlSelected, setDlSelected]   = useState<Set<string>>(new Set())
+  const [dlCategories, setDlCategories] = useState<Record<string, string>>({})
+  const [dlProcessing, setDlProcessing] = useState(false)
+
+  useEffect(() => {
+    const init: Record<string, string> = {}
+    downloads.forEach(d => { init[d.filename] = d.category })
+    setDlCategories(prev => {
+      const merged = { ...init }
+      Object.keys(prev).forEach(k => { if (k in merged) merged[k] = prev[k] })
+      return merged
+    })
+  }, [downloads])
+
+  const dlToggle = (filename: string) => {
+    setDlSelected(prev => { const next = new Set(prev); next.has(filename) ? next.delete(filename) : next.add(filename); return next })
+  }
+  const dlToggleAll = () => {
+    if (dlSelected.size === downloads.length) setDlSelected(new Set())
+    else setDlSelected(new Set(downloads.map(d => d.filename)))
+  }
+  const handleDlProcess = async () => {
+    const items = [...dlSelected].map(fn => ({ filename: fn, category: dlCategories[fn] || 'economy' }))
+    if (!items.length) return
+    setDlProcessing(true)
+    try { await api.processSelected(items); onStartPolling() }
+    catch {} finally { setDlProcessing(false) }
+  }
+  const deleteDownload = async (fn: string, e: React.MouseEvent) => {
+    e.stopPropagation(); if (!confirm('수집된 영상을 삭제할까요?')) return
+    await api.deleteDownload(fn)
+    setDlSelected(prev => { const next = new Set(prev); next.delete(fn); return next })
+    onRefresh()
   }
 
   const [uploading, setUploading]     = useState(false)
@@ -437,6 +479,68 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
           ✓ {status.message}
         </div>
       )}
+
+      {/* ── 수집됨 목록 ── */}
+      <div style={{ borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        {/* 헤더 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: '#fafafa', borderBottom: '1px solid var(--border)' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', fontWeight: 700, color: 'var(--text2)' }}>
+            <input type="checkbox"
+              checked={dlSelected.size === downloads.length && downloads.length > 0}
+              onChange={dlToggleAll}
+              style={{ accentColor: 'var(--primary)', width: 16, height: 16, cursor: 'pointer' }} />
+            📥 수집됨{downloads.length > 0 ? ` (${downloads.length})` : ''}
+          </label>
+          {dlSelected.size > 0 && (
+            <span style={{ fontSize: 13, color: 'var(--muted)' }}>{dlSelected.size}개 선택</span>
+          )}
+          <button
+            onClick={handleDlProcess}
+            disabled={dlSelected.size === 0 || dlProcessing}
+            className="btn-primary"
+            style={{ marginLeft: 'auto', padding: '6px 14px', fontSize: 13, fontWeight: 700, borderRadius: 8, opacity: dlSelected.size === 0 ? 0.5 : 1 }}>
+            {dlProcessing ? '처리 중...' : '✂️ 편집 시작'}
+          </button>
+        </div>
+        {/* 목록 */}
+        <div style={{ overflowY: 'auto', maxHeight: isMobile ? 360 : 736 }}>
+          {downloads.length === 0
+            ? <div style={{ padding: '20px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                아직 수집된 영상이 없어요
+              </div>
+            : downloads.map(d => {
+                const thumbW = isMobile ? 144 : 240
+                const thumbH = isMobile ? 96 : 160
+                return (
+                  <div key={d.filename} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                    <input type="checkbox" checked={dlSelected.has(d.filename)} onChange={() => dlToggle(d.filename)}
+                      style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer', marginTop: 3 }} />
+                    <div style={{ width: thumbW, height: thumbH, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
+                      {d.thumbnail_url
+                        ? <img src={d.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? 36 : 52 }}>🎬</div>}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 6, wordBreak: 'break-word' }}>
+                        {d.stem}
+                      </div>
+                      <select value={dlCategories[d.filename] || d.category}
+                        onChange={e => setDlCategories(prev => ({ ...prev, [d.filename]: e.target.value }))}
+                        onClick={e => e.stopPropagation()}
+                        style={{ fontSize: 12, padding: '3px 7px', border: '1px solid var(--border)', borderRadius: 6, background: 'white', color: 'var(--text2)', cursor: 'pointer', outline: 'none' }}>
+                        {CATEGORIES_DL.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </select>
+                    </div>
+                    <button onClick={e => deleteDownload(d.filename, e)}
+                      style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }}>
+                      삭제
+                    </button>
+                  </div>
+                )
+              })
+          }
+        </div>
+      </div>
     </aside>
   )
 }

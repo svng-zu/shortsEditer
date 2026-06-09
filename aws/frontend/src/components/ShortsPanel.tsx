@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef, useCallback, RefObject } from 'react'
-import { api, ShortInfo, RawInfo, DownloadInfo, StyleParams } from '../services/api'
+import { api, ShortInfo, RawInfo, StyleParams } from '../services/api'
 import YouTubeUploadModal from './YouTubeUploadModal'
 
 interface Props {
-  activeTab: 'downloads' | 'raws' | 'shorts'
-  onTabChange: (t: 'downloads' | 'raws' | 'shorts') => void
-  downloads: DownloadInfo[]
+  activeTab: 'raws' | 'shorts'
+  onTabChange: (t: 'raws' | 'shorts') => void
   raws: RawInfo[]
   shorts: ShortInfo[]
   selectedRaw: RawInfo | null
@@ -128,57 +127,12 @@ function CategoryBadge({ cat }: { cat: string }) {
   return <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: s.bg, color: s.color }}>{s.label}</span>
 }
 
-const CATEGORIES_DL = [
-  { value: 'sports', label: '스포츠' },
-  { value: 'economy', label: '경제' },
-  { value: 'politics', label: '정치' },
-]
-
 export default function ShortsPanel({
-  activeTab, onTabChange, downloads, raws, shorts,
+  activeTab, onTabChange, raws, shorts,
   selectedRaw, selectedShort, onSelectRaw, onSelectShort,
   onRefresh, onStartPolling, isMobile = false,
 }: Props) {
   const [uploadTarget, setUploadTarget] = useState<ShortInfo | null>(null)
-  // 수집됨 탭: 선택된 항목 + 카테고리 로컬 상태
-  const [dlSelected, setDlSelected] = useState<Set<string>>(new Set())
-  const [dlCategories, setDlCategories] = useState<Record<string, string>>({})
-  const [dlProcessing, setDlProcessing] = useState(false)
-
-  // downloads가 바뀌면 카테고리 초기화
-  useEffect(() => {
-    const init: Record<string, string> = {}
-    downloads.forEach(d => { init[d.filename] = d.category })
-    setDlCategories(prev => {
-      const merged = { ...init }
-      // 사용자가 이미 바꾼 항목 유지
-      Object.keys(prev).forEach(k => { if (k in merged) merged[k] = prev[k] })
-      return merged
-    })
-  }, [downloads])
-
-  const dlToggle = (filename: string) => {
-    setDlSelected(prev => {
-      const next = new Set(prev)
-      next.has(filename) ? next.delete(filename) : next.add(filename)
-      return next
-    })
-  }
-  const dlToggleAll = () => {
-    if (dlSelected.size === downloads.length) setDlSelected(new Set())
-    else setDlSelected(new Set(downloads.map(d => d.filename)))
-  }
-  const handleDlProcess = async () => {
-    const items = [...dlSelected].map(fn => ({
-      filename: fn,
-      category: dlCategories[fn] || 'economy',
-    }))
-    if (!items.length) return
-    setDlProcessing(true)
-    try { await api.processSelected(items); onStartPolling() }
-    catch {}
-    finally { setDlProcessing(false) }
-  }
 
   const deleteShort = async (fn: string, e: React.MouseEvent) => {
     e.stopPropagation(); if (!confirm('삭제?')) return
@@ -189,13 +143,6 @@ export default function ShortsPanel({
     e.stopPropagation(); if (!confirm('삭제?')) return
     await api.deleteRaw(fn)
     if (selectedRaw?.filename === fn) onSelectRaw(null)
-    onRefresh()
-  }
-
-  const deleteDownload = async (fn: string, e: React.MouseEvent) => {
-    e.stopPropagation(); if (!confirm('수집된 영상을 삭제할까요?')) return
-    await api.deleteDownload(fn)
-    setDlSelected(prev => { const next = new Set(prev); next.delete(fn); return next })
     onRefresh()
   }
 
@@ -255,7 +202,7 @@ export default function ShortsPanel({
         <div style={{ background: 'var(--bg)' }}>
           {/* 탭 */}
           <div style={{ display: 'flex', background: 'white', borderBottom: '1px solid var(--border)', position: 'sticky', top: 52, zIndex: 50 }}>
-            {(['downloads', 'raws', 'shorts'] as const).map(tab => (
+            {(['raws', 'shorts'] as const).map(tab => (
               <button key={tab} onClick={() => onTabChange(tab)} style={{
                 flex: 1, padding: '13px 0', border: 'none', background: 'none', cursor: 'pointer',
                 fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
@@ -263,69 +210,10 @@ export default function ShortsPanel({
                 borderBottom: `3px solid ${activeTab === tab ? 'var(--primary)' : 'transparent'}`,
                 transition: 'color .15s',
               }}>
-                {tab === 'downloads' ? `📥 수집됨${downloads.length ? ` (${downloads.length})` : ''}` : tab === 'raws' ? '✂️ 편집' : '🎬 쇼츠'}
+                {tab === 'raws' ? '✂️ 편집' : '🎬 쇼츠'}
               </button>
             ))}
           </div>
-
-          {/* 수집됨 목록 */}
-          {activeTab === 'downloads' && (
-            <div style={{ background: 'white' }}>
-              {downloads.length === 0
-                ? <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--muted)' }}>
-                    <div style={{ fontSize: 40, marginBottom: 10, opacity: 0.3 }}>📥</div>
-                    <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text2)' }}>수집된 영상 없음</p>
-                    <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 4 }}>파이프라인에서 영상을 먼저 수집하세요</p>
-                  </div>
-                : <>
-                    {/* 전체선택 + 편집 시작 */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)', background: '#fafafa' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', fontWeight: 600, color: 'var(--text2)' }}>
-                        <input type="checkbox"
-                          checked={dlSelected.size === downloads.length && downloads.length > 0}
-                          onChange={dlToggleAll}
-                          style={{ accentColor: 'var(--primary)', width: 16, height: 16, cursor: 'pointer' }} />
-                        전체선택
-                      </label>
-                      <button
-                        onClick={handleDlProcess}
-                        disabled={dlSelected.size === 0 || dlProcessing}
-                        className="btn-primary"
-                        style={{ marginLeft: 'auto', padding: '8px 16px', fontSize: 14, fontWeight: 700, borderRadius: 8, opacity: dlSelected.size === 0 ? 0.5 : 1 }}>
-                        {dlProcessing ? '처리 중...' : `✂️ 편집 시작 (${dlSelected.size}개)`}
-                      </button>
-                    </div>
-                    {downloads.map(d => (
-                      <div key={d.filename} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
-                        <input type="checkbox" checked={dlSelected.has(d.filename)} onChange={() => dlToggle(d.filename)}
-                          style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer', marginTop: 3 }} />
-                        {/* 썸네일 */}
-                        <div style={{ width: 144, height: 96, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
-                          {d.thumbnail_url
-                            ? <img src={d.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>🎬</div>}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 5, wordBreak: 'break-word' }}>
-                            {d.stem}
-                          </div>
-                          <select value={dlCategories[d.filename] || d.category}
-                            onChange={e => setDlCategories(prev => ({ ...prev, [d.filename]: e.target.value }))}
-                            onClick={e => e.stopPropagation()}
-                            style={{ fontSize: 12, padding: '3px 7px', border: '1px solid var(--border)', borderRadius: 6, background: 'white', color: 'var(--text2)', cursor: 'pointer', outline: 'none' }}>
-                            {CATEGORIES_DL.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                          </select>
-                        </div>
-                        <button onClick={e => deleteDownload(d.filename, e)}
-                          style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }}>
-                          삭제
-                        </button>
-                      </div>
-                    ))}
-                  </>
-              }
-            </div>
-          )}
 
           {/* RAW 목록 */}
           {activeTab === 'raws' && (
@@ -405,7 +293,7 @@ export default function ShortsPanel({
       {uploadTarget && <YouTubeUploadModal filename={uploadTarget.filename} defaultTitle={uploadTarget.title} onClose={() => setUploadTarget(null)} />}
 
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', padding: '0 16px', flexShrink: 0 }}>
-        {(['downloads', 'raws', 'shorts'] as const).map(tab => (
+        {(['raws', 'shorts'] as const).map(tab => (
           <button key={tab} onClick={() => onTabChange(tab)} style={{
             padding: '12px 16px', border: 'none', background: 'none', cursor: 'pointer',
             fontSize: 15, fontWeight: 600, fontFamily: 'inherit',
@@ -413,74 +301,12 @@ export default function ShortsPanel({
             borderBottom: `2px solid ${activeTab === tab ? 'var(--primary)' : 'transparent'}`,
             marginBottom: -1, transition: 'color .15s',
           }}>
-            {tab === 'downloads'
-              ? `📥 수집됨${downloads.length ? ` (${downloads.length})` : ''}`
-              : tab === 'raws' ? '✂️ 영상 편집' : '🎬 완성 쇼츠'}
+            {tab === 'raws' ? '✂️ 영상 편집' : '🎬 완성 쇼츠'}
           </button>
         ))}
       </div>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-
-        {/* ─── 수집됨 탭 ─── */}
-        {activeTab === 'downloads' && (
-          <div style={{ flex: 1, overflowY: 'auto', background: 'var(--surface2)' }}>
-            {downloads.length === 0
-              ? <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--muted)' }}>
-                  <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.4 }}>📥</div>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text2)' }}>수집된 영상 없음</p>
-                  <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>파이프라인에서 영상을 먼저 수집하세요</p>
-                </div>
-              : <div style={{ background: 'white', margin: 16, borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
-                  {/* 전체선택 + 편집시작 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)', background: '#fafafa' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', fontWeight: 600, color: 'var(--text2)' }}>
-                      <input type="checkbox"
-                        checked={dlSelected.size === downloads.length && downloads.length > 0}
-                        onChange={dlToggleAll}
-                        style={{ accentColor: 'var(--primary)', width: 16, height: 16, cursor: 'pointer' }} />
-                      전체선택
-                    </label>
-                    <span style={{ fontSize: 13, color: 'var(--muted)' }}>{dlSelected.size > 0 ? `${dlSelected.size}개 선택됨` : `총 ${downloads.length}개`}</span>
-                    <button
-                      onClick={handleDlProcess}
-                      disabled={dlSelected.size === 0 || dlProcessing}
-                      className="btn-primary"
-                      style={{ marginLeft: 'auto', padding: '8px 18px', fontSize: 14, fontWeight: 700, borderRadius: 8, opacity: dlSelected.size === 0 ? 0.5 : 1 }}>
-                      {dlProcessing ? '처리 중...' : `✂️ 편집 시작${dlSelected.size > 0 ? ` (${dlSelected.size}개)` : ''}`}
-                    </button>
-                  </div>
-                  {downloads.map(d => (
-                    <div key={d.filename} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-                      <input type="checkbox" checked={dlSelected.has(d.filename)} onChange={() => dlToggle(d.filename)}
-                        style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer', marginTop: 3 }} />
-                      {/* 썸네일 */}
-                      <div style={{ width: 160, height: 104, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
-                        {d.thumbnail_url
-                          ? <img src={d.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 }}>🎬</div>}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 6, wordBreak: 'break-word' }}>
-                          {d.stem}
-                        </div>
-                        <select
-                          value={dlCategories[d.filename] || d.category}
-                          onChange={e => setDlCategories(prev => ({ ...prev, [d.filename]: e.target.value }))}
-                          style={{ fontSize: 12, padding: '3px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'white', color: 'var(--text2)', cursor: 'pointer', outline: 'none' }}>
-                          {CATEGORIES_DL.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                        </select>
-                      </div>
-                      <button onClick={e => deleteDownload(d.filename, e)}
-                        style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }}>
-                        삭제
-                      </button>
-                    </div>
-                  ))}
-                </div>
-            }
-          </div>
-        )}
 
         {/* ─── RAW 탭 ─── */}
         {activeTab === 'raws' && (
