@@ -24,6 +24,7 @@ jobs:
             cd ~/short_editor/shortsEditer
 
             echo "== 코드 최신화 =="
+            sudo chown -R ubuntu:ubuntu ~/short_editor/shortsEditer/aws/data || true
             git fetch origin main
             git reset --hard origin/main
 
