@@ -1,0 +1,48 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[US Stock Strategy] NYC Market Plunges on Rate Hike Fears… Nasdaq Down 4.2%.json",
+  "category": "economy",
+  "intro_text": "스페이스X IPO\n1조 7500억 달러",
+  "candidates": [
+    {
+      "start": 40.9,
+      "end": 46.14,
+      "reason": "스페이스X IPO에 1500억 달러 규모의 투자 수요가 몰렸다는 핵심 경제 수치를 언급하여 주목도를 높입니다.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 50.66,
+      "end": 58.38,
+      "reason": "스페이스X의 기업 가치 1조 7500억 달러 평가와 고평가 우려를 동시에 언급하여 임팩트 있는 경제 전망을 제시합니다.",
+      "score": 10,
+      "edit_order": 2
+    },
+    {
+      "start": 78.83,
+      "end": 85.67,
+      "reason": "구글과의 대규모 계약(매월 9억 2천만 달러)을 언급하며 스페이스X의 안정적인 돈줄 확보라는 핵심 경제 수치와 전망을 보여줍니다.",
+      "score": 9,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 9.24,
+      "orig_start": 38.9,
+      "orig_end": 48.14
+    },
+    {
+      "raw_start": 9.24,
+      "raw_end": 20.96,
+      "orig_start": 48.66,
+      "orig_end": 60.38
+    },
+    {
+      "raw_start": 20.96,
+      "raw_end": 31.8,
+      "orig_start": 76.83,
+      "orig_end": 87.67
+    }
+  ]
+}

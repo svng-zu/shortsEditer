@@ -38,7 +38,7 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
   const [dragOver, setDragOver]             = useState(false)
   const [collectLimit, setCollectLimit]     = useState(3)
   const [oauthState, setOauthState]         = useState<{status:string; url?:string; code?:string} | null>(null)
-  const [channels, setChannels]             = useState<{url:string; category:string}[]>([])
+  const [channels, setChannels]             = useState<{url:string; category:string; thumbnail_url?:string}[]>([])
   const [showChannels, setShowChannels]     = useState(false)
   const [newChUrl, setNewChUrl]             = useState('')
   const [newChCategory, setNewChCategory]   = useState('sports')
@@ -369,11 +369,15 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', padding: '8px 4px 0' }}>
               {channels.slice(0, 6).map(ch => (
                 <span key={ch.url} title={ch.url} style={{
-                  fontSize: 13, fontWeight: 600, padding: '3px 10px', borderRadius: 999,
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  fontSize: 13, fontWeight: 600, padding: '3px 10px 3px 5px', borderRadius: 999,
                   background: ch.category === 'sports' ? '#e8f5e9' : ch.category === 'economy' ? '#fff8e1' : '#fce4ec',
                   color: ch.category === 'sports' ? '#2e7d32' : ch.category === 'economy' ? '#f57f17' : '#c62828',
                   whiteSpace: 'nowrap',
                 }}>
+                  {ch.thumbnail_url && (
+                    <img src={ch.thumbnail_url} alt="" style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                  )}
                   {channelName(ch.url)}
                 </span>
               ))}
@@ -396,6 +400,9 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
                 )}
                 {channels.map(ch => (
                   <div key={ch.url} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                    {ch.thumbnail_url && (
+                      <img src={ch.thumbnail_url} alt="" style={{ width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                    )}
                     <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text)' }} title={ch.url}>{channelName(ch.url)}</span>
                     <span style={{ padding: '1px 8px', borderRadius: 10, fontSize: 13, background: ch.category === 'sports' ? '#e8f5e9' : ch.category === 'economy' ? '#fff8e1' : '#fce4ec', color: ch.category === 'sports' ? '#2e7d32' : ch.category === 'economy' ? '#f57f17' : '#c62828', whiteSpace: 'nowrap' }}>
                       {ch.category === 'sports' ? '스포츠' : ch.category === 'economy' ? '경제' : '정치'}

@@ -1,0 +1,48 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[US Stock Strategy] NYC Market Plunges on Rate Hike Fears… Nasdaq Down 4.2%.json",
+  "category": "economy",
+  "intro_text": "뉴욕 증시 폭락\n금리 인상 공포",
+  "candidates": [
+    {
+      "start": 0.34,
+      "end": 8.84,
+      "reason": "뉴욕 증시의 거센 조정과 예상보다 강한 고용보고서로 인한 금리 인상 가능성 언급으로 핵심 경제 수치와 임팩트 있는 전망을 포함합니다.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 19.34,
+      "end": 25.64,
+      "reason": "필라델피아 반도체 지수 10% 폭락, 나스닥 1년 만에 최대 낙폭 등 구체적인 핵심 경제 수치 언급으로 시청자에게 강한 임팩트를 줍니다.",
+      "score": 10,
+      "edit_order": 2
+    },
+    {
+      "start": 12.92,
+      "end": 19.34,
+      "reason": "초대형 IPO와 빅테크 유상증자로 인한 시장 유동성 흡수 우려를 언급하며 임팩트 있는 경제 전망을 제시합니다.",
+      "score": 8,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 10.84,
+      "orig_start": 0,
+      "orig_end": 10.84
+    },
+    {
+      "raw_start": 10.84,
+      "raw_end": 21.14,
+      "orig_start": 17.34,
+      "orig_end": 27.64
+    },
+    {
+      "raw_start": 21.14,
+      "raw_end": 31.56,
+      "orig_start": 10.92,
+      "orig_end": 21.34
+    }
+  ]
+}

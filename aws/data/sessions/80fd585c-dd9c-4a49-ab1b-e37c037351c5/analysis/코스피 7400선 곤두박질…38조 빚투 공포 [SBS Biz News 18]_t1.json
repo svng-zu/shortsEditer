@@ -1,0 +1,42 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/코스피 7400선 곤두박질…38조 빚투 공포 [SBS Biz News 18].json",
+  "category": "economy",
+  "intro_text": "국내 증시 폭락\n코스피 7400선",
+  "candidates": [
+    {
+      "start": 0.21,
+      "end": 87.88,
+      "reason": "코스피 수치 언급 및 시장 전반의 하락세, 빚투 공포 등 핵심 이슈를 다룸.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 168.99,
+      "end": 247.42,
+      "reason": "삼성전자 주가 동향을 통해 국내 증시의 핵심 종목 상황과 시장 영향 분석.",
+      "score": 8,
+      "edit_order": 2
+    },
+    {
+      "start": 247.42,
+      "end": 321.9,
+      "reason": "시장 하락의 원인 분석 및 투자 심리, 빚투 관련 부작용 등 심층적인 내용.",
+      "score": 8,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 89.88,
+      "orig_start": 0,
+      "orig_end": 89.88
+    },
+    {
+      "raw_start": 89.88,
+      "raw_end": 120.0,
+      "orig_start": 166.99,
+      "orig_end": 197.11
+    }
+  ]
+}

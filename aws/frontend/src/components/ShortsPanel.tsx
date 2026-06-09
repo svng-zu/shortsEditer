@@ -133,6 +133,7 @@ export default function ShortsPanel({
   onRefresh, onStartPolling, isMobile = false,
 }: Props) {
   const [uploadTarget, setUploadTarget] = useState<ShortInfo | null>(null)
+  const [rawSelected, setRawSelected] = useState<Set<string>>(new Set())
 
   const deleteShort = async (fn: string, e: React.MouseEvent) => {
     e.stopPropagation(); if (!confirm('삭제?')) return
@@ -143,6 +144,18 @@ export default function ShortsPanel({
     e.stopPropagation(); if (!confirm('삭제?')) return
     await api.deleteRaw(fn)
     if (selectedRaw?.filename === fn) onSelectRaw(null)
+    setRawSelected(prev => { const s = new Set(prev); s.delete(fn); return s })
+    onRefresh()
+  }
+
+  const rawToggle = (fn: string) => setRawSelected(prev => { const s = new Set(prev); s.has(fn) ? s.delete(fn) : s.add(fn); return s })
+  const rawToggleAll = () => setRawSelected(prev => prev.size === raws.length ? new Set() : new Set(raws.map(r => r.filename)))
+  const handleRawDeleteSelected = async () => {
+    if (rawSelected.size === 0) return
+    if (!confirm(`선택된 ${rawSelected.size}개 영상을 삭제하시겠습니까?`)) return
+    await Promise.all([...rawSelected].map(fn => api.deleteRaw(fn)))
+    if (selectedRaw && rawSelected.has(selectedRaw.filename)) onSelectRaw(null)
+    setRawSelected(new Set())
     onRefresh()
   }
 
@@ -218,6 +231,15 @@ export default function ShortsPanel({
           {/* RAW 목록 */}
           {activeTab === 'raws' && (
             <div style={{ background: 'white' }}>
+              {raws.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }}>
+                  <input type="checkbox" checked={rawSelected.size === raws.length && raws.length > 0} onChange={rawToggleAll} style={{ cursor: 'pointer', accentColor: 'var(--primary)', width: 16, height: 16 }} />
+                  <span style={{ fontSize: 13, color: 'var(--text2)', flex: 1 }}>{rawSelected.size > 0 ? `${rawSelected.size}개 선택됨` : '전체 선택'}</span>
+                  {rawSelected.size > 0 && (
+                    <button onClick={handleRawDeleteSelected} style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, background: 'var(--error, #d93025)', color: 'white', border: 'none', cursor: 'pointer' }}>선택 삭제</button>
+                  )}
+                </div>
+              )}
               {raws.length === 0
                 ? <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--muted)' }}>
                     <div style={{ fontSize: 40, marginBottom: 10, opacity: 0.3 }}>🎞</div>
@@ -232,6 +254,7 @@ export default function ShortsPanel({
                       background: 'white',
                       WebkitTapHighlightColor: 'transparent',
                     }}>
+                      <input type="checkbox" checked={rawSelected.has(r.filename)} onClick={e => e.stopPropagation()} onChange={() => rawToggle(r.filename)} style={{ cursor: 'pointer', accentColor: 'var(--primary)', width: 16, height: 16, flexShrink: 0 }} />
                       <div style={{ width: 48, height: 48, borderRadius: 12, background: '#e8eaed', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
                         ✂️
                       </div>
@@ -311,10 +334,16 @@ export default function ShortsPanel({
         {/* ─── RAW 탭 ─── */}
         {activeTab === 'raws' && (
           <>
-            <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface2)' }}>
-              <div style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: 'var(--text2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                편집된 영상
-                <span style={{ background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>{raws.length}</span>
+            <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface2)', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: 'var(--text2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                {raws.length > 0 && (
+                  <input type="checkbox" checked={rawSelected.size === raws.length && raws.length > 0} onChange={rawToggleAll} style={{ cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }} />
+                )}
+                <span style={{ flex: 1 }}>편집된 영상</span>
+                {rawSelected.size > 0
+                  ? <button onClick={handleRawDeleteSelected} style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: 'var(--error, #d93025)', color: 'white', border: 'none', cursor: 'pointer' }}>삭제({rawSelected.size})</button>
+                  : <span style={{ background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>{raws.length}</span>
+                }
               </div>
               {raws.length === 0
                 ? <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)' }}>
@@ -323,18 +352,22 @@ export default function ShortsPanel({
                   </div>
                 : raws.map(r => (
                     <div key={r.filename} onClick={() => onSelectRaw(r)} style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
                       padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
                       borderLeft: `3px solid ${selectedRaw?.filename === r.filename ? 'var(--primary)' : 'transparent'}`,
                       background: selectedRaw?.filename === r.filename ? 'var(--primary-bg)' : 'transparent',
                       transition: 'background .15s',
                     }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {r.title || r.filename}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <CategoryBadge cat={r.category} />
-                        <button onClick={e => deleteRaw(r.filename, e)}
-                          style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', marginLeft: 'auto' }}>삭제</button>
+                      <input type="checkbox" checked={rawSelected.has(r.filename)} onClick={e => e.stopPropagation()} onChange={() => rawToggle(r.filename)} style={{ cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {r.title || r.filename}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <CategoryBadge cat={r.category} />
+                          <button onClick={e => deleteRaw(r.filename, e)}
+                            style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', marginLeft: 'auto' }}>삭제</button>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -423,6 +456,12 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [subBgColor,   setSubBgColor]   = useState('#000000')
   const [subBgOpacity, setSubBgOpacity] = useState(0.6)
   const [channelName, setChannelName] = useState('')
+  const [channelX,    setChannelX]    = useState(0)
+  const [channelY,    setChannelY]    = useState(0)
+  const [channelFontsize, setChannelFontsize] = useState(36)
+  const [channelImageUrl, setChannelImageUrl] = useState('')
+  const [regChannels, setRegChannels] = useState<{url: string; category: string; thumbnail_url?: string}[]>([])
+  const avatarImgRef = useRef<HTMLImageElement | null>(null)
   const [bgOptions,     setBgOptions]     = useState<string[]>([])
   const [bgType,        setBgType]        = useState<'blur' | 'solid' | 'image'>('blur')
   const [bgSolidColor,  setBgSolidColor]  = useState('#1A1A1A')
@@ -458,17 +497,27 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   }, [])
 
   useEffect(() => { api.getBackgrounds().then(r => { setBgOptions(r.backgrounds); r.backgrounds.forEach(loadBg) }).catch(() => {}) }, [])
+  useEffect(() => { api.getChannels().then(r => setRegChannels(r.channels)).catch(() => {}) }, [])
 
   useEffect(() => {
     if (!raw) return
     const parts = raw.title.split(' / ')
     setTitle1(parts[0] || ''); setTitle2(parts[1] || ''); setChannelName(''); setRenderMsg('')
+    setChannelX(0); setChannelY(0); setChannelFontsize(36); setChannelImageUrl('')
     if (bgOptions.includes(raw.category)) {
       setBgType('image'); setBgImageName(raw.category); loadBg(raw.category)
     } else {
       setBgType('blur')
     }
   }, [raw?.filename])
+
+  useEffect(() => {
+    if (!channelImageUrl) { avatarImgRef.current = null; return }
+    const img = new Image(); img.crossOrigin = 'anonymous'
+    img.onload = () => { avatarImgRef.current = img }
+    img.onerror = () => { avatarImgRef.current = null }
+    img.src = channelImageUrl
+  }, [channelImageUrl])
 
   // 영상 자체의 재생/음소거 상태 — 선택된 영상이 바뀔 때만 새로 로드한다
   // (제목/스타일을 입력할 때마다 src를 다시 지정하면 오디오가 매번 처음부터 끊겨 재생된다)
@@ -562,21 +611,34 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
       }
       const channel = channelName.trim()
       if (channel) {
-        const sz = Math.round(36*SCALE)
+        const sz = Math.round(channelFontsize * SCALE)
         const bottomH = CV_H - (VID_Y_PX + VID_H_PX)
-        const cY = VID_Y_PX + VID_H_PX + Math.round((bottomH - sz) / 2)
+        const cY = VID_Y_PX + VID_H_PX + Math.round((bottomH - sz) / 2) + Math.round(channelY * SCALE)
+        const cX = CV_W / 2 + Math.round(channelX * SCALE)
         ctx.textAlign = 'center'; ctx.textBaseline = 'top'
         ctx.font = `bold ${sz}px 'Malgun Gothic',sans-serif`
         ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2
         ctx.fillStyle = 'rgba(255,255,255,0.75)'
-        ctx.fillText(channel, CV_W/2, cY)
+        ctx.fillText(channel, cX, cY)
         ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
+        // 원형 아바타 이미지
+        const avatar = avatarImgRef.current
+        if (avatar) {
+          const avSize = sz * 2
+          const tw = ctx.measureText(channel).width
+          const avX = cX - tw / 2 - avSize - Math.round(6 * SCALE)
+          const avY = cY + (sz - avSize) / 2
+          ctx.save()
+          ctx.beginPath(); ctx.arc(avX + avSize / 2, avY + avSize / 2, avSize / 2, 0, Math.PI * 2); ctx.clip()
+          ctx.drawImage(avatar, avX, avY, avSize, avSize)
+          ctx.restore()
+        }
       }
       rafRef.current = requestAnimationFrame(draw)
     }
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleScale, subtitles, subSize, subColor, subY, subBgEnabled, subBgColor, subBgOpacity, channelName, bgType, bgSolidColor, bgImageName, templateId, brightness, contrast, saturation])
+  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleScale, subtitles, subSize, subColor, subY, subBgEnabled, subBgColor, subBgOpacity, channelName, channelX, channelY, channelFontsize, channelImageUrl, bgType, bgSolidColor, bgImageName, templateId, brightness, contrast, saturation])
 
   // 음량 조절 — 미리듣기 영상에 즉시 반영 (HTML 비디오는 0~1 범위만 지원하므로 100%까지만 미리듣기 가능, 그 이상은 렌더링 결과로 확인)
   useEffect(() => {
@@ -589,6 +651,8 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     title_fontsize_scale: titleScale, sub_fontsize: subSize, sub_color: subColor, sub_margin_v: subY,
     sub_bg_enabled: subBgEnabled, sub_bg_color: subBgColor, sub_bg_opacity: subBgOpacity,
     channel_name: channelName.trim(),
+    channel_x: channelX, channel_y: channelY, channel_fontsize: channelFontsize,
+    channel_image_url: channelImageUrl,
     font_name: subFont,
     brightness, contrast, saturation, volume,
   })
@@ -707,7 +771,26 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                 {/* 출처 채널명 */}
                 <div>
                   <div className="section-label">출처 채널명 (영상 하단)</div>
-                  <input value={channelName} onChange={e => setChannelName(e.target.value)} placeholder="예: 채널명 / 출처: ○○뉴스" className="input-field" />
+                  <input value={channelName} onChange={e => setChannelName(e.target.value)} placeholder="예: 채널명 / 출처: ○○뉴스" className="input-field" style={{ marginBottom: 8 }} />
+                  {regChannels.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                      {regChannels.map(ch => {
+                        const name = ch.url.match(/youtube\.com\/(@[^/?#]+)/i)?.[1] || ch.url
+                        return (
+                          <button key={ch.url} onClick={() => { setChannelName(name); setChannelImageUrl(ch.thumbnail_url || '') }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '2px 8px', borderRadius: 999, border: '1px solid var(--border)', background: 'var(--surface2)', cursor: 'pointer' }}>
+                            {ch.thumbnail_url && <img src={ch.thumbnail_url} alt="" style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover' }} />}
+                            {name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    <Slider label="X 위치" value={channelX} display={`${channelX}px`} min={-400} max={400} step={10} onChange={setChannelX} />
+                    <Slider label="Y 위치" value={channelY} display={`${channelY}px`} min={-200} max={200} step={5} onChange={setChannelY} />
+                    <Slider label="크기" value={channelFontsize} display={`${channelFontsize}px`} min={18} max={80} step={2} onChange={setChannelFontsize} />
+                  </div>
                 </div>
 
                 {/* 배경 */}
@@ -884,7 +967,26 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
               {/* 출처 채널명 */}
               <div>
                 <div className="section-label">출처 채널명 (영상 하단)</div>
-                <input value={channelName} onChange={e => setChannelName(e.target.value)} placeholder="예: 채널명 / 출처: ○○뉴스" className="input-field" />
+                <input value={channelName} onChange={e => setChannelName(e.target.value)} placeholder="예: 채널명 / 출처: ○○뉴스" className="input-field" style={{ marginBottom: 8 }} />
+                {regChannels.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                    {regChannels.map(ch => {
+                      const name = ch.url.match(/youtube\.com\/(@[^/?#]+)/i)?.[1] || ch.url
+                      return (
+                        <button key={ch.url} onClick={() => { setChannelName(name); setChannelImageUrl(ch.thumbnail_url || '') }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '2px 8px', borderRadius: 999, border: '1px solid var(--border)', background: 'var(--surface2)', cursor: 'pointer' }}>
+                          {ch.thumbnail_url && <img src={ch.thumbnail_url} alt="" style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover' }} />}
+                          {name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  <Slider label="X 위치" value={channelX} display={`${channelX}px`} min={-400} max={400} step={10} onChange={setChannelX} />
+                  <Slider label="Y 위치" value={channelY} display={`${channelY}px`} min={-200} max={200} step={5} onChange={setChannelY} />
+                  <Slider label="크기" value={channelFontsize} display={`${channelFontsize}px`} min={18} max={80} step={2} onChange={setChannelFontsize} />
+                </div>
               </div>
 
               {/* 배경 */}

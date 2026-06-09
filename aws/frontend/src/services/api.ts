@@ -164,6 +164,10 @@ export interface StyleParams {
   sub_bg_color?: string
   sub_bg_opacity?: number
   channel_name?: string
+  channel_x?: number
+  channel_y?: number
+  channel_fontsize?: number
+  channel_image_url?: string
   font_name?: string
   brightness?: number
   contrast?: number
@@ -256,7 +260,7 @@ export const api = {
   },
 
   // Channels
-  async getChannels(): Promise<{ channels: { url: string; category: string }[] }> {
+  async getChannels(): Promise<{ channels: { url: string; category: string; thumbnail_url?: string }[] }> {
     const { data } = await client.get('/api/channels')
     return data
   },

@@ -1,0 +1,22 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[Issue Pick？ Pick!] President Lee, ＂Ruined the democratic nation of South Korea in an instant＂： E....json",
+  "category": "politics",
+  "intro_text": "이재명 발언\n민주주의 훼손",
+  "candidates": [
+    {
+      "start": 10.0,
+      "end": 25.0,
+      "reason": "영상 제목에 언급된 이재명 대표의 '민주주의 훼손' 관련 강한 발언이 포함될 것으로 예상되는 핵심 구간. 여론을 뒤흔들 만한 논쟁적 주장.",
+      "score": 10,
+      "edit_order": 1
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 19.0,
+      "orig_start": 8.0,
+      "orig_end": 27.0
+    }
+  ]
+}

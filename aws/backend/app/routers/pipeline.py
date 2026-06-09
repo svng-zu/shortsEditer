@@ -82,7 +82,9 @@ async def add_channel(item: ChannelItem, session: SessionDirs = Depends(get_sess
     channels = _load_channels(session)
     if any(c["url"] == item.url for c in channels):
         raise HTTPException(400, "이미 등록된 채널입니다.")
-    channels.append({"url": item.url, "category": item.category})
+    collector = YoutubeCollector(session)
+    ch_info = await asyncio.to_thread(collector.get_channel_info, item.url)
+    channels.append({"url": item.url, "category": item.category, "thumbnail_url": ch_info.get("thumbnail_url", "")})
     _save_channels(session, channels)
     return {"ok": True, "channels": channels}
 

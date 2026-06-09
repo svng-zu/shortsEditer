@@ -43,6 +43,10 @@ class StyleParams(BaseModel):
     sub_bg_color: str = "#000000"
     sub_bg_opacity: float = 0.6
     channel_name: str = ""
+    channel_x: int = 0
+    channel_y: int = 0
+    channel_fontsize: int = 36
+    channel_image_url: str = ""
     font_name: str = "NanumSquareRoundEB"
     brightness: float = 0.0
     contrast: float = 1.0

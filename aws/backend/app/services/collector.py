@@ -265,6 +265,28 @@ class YoutubeCollector:
             "video_id": video_id,
         }
 
+    def get_channel_info(self, channel_url: str) -> dict:
+        """채널 URL에서 채널 아바타 썸네일 URL 추출 (yt-dlp extract_flat)"""
+        opts = {
+            **_auth_opts(),
+            "quiet": True,
+            "skip_download": True,
+            "no_warnings": True,
+            "extract_flat": True,
+            "playlistend": 1,
+        }
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(channel_url, download=False)
+            thumbnails = info.get("thumbnails") or []
+            # 가장 높은 해상도(마지막 항목)의 URL 사용
+            thumbnail_url = next(
+                (t["url"] for t in reversed(thumbnails) if t.get("url")), None
+            )
+            return {"thumbnail_url": thumbnail_url or info.get("thumbnail") or ""}
+        except Exception:
+            return {"thumbnail_url": ""}
+
     def download_video(self, video_url: str, quality: str = "1080",
                        on_progress: callable = None) -> dict:
         """영상 다운로드 (yt-dlp + 인증)"""

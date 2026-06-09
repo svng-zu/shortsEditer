@@ -1,0 +1,48 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[US Stock Strategy] NYC Market Plunges on Rate Hike Fears… Nasdaq Down 4.2%.json",
+  "category": "economy",
+  "intro_text": "젠슨 황 방한\n韓 기업 협력 확대",
+  "candidates": [
+    {
+      "start": 133.26,
+      "end": 147.34,
+      "reason": "젠슨 황 CEO가 SK를 엔비디아의 가장 큰 파트너로 평가하고, 하락 증시에 대해 '저렴한 주식을 살 기회'라며 자신감을 드러내는 임팩트 있는 발언을 담습니다.",
+      "score": 10,
+      "edit_order": 1
+    },
+    {
+      "start": 154.38,
+      "end": 159.7,
+      "reason": "SK텔레콤과 아시아 최대 규모의 AI 팩토리 가동을 추진한다는 구체적인 협력 내용을 언급하여 시청자에게 임팩트 있는 산업 동향을 전달합니다.",
+      "score": 9,
+      "edit_order": 2
+    },
+    {
+      "start": 208.16,
+      "end": 214.74,
+      "reason": "네이버와 기가와트급 AI 팩토리 구축 협력을 언급하며 국내 주요 기업과의 대규모 AI 협력 소식을 전달하여 임팩트 있는 미래 산업 전망을 제시합니다.",
+      "score": 9,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 18.08,
+      "orig_start": 131.26,
+      "orig_end": 149.34
+    },
+    {
+      "raw_start": 18.08,
+      "raw_end": 27.4,
+      "orig_start": 152.38,
+      "orig_end": 161.7
+    },
+    {
+      "raw_start": 27.4,
+      "raw_end": 37.98,
+      "orig_start": 206.16,
+      "orig_end": 216.74
+    }
+  ]
+}

@@ -244,14 +244,16 @@ class EditorBase:
         if channel:
             esc = channel.replace("'", "\\'").replace(":", "\\:").replace("%", "\\%")
             font_opt = f":fontfile='{self.font}'" if self.font else ""
-            ch_fontsize = 36
-            cy = VIDEO_Y + VIDEO_H + (BOTTOM_H - ch_fontsize) // 2
+            ch_fontsize = int(s.get("channel_fontsize") or 36)
+            ch_x_off = int(s.get("channel_x") or 0)
+            ch_y_off = int(s.get("channel_y") or 0)
+            cy = VIDEO_Y + VIDEO_H + (BOTTOM_H - ch_fontsize) // 2 + ch_y_off
             filters.append(
                 f"drawtext=text='{esc}'"
                 f"{font_opt}"
                 f":fontsize={ch_fontsize}:fontcolor=white@0.75"
                 f":borderw=2:bordercolor=black@0.6"
-                f":x=(w-text_w)/2:y={cy}"
+                f":x=(w-text_w)/2{f'+{ch_x_off}' if ch_x_off > 0 else f'{ch_x_off}' if ch_x_off < 0 else ''}:y={cy}"
             )
         return ",".join(filters)
 
@@ -273,14 +275,16 @@ class EditorBase:
         if channel:
             esc = channel.replace("'", "\\'").replace(":", "\\:").replace("%", "\\%")
             font_opt = f":fontfile='{self.font}'" if self.font else ""
-            ch_fontsize = 36
-            cy = VIDEO_Y + VIDEO_H + (BOTTOM_H - ch_fontsize) // 2
+            ch_fontsize = int(s.get("channel_fontsize") or 36)
+            ch_x_off = int(s.get("channel_x") or 0)
+            ch_y_off = int(s.get("channel_y") or 0)
+            cy = VIDEO_Y + VIDEO_H + (BOTTOM_H - ch_fontsize) // 2 + ch_y_off
             filters.append(
                 f"drawtext=text='{esc}'"
                 f"{font_opt}"
                 f":fontsize={ch_fontsize}:fontcolor=white@0.75"
                 f":borderw=2:bordercolor=black@0.6"
-                f":x=(w-text_w)/2:y={cy}"
+                f":x=(w-text_w)/2{f'+{ch_x_off}' if ch_x_off > 0 else f'{ch_x_off}' if ch_x_off < 0 else ''}:y={cy}"
             )
         return filters
 
@@ -664,7 +668,40 @@ class EditorBase:
                 [output_path]
             )
 
+        # 채널 아바타 이미지 오버레이 (channel_image_url이 있을 때)
+        channel_image_url = (style or {}).get("channel_image_url", "")
+        avatar_tmp = None
+        if channel_image_url:
+            try:
+                import urllib.request, tempfile
+                avatar_tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+                urllib.request.urlretrieve(channel_image_url, avatar_tmp.name)
+                avatar_tmp.close()
+                av_size = int((style or {}).get("channel_fontsize") or 36) * 2
+                ch_x_off = int((style or {}).get("channel_x") or 0)
+                ch_y_off = int((style or {}).get("channel_y") or 0)
+                av_cy = VIDEO_Y + VIDEO_H + (BOTTOM_H - av_size) // 2 + ch_y_off
+                av_cx = CANVAS_W // 2 - 220 + ch_x_off
+                av_idx = cmd.count("-i")
+                fc_idx = cmd.index("-filter_complex") + 1
+                old_fc = cmd[fc_idx]
+                parts = old_fc.rsplit("[out]", 1)
+                if len(parts) == 2:
+                    new_fc = (parts[0] + "[preav]" + parts[1]
+                              + f";[{av_idx}:v]scale={av_size}:{av_size}[avatar]"
+                              + f";[preav][avatar]overlay={av_cx}:{av_cy}[out]")
+                    cmd = list(cmd)
+                    cmd.insert(fc_idx - 1, avatar_tmp.name)
+                    cmd.insert(fc_idx - 1, "-i")
+                    cmd[cmd.index("-filter_complex") + 1] = new_fc
+            except Exception as e:
+                print(f"  [avatar] 오버레이 실패: {e}")
+                avatar_tmp = None
+
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if avatar_tmp:
+            try: os.unlink(avatar_tmp.name)
+            except Exception: pass
         print(f"  [Stage 2] 완료 → {os.path.basename(output_path)}")
 
         # 나레이션 믹싱

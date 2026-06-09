@@ -1,0 +1,73 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/Eagles vs Giants｜6.7｜KBO Highlights｜KBO X TVING.json",
+  "category": "sports",
+  "intro_text": "이글스 vs 자이언츠\n6.7 KBO 하이라이트",
+  "candidates": [
+    {
+      "start": 0.0,
+      "end": 15.0,
+      "reason": "경기 시작을 알리고 대결 팀을 명확히 제시하는 도입부. 영상 제목과 첫 장면 확인 기준에 부합.",
+      "score": 8,
+      "edit_order": 1,
+      "connection_note": "시작"
+    },
+    {
+      "start": 200.0,
+      "end": 215.0,
+      "reason": "경기 초반 또는 중반의 주요 활약 장면으로, 전체 경기 흐름을 이해하는 데 도움을 줌. (자막 정보 부족으로 일반적인 하이라이트 구간으로 추정)",
+      "score": 6,
+      "edit_order": 2,
+      "connection_note": "경기 시작 후 첫 번째 주요 장면으로 자연스럽게 전환하여 시청자의 흥미를 유발"
+    },
+    {
+      "start": 300.0,
+      "end": 315.0,
+      "reason": "또 다른 주요 활약 장면으로, 경기 중반의 긴장감을 높이는 구간. (자막 정보 부족으로 일반적인 하이라이트 구간으로 추정)",
+      "score": 7,
+      "edit_order": 3,
+      "connection_note": "이전 활약에 이어 경기 흐름을 계속 이어가며 중요한 순간들을 연결"
+    },
+    {
+      "start": 790.0,
+      "end": 805.0,
+      "reason": "자막에 '9'가 언급된 9회 승부처 구간으로, 경기 결정적 장면 또는 극적인 순간일 가능성이 높음. 하이라이트의 클라이맥스.",
+      "score": 10,
+      "edit_order": 4,
+      "connection_note": "경기 중반의 빌드업을 넘어 가장 극적이고 결정적인 승부처로 연결하여 긴장감을 최고조로 끌어올림"
+    },
+    {
+      "start": 1030.0,
+      "end": 1045.0,
+      "reason": "경기 종료 직전 또는 직후의 장면으로, 승패가 결정된 후의 환호, 아쉬움 등 극적인 순간의 여운을 담을 수 있는 구간.",
+      "score": 9,
+      "edit_order": 5,
+      "connection_note": "결정적 장면 이후의 결과를 보여주며 경기의 감동을 마무리하고 여운을 남김"
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 17.0,
+      "orig_start": 0,
+      "orig_end": 17.0
+    },
+    {
+      "raw_start": 17.0,
+      "raw_end": 36.0,
+      "orig_start": 198.0,
+      "orig_end": 217.0
+    },
+    {
+      "raw_start": 36.0,
+      "raw_end": 55.0,
+      "orig_start": 298.0,
+      "orig_end": 317.0
+    },
+    {
+      "raw_start": 55.0,
+      "raw_end": 59.0,
+      "orig_start": 788.0,
+      "orig_end": 792.0
+    }
+  ]
+}

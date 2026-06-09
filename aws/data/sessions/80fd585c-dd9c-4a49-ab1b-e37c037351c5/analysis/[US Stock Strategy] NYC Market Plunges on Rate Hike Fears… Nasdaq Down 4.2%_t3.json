@@ -1,0 +1,48 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[US Stock Strategy] NYC Market Plunges on Rate Hike Fears… Nasdaq Down 4.2%.json",
+  "category": "economy",
+  "intro_text": "미국-이란 전쟁\n100일째 긴장 고조",
+  "candidates": [
+    {
+      "start": 94.85,
+      "end": 101.97,
+      "reason": "미국과 이란 전쟁이 100일을 맞았다는 시점과 트럼프 대통령의 협상 압박을 언급하여 일반인이 체감할 수 있는 국제 정세 이슈를 다룹니다.",
+      "score": 8,
+      "edit_order": 1
+    },
+    {
+      "start": 110.01,
+      "end": 115.01,
+      "reason": "이란의 이스라엘 공격으로 긴장이 다시 높아진 상황을 언급하여 시청자에게 임팩트 있는 국제 정세 변화를 전달합니다.",
+      "score": 9,
+      "edit_order": 2
+    },
+    {
+      "start": 115.01,
+      "end": 125.38,
+      "reason": "트럼프 대통령이 이스라엘의 보복 자제를 요청하며 종전 협상 관리에 나선 모습을 보여주어 국제 정세의 중요한 전환점을 제시합니다.",
+      "score": 8,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 11.12,
+      "orig_start": 92.85,
+      "orig_end": 103.97
+    },
+    {
+      "raw_start": 11.12,
+      "raw_end": 20.12,
+      "orig_start": 108.01,
+      "orig_end": 117.01
+    },
+    {
+      "raw_start": 20.12,
+      "raw_end": 34.49,
+      "orig_start": 113.01,
+      "orig_end": 127.38
+    }
+  ]
+}
