@@ -10,7 +10,7 @@ from app.config import settings
 
 # 메인 분석: 고성능, 청크 요약: 저비용
 MAIN_MODEL_NAME = "gemini-2.5-flash"
-CHEAP_MODEL_NAME = "gemini-2.0-flash-lite"
+CHEAP_MODEL_NAME = "gemini-2.5-flash"
 
 # ────────────────────────────────────────────────
 # 카테고리별 기준 프롬프트

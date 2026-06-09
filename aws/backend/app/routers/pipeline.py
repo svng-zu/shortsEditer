@@ -634,11 +634,7 @@ async def list_downloads(session: SessionDirs = Depends(get_session)):
     id_map = load_video_id_map(session)
     result = []
     for f in sorted(session.download_dir.glob("*.mp4")):
-        video_id = id_map.get(f.stem)
-        thumbnail_url = (
-            f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"
-            if video_id else None
-        )
+        thumbnail_url = f"/api/media/downloads/{session.session_id}/{f.name}/thumbnail"
         result.append(DownloadInfo(
             filename=f.name,
             stem=f.stem,
