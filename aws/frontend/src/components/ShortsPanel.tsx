@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { api, ShortInfo, RawInfo, StyleParams } from '../services/api'
+import { useState, useEffect, useRef, useCallback, RefObject } from 'react'
+import { api, ShortInfo, RawInfo, DownloadInfo, StyleParams } from '../services/api'
 import YouTubeUploadModal from './YouTubeUploadModal'
 
 interface Props {
-  activeTab: 'raws' | 'shorts'
-  onTabChange: (t: 'raws' | 'shorts') => void
+  activeTab: 'downloads' | 'raws' | 'shorts'
+  onTabChange: (t: 'downloads' | 'raws' | 'shorts') => void
+  downloads: DownloadInfo[]
   raws: RawInfo[]
   shorts: ShortInfo[]
   selectedRaw: RawInfo | null
@@ -27,6 +28,25 @@ const TMPL_COLORS: Record<string, Record<number, { bg: string; div: string }>> =
   economy:  { 1: { bg: '#0a0f0a', div: '#00E676' }, 2: { bg: '#f5f5f5', div: '#00897B' }, 3: { bg: '#0d1b2a', div: '#00E676' } },
   politics: { 1: { bg: '#0d0505', div: '#FF3D3D' }, 2: { bg: '#f5f5f5', div: '#CC0000' }, 3: { bg: '#111111', div: '#FF3D3D' } },
 }
+
+function _hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.slice(0, 2), 16) || 0
+  const g = parseInt(h.slice(2, 4), 16) || 0
+  const b = parseInt(h.slice(4, 6), 16) || 0
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+// 자막 글꼴 — FFmpeg 렌더링에 쓰이는 FONT_MAP(editor_base.py)과 키를 맞춰야 한다
+const SUB_FONT_OPTIONS: { value: string; label: string }[] = [
+  { value: 'NanumSquareRoundEB',   label: '나눔스퀘어라운드 EB' },
+  { value: 'NanumSquareRoundB',    label: '나눔스퀘어라운드 B' },
+  { value: 'NanumSquareB',         label: '나눔스퀘어 B' },
+  { value: 'NanumGothicBold',      label: '나눔고딕 Bold' },
+  { value: 'NanumGothic',          label: '나눔고딕' },
+  { value: 'NanumBarunGothicBold', label: '나눔바른고딕 Bold' },
+  { value: 'NanumMyeongjoBold',    label: '나눔명조 Bold' },
+]
 
 const bgCache: Record<string, HTMLImageElement | null> = {}
 function loadBg(name: string) {
@@ -60,17 +80,17 @@ function SrtModal({ stem, onClose }: { stem: string; onClose: () => void }) {
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
       <div className="card" style={{ width: 560, maxWidth: '95vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-          <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>자막 편집</span>
+          <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>자막 편집</span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => { const last = entries.length ? parseInt(entries[entries.length-1].index)+1 : 1; setEntries([...entries, { index: String(last), times: '00:00:00,000 --> 00:00:00,000', text: '' }]) }}
-              className="btn-outlined" style={{ padding: '5px 12px', fontSize: 12 }}>+ 추가</button>
-            <button onClick={save} disabled={saving} className="btn-primary" style={{ padding: '5px 14px', fontSize: 12 }}>
+              className="btn-outlined" style={{ padding: '5px 12px', fontSize: 14 }}>+ 추가</button>
+            <button onClick={save} disabled={saving} className="btn-primary" style={{ padding: '5px 14px', fontSize: 14 }}>
               {saving ? '저장 중...' : '저장'}
             </button>
-            <button onClick={onClose} className="btn-outlined" style={{ padding: '5px 10px', fontSize: 12 }}>✕</button>
+            <button onClick={onClose} className="btn-outlined" style={{ padding: '5px 10px', fontSize: 14 }}>✕</button>
           </div>
         </div>
-        <div style={{ padding: '8px 20px', fontSize: 11, color: 'var(--text2)', background: 'var(--surface2)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ padding: '8px 20px', fontSize: 13, color: 'var(--text2)', background: 'var(--surface2)', borderBottom: '1px solid var(--border)' }}>
           시간: 00:00:00,000 → 00:00:00,000 형식 / 저장 후 다음 렌더링에 반영
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -79,19 +99,19 @@ function SrtModal({ stem, onClose }: { stem: string; onClose: () => void }) {
             : entries.map((e, i) => (
                 <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', background: 'var(--surface2)', display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 10, color: 'var(--muted)', minWidth: 20 }}>{e.index}</span>
+                    <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 20 }}>{e.index}</span>
                     <input value={e.times} onChange={ev => { const u = [...entries]; u[i] = { ...e, times: ev.target.value }; setEntries(u) }}
-                      className="input-field" style={{ flex: 1, fontSize: 11, fontFamily: 'monospace', padding: '3px 6px' }} />
+                      className="input-field" style={{ flex: 1, fontSize: 13, fontFamily: 'monospace', padding: '3px 6px' }} />
                     <button onClick={() => setEntries(entries.filter((_, j) => j !== i))}
-                      style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: 14 }}>✕</button>
+                      style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: 16 }}>✕</button>
                   </div>
                   <textarea value={e.text} rows={2} onChange={ev => { const u = [...entries]; u[i] = { ...e, text: ev.target.value }; setEntries(u) }}
-                    className="input-field" style={{ fontSize: 13, resize: 'vertical', lineHeight: 1.5 }} />
+                    className="input-field" style={{ fontSize: 15, resize: 'vertical', lineHeight: 1.5 }} />
                 </div>
               ))
           }
         </div>
-        {msg && <div style={{ padding: '8px 20px', fontSize: 12, color: msg.startsWith('✓') ? 'var(--success)' : 'var(--error)', borderTop: '1px solid var(--border)' }}>{msg}</div>}
+        {msg && <div style={{ padding: '8px 20px', fontSize: 14, color: msg.startsWith('✓') ? 'var(--success)' : 'var(--error)', borderTop: '1px solid var(--border)' }}>{msg}</div>}
       </div>
     </div>
   )
@@ -105,15 +125,60 @@ function CategoryBadge({ cat }: { cat: string }) {
   }
   const s = map[cat]
   if (!s) return null
-  return <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: s.bg, color: s.color }}>{s.label}</span>
+  return <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: s.bg, color: s.color }}>{s.label}</span>
 }
 
+const CATEGORIES_DL = [
+  { value: 'sports', label: '스포츠' },
+  { value: 'economy', label: '경제' },
+  { value: 'politics', label: '정치' },
+]
+
 export default function ShortsPanel({
-  activeTab, onTabChange, raws, shorts,
+  activeTab, onTabChange, downloads, raws, shorts,
   selectedRaw, selectedShort, onSelectRaw, onSelectShort,
   onRefresh, onStartPolling, isMobile = false,
 }: Props) {
   const [uploadTarget, setUploadTarget] = useState<ShortInfo | null>(null)
+  // 수집됨 탭: 선택된 항목 + 카테고리 로컬 상태
+  const [dlSelected, setDlSelected] = useState<Set<string>>(new Set())
+  const [dlCategories, setDlCategories] = useState<Record<string, string>>({})
+  const [dlProcessing, setDlProcessing] = useState(false)
+
+  // downloads가 바뀌면 카테고리 초기화
+  useEffect(() => {
+    const init: Record<string, string> = {}
+    downloads.forEach(d => { init[d.filename] = d.category })
+    setDlCategories(prev => {
+      const merged = { ...init }
+      // 사용자가 이미 바꾼 항목 유지
+      Object.keys(prev).forEach(k => { if (k in merged) merged[k] = prev[k] })
+      return merged
+    })
+  }, [downloads])
+
+  const dlToggle = (filename: string) => {
+    setDlSelected(prev => {
+      const next = new Set(prev)
+      next.has(filename) ? next.delete(filename) : next.add(filename)
+      return next
+    })
+  }
+  const dlToggleAll = () => {
+    if (dlSelected.size === downloads.length) setDlSelected(new Set())
+    else setDlSelected(new Set(downloads.map(d => d.filename)))
+  }
+  const handleDlProcess = async () => {
+    const items = [...dlSelected].map(fn => ({
+      filename: fn,
+      category: dlCategories[fn] || 'economy',
+    }))
+    if (!items.length) return
+    setDlProcessing(true)
+    try { await api.processSelected(items); onStartPolling() }
+    catch {}
+    finally { setDlProcessing(false) }
+  }
 
   const deleteShort = async (fn: string, e: React.MouseEvent) => {
     e.stopPropagation(); if (!confirm('삭제?')) return
@@ -145,7 +210,7 @@ export default function ShortsPanel({
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: 'var(--primary)', lineHeight: 1, padding: '0 4px 0 0' }}>
                 ←
               </button>
-              <span style={{ fontWeight: 700, fontSize: 14, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedRaw?.title || '편집'}</span>
+              <span style={{ fontWeight: 700, fontSize: 16, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedRaw?.title || '편집'}</span>
               <CategoryBadge cat={selectedRaw?.category || ''} />
             </div>
             <RawEditArea raw={selectedRaw} onStartPolling={onStartPolling} isMobile />
@@ -159,16 +224,16 @@ export default function ShortsPanel({
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: 'white', lineHeight: 1, padding: '0 4px 0 0' }}>
                 ←
               </button>
-              <span style={{ fontWeight: 700, fontSize: 14, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'white' }}>
+              <span style={{ fontWeight: 700, fontSize: 16, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'white' }}>
                 {selectedShort.title || selectedShort.filename}
               </span>
               <div style={{ display: 'flex', gap: 6 }}>
                 <a href={selectedShort.url} download={selectedShort.filename}
-                  style={{ fontSize: 11, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', textDecoration: 'none' }}>⬇</a>
+                  style={{ fontSize: 13, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', textDecoration: 'none' }}>⬇</a>
                 <button onClick={() => setUploadTarget(selectedShort)}
-                  style={{ fontSize: 11, padding: '6px 10px', borderRadius: 8, background: '#ea4335', color: 'white', border: 'none', cursor: 'pointer' }}>YT</button>
+                  style={{ fontSize: 13, padding: '6px 10px', borderRadius: 8, background: '#ea4335', color: 'white', border: 'none', cursor: 'pointer' }}>YT</button>
                 <button onClick={async e => { await deleteShort(selectedShort.filename, e); onSelectShort(null) }}
-                  style={{ fontSize: 11, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer' }}>삭제</button>
+                  style={{ fontSize: 13, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer' }}>삭제</button>
               </div>
             </div>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -183,16 +248,67 @@ export default function ShortsPanel({
         <div style={{ background: 'var(--bg)' }}>
           {/* 탭 */}
           <div style={{ display: 'flex', background: 'white', borderBottom: '1px solid var(--border)', position: 'sticky', top: 52, zIndex: 50 }}>
-            {(['raws', 'shorts'] as const).map(tab => (
+            {(['downloads', 'raws', 'shorts'] as const).map(tab => (
               <button key={tab} onClick={() => onTabChange(tab)} style={{
                 flex: 1, padding: '13px 0', border: 'none', background: 'none', cursor: 'pointer',
                 fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
                 color: activeTab === tab ? 'var(--primary)' : 'var(--text2)',
                 borderBottom: `3px solid ${activeTab === tab ? 'var(--primary)' : 'transparent'}`,
                 transition: 'color .15s',
-              }}>{tab === 'raws' ? '✂️ 영상 편집' : '🎬 완성 쇼츠'}</button>
+              }}>
+                {tab === 'downloads' ? `📥 수집됨${downloads.length ? ` (${downloads.length})` : ''}` : tab === 'raws' ? '✂️ 편집' : '🎬 쇼츠'}
+              </button>
             ))}
           </div>
+
+          {/* 수집됨 목록 */}
+          {activeTab === 'downloads' && (
+            <div style={{ background: 'white' }}>
+              {downloads.length === 0
+                ? <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--muted)' }}>
+                    <div style={{ fontSize: 40, marginBottom: 10, opacity: 0.3 }}>📥</div>
+                    <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text2)' }}>수집된 영상 없음</p>
+                    <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 4 }}>파이프라인에서 영상을 먼저 수집하세요</p>
+                  </div>
+                : <>
+                    {/* 전체선택 + 편집 시작 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)', background: '#fafafa' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', fontWeight: 600, color: 'var(--text2)' }}>
+                        <input type="checkbox"
+                          checked={dlSelected.size === downloads.length && downloads.length > 0}
+                          onChange={dlToggleAll}
+                          style={{ accentColor: 'var(--primary)', width: 16, height: 16, cursor: 'pointer' }} />
+                        전체선택
+                      </label>
+                      <button
+                        onClick={handleDlProcess}
+                        disabled={dlSelected.size === 0 || dlProcessing}
+                        className="btn-primary"
+                        style={{ marginLeft: 'auto', padding: '8px 16px', fontSize: 14, fontWeight: 700, borderRadius: 8, opacity: dlSelected.size === 0 ? 0.5 : 1 }}>
+                        {dlProcessing ? '처리 중...' : `✂️ 편집 시작 (${dlSelected.size}개)`}
+                      </button>
+                    </div>
+                    {downloads.map(d => (
+                      <div key={d.filename} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+                        <input type="checkbox" checked={dlSelected.has(d.filename)} onChange={() => dlToggle(d.filename)}
+                          style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
+                            {d.stem}
+                          </div>
+                          <select value={dlCategories[d.filename] || d.category}
+                            onChange={e => setDlCategories(prev => ({ ...prev, [d.filename]: e.target.value }))}
+                            onClick={e => e.stopPropagation()}
+                            style={{ fontSize: 13, padding: '3px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'white', color: 'var(--text2)', cursor: 'pointer', outline: 'none' }}>
+                            {CATEGORIES_DL.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+              }
+            </div>
+          )}
 
           {/* RAW 목록 */}
           {activeTab === 'raws' && (
@@ -200,8 +316,8 @@ export default function ShortsPanel({
               {raws.length === 0
                 ? <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--muted)' }}>
                     <div style={{ fontSize: 40, marginBottom: 10, opacity: 0.3 }}>🎞</div>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text2)' }}>편집된 영상 없음</p>
-                    <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>파이프라인에서 영상 편집을 실행하세요</p>
+                    <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text2)' }}>편집된 영상 없음</p>
+                    <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 4 }}>파이프라인에서 영상 편집을 실행하세요</p>
                   </div>
                 : raws.map(r => (
                     <div key={r.filename} onClick={() => onSelectRaw(r)} style={{
@@ -215,13 +331,13 @@ export default function ShortsPanel({
                         ✂️
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', marginBottom: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {r.title || r.filename}
                         </div>
                         <CategoryBadge cat={r.category} />
                       </div>
                       <button onClick={e => deleteRaw(r.filename, e)}
-                        style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }}>삭제</button>
+                        style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }}>삭제</button>
                       <span style={{ color: '#bdc1c6', fontSize: 22, flexShrink: 0 }}>›</span>
                     </div>
                   ))
@@ -235,8 +351,8 @@ export default function ShortsPanel({
               {shorts.length === 0
                 ? <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--muted)' }}>
                     <div style={{ fontSize: 40, marginBottom: 10, opacity: 0.3 }}>🎬</div>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text2)' }}>완성된 쇼츠 없음</p>
-                    <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>편집실에서 렌더링을 실행하세요</p>
+                    <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text2)' }}>완성된 쇼츠 없음</p>
+                    <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 4 }}>편집실에서 렌더링을 실행하세요</p>
                   </div>
                 : shorts.map(s => (
                     <div key={s.filename} onClick={() => onSelectShort(s)} style={{
@@ -250,10 +366,10 @@ export default function ShortsPanel({
                         <video src={`${s.url}#t=1`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', marginBottom: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {s.title || s.filename}
                         </div>
-                        <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>탭하여 재생 ▶</span>
+                        <span style={{ fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>탭하여 재생 ▶</span>
                       </div>
                       <span style={{ color: '#bdc1c6', fontSize: 22, flexShrink: 0 }}>›</span>
                     </div>
@@ -272,31 +388,85 @@ export default function ShortsPanel({
       {uploadTarget && <YouTubeUploadModal filename={uploadTarget.filename} defaultTitle={uploadTarget.title} onClose={() => setUploadTarget(null)} />}
 
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', padding: '0 16px', flexShrink: 0 }}>
-        {(['raws', 'shorts'] as const).map(tab => (
+        {(['downloads', 'raws', 'shorts'] as const).map(tab => (
           <button key={tab} onClick={() => onTabChange(tab)} style={{
             padding: '12px 16px', border: 'none', background: 'none', cursor: 'pointer',
-            fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+            fontSize: 15, fontWeight: 600, fontFamily: 'inherit',
             color: activeTab === tab ? 'var(--primary)' : 'var(--text2)',
             borderBottom: `2px solid ${activeTab === tab ? 'var(--primary)' : 'transparent'}`,
             marginBottom: -1, transition: 'color .15s',
-          }}>{tab === 'raws' ? '영상 편집' : '완성 쇼츠'}</button>
+          }}>
+            {tab === 'downloads'
+              ? `📥 수집됨${downloads.length ? ` (${downloads.length})` : ''}`
+              : tab === 'raws' ? '✂️ 영상 편집' : '🎬 완성 쇼츠'}
+          </button>
         ))}
       </div>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
+        {/* ─── 수집됨 탭 ─── */}
+        {activeTab === 'downloads' && (
+          <div style={{ flex: 1, overflowY: 'auto', background: 'var(--surface2)' }}>
+            {downloads.length === 0
+              ? <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--muted)' }}>
+                  <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.4 }}>📥</div>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text2)' }}>수집된 영상 없음</p>
+                  <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>파이프라인에서 영상을 먼저 수집하세요</p>
+                </div>
+              : <div style={{ background: 'white', margin: 16, borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
+                  {/* 전체선택 + 편집시작 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)', background: '#fafafa' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', fontWeight: 600, color: 'var(--text2)' }}>
+                      <input type="checkbox"
+                        checked={dlSelected.size === downloads.length && downloads.length > 0}
+                        onChange={dlToggleAll}
+                        style={{ accentColor: 'var(--primary)', width: 16, height: 16, cursor: 'pointer' }} />
+                      전체선택
+                    </label>
+                    <span style={{ fontSize: 13, color: 'var(--muted)' }}>{dlSelected.size > 0 ? `${dlSelected.size}개 선택됨` : `총 ${downloads.length}개`}</span>
+                    <button
+                      onClick={handleDlProcess}
+                      disabled={dlSelected.size === 0 || dlProcessing}
+                      className="btn-primary"
+                      style={{ marginLeft: 'auto', padding: '8px 18px', fontSize: 14, fontWeight: 700, borderRadius: 8, opacity: dlSelected.size === 0 ? 0.5 : 1 }}>
+                      {dlProcessing ? '처리 중...' : `✂️ 편집 시작${dlSelected.size > 0 ? ` (${dlSelected.size}개)` : ''}`}
+                    </button>
+                  </div>
+                  {downloads.map(d => (
+                    <div key={d.filename} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+                      <input type="checkbox" checked={dlSelected.has(d.filename)} onChange={() => dlToggle(d.filename)}
+                        style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {d.stem}
+                        </div>
+                      </div>
+                      <select
+                        value={dlCategories[d.filename] || d.category}
+                        onChange={e => setDlCategories(prev => ({ ...prev, [d.filename]: e.target.value }))}
+                        style={{ fontSize: 13, padding: '5px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'white', color: 'var(--text2)', cursor: 'pointer', outline: 'none', flexShrink: 0 }}>
+                        {CATEGORIES_DL.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+            }
+          </div>
+        )}
+
         {/* ─── RAW 탭 ─── */}
         {activeTab === 'raws' && (
           <>
             <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface2)' }}>
-              <div style={{ padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: 'var(--text2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 편집된 영상
-                <span style={{ background: 'var(--primary)', color: 'white', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>{raws.length}</span>
+                <span style={{ background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>{raws.length}</span>
               </div>
               {raws.length === 0
                 ? <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)' }}>
                     <div style={{ fontSize: 24, marginBottom: 6, opacity: 0.4 }}>🎞</div>
-                    <p style={{ fontSize: 11 }}>영상 편집 후 표시됩니다</p>
+                    <p style={{ fontSize: 13 }}>영상 편집 후 표시됩니다</p>
                   </div>
                 : raws.map(r => (
                     <div key={r.filename} onClick={() => onSelectRaw(r)} style={{
@@ -305,13 +475,13 @@ export default function ShortsPanel({
                       background: selectedRaw?.filename === r.filename ? 'var(--primary-bg)' : 'transparent',
                       transition: 'background .15s',
                     }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {r.title || r.filename}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <CategoryBadge cat={r.category} />
                         <button onClick={e => deleteRaw(r.filename, e)}
-                          style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', marginLeft: 'auto' }}>삭제</button>
+                          style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', marginLeft: 'auto' }}>삭제</button>
                       </div>
                     </div>
                   ))
@@ -325,14 +495,14 @@ export default function ShortsPanel({
         {activeTab === 'shorts' && (
           <>
             <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface2)' }}>
-              <div style={{ padding: '10px 12px', fontSize: 11, fontWeight: 600, color: 'var(--text2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: 'var(--text2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 완성 쇼츠
-                <span style={{ background: 'var(--primary)', color: 'white', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>{shorts.length}</span>
+                <span style={{ background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>{shorts.length}</span>
               </div>
               {shorts.length === 0
                 ? <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)' }}>
                     <div style={{ fontSize: 24, marginBottom: 6, opacity: 0.4 }}>🎬</div>
-                    <p style={{ fontSize: 11 }}>렌더링 후 표시됩니다</p>
+                    <p style={{ fontSize: 13 }}>렌더링 후 표시됩니다</p>
                   </div>
                 : shorts.map(s => (
                     <div key={s.filename} onClick={() => onSelectShort(s)} style={{
@@ -345,16 +515,16 @@ export default function ShortsPanel({
                         <video src={`${s.url}#t=1`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {s.title || s.filename}
                         </div>
                         <div style={{ display: 'flex', gap: 4 }}>
                           <a href={s.url} download={s.filename} onClick={e => e.stopPropagation()}
-                            className="btn-outlined" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4 }}>다운</a>
+                            className="btn-outlined" style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4 }}>다운</a>
                           <button onClick={e => { e.stopPropagation(); setUploadTarget(s) }}
-                            style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#fce8e6', color: 'var(--error)', border: '1px solid #f28b82', cursor: 'pointer' }}>YT</button>
+                            style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4, background: '#fce8e6', color: 'var(--error)', border: '1px solid #f28b82', cursor: 'pointer' }}>YT</button>
                           <button onClick={e => deleteShort(s.filename, e)}
-                            style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', marginLeft: 'auto' }}>삭제</button>
+                            style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', marginLeft: 'auto' }}>삭제</button>
                         </div>
                       </div>
                     </div>
@@ -368,7 +538,7 @@ export default function ShortsPanel({
                   </div>
                 : <div style={{ textAlign: 'center', color: 'var(--muted)' }}>
                     <div style={{ fontSize: 40, marginBottom: 8, opacity: 0.3 }}>▶</div>
-                    <p style={{ fontSize: 13 }}>쇼츠를 선택하세요</p>
+                    <p style={{ fontSize: 15 }}>쇼츠를 선택하세요</p>
                   </div>
               }
             </div>
@@ -395,9 +565,17 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [subSize,   setSubSize]     = useState(52)
   const [subColor,  setSubColor]    = useState('#FFFFFF')
   const [subY,      setSubY]        = useState(20)
+  const [subFont,   setSubFont]     = useState('NanumSquareRoundEB')
+  const [subBgEnabled, setSubBgEnabled] = useState(false)
+  const [subBgColor,   setSubBgColor]   = useState('#000000')
+  const [subBgOpacity, setSubBgOpacity] = useState(0.6)
   const [channelName, setChannelName] = useState('')
-  const [bgOptions, setBgOptions]   = useState<string[]>([])
-  const [bgImage,   setBgImage]     = useState('')
+  const [bgOptions,     setBgOptions]     = useState<string[]>([])
+  const [bgType,        setBgType]        = useState<'blur' | 'solid' | 'image'>('blur')
+  const [bgSolidColor,  setBgSolidColor]  = useState('#1A1A1A')
+  const [bgImageName,   setBgImageName]   = useState('')
+  const [bgUploadMsg,   setBgUploadMsg]   = useState('')
+  const bgFileInputRef = useRef<HTMLInputElement>(null)
   const [templateId, setTemplateId] = useState(1)
   // 캡컷 스타일 색감/음량 보정 — brightness: -1~1, contrast/saturation/volume: 0~3 (1=원본)
   const [brightness, setBrightness] = useState(0)
@@ -432,8 +610,11 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     if (!raw) return
     const parts = raw.title.split(' / ')
     setTitle1(parts[0] || ''); setTitle2(parts[1] || ''); setChannelName(''); setRenderMsg('')
-    if (bgOptions.includes(raw.category)) { setBgImage(raw.category); loadBg(raw.category) }
-    else setBgImage('')
+    if (bgOptions.includes(raw.category)) {
+      setBgType('image'); setBgImageName(raw.category); loadBg(raw.category)
+    } else {
+      setBgType('blur')
+    }
   }, [raw?.filename])
 
   // 영상 자체의 재생/음소거 상태 — 선택된 영상이 바뀔 때만 새로 로드한다
@@ -478,9 +659,15 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
       ctx.clearRect(0, 0, CV_W, CV_H)
       const cat = raw.category || 'economy'
       const colors = (TMPL_COLORS[cat] || TMPL_COLORS.economy)[templateId] || { bg: '#0a0f0a', div: '#00E676' }
-      const bgImg = bgCache[bgImage]
-      if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) ctx.drawImage(bgImg, 0, 0, CV_W, CV_H)
-      else { ctx.fillStyle = colors.bg; ctx.fillRect(0, 0, CV_W, CV_H) }
+      if (bgType === 'solid') {
+        ctx.fillStyle = bgSolidColor; ctx.fillRect(0, 0, CV_W, CV_H)
+      } else if (bgType === 'image') {
+        const bgImg = bgCache[bgImageName]
+        if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) ctx.drawImage(bgImg, 0, 0, CV_W, CV_H)
+        else { ctx.fillStyle = colors.bg; ctx.fillRect(0, 0, CV_W, CV_H) }
+      } else {
+        ctx.fillStyle = colors.bg; ctx.fillRect(0, 0, CV_W, CV_H)
+      }
 
       if (vid.readyState >= 2) {
         // 캡컷 스타일 색감 보정 미리보기 — 실제 렌더링은 서버에서 ffmpeg eq 필터로 적용된다
@@ -513,8 +700,11 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         const sY = VID_Y_PX+VID_H_PX-Math.round(subY*SCALE)-sz-4
         ctx.textAlign = 'center'; ctx.textBaseline = 'top'
         ctx.font = `bold ${sz}px 'Malgun Gothic',sans-serif`
-        const tw = ctx.measureText('자막 샘플').width+8
-        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(CV_W/2-tw/2,sY-2,tw,sz+4)
+        if (subBgEnabled) {
+          const tw = ctx.measureText('자막 샘플').width+8
+          ctx.fillStyle = _hexToRgba(subBgColor, subBgOpacity)
+          ctx.fillRect(CV_W/2-tw/2,sY-2,tw,sz+4)
+        }
         ctx.fillStyle = subColor; ctx.fillText('자막 샘플', CV_W/2, sY)
       }
       const channel = channelName.trim()
@@ -533,7 +723,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     }
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleScale, subtitles, subSize, subColor, subY, channelName, bgImage, templateId, brightness, contrast, saturation])
+  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleScale, subtitles, subSize, subColor, subY, subBgEnabled, subBgColor, subBgOpacity, channelName, bgType, bgSolidColor, bgImageName, templateId, brightness, contrast, saturation])
 
   // 음량 조절 — 미리듣기 영상에 즉시 반영 (HTML 비디오는 0~1 범위만 지원하므로 100%까지만 미리듣기 가능, 그 이상은 렌더링 결과로 확인)
   useEffect(() => {
@@ -544,16 +734,23 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const getStyle = (): StyleParams => ({
     title1_color: t1Color, title2_color: t2Color, title_y_extra: titleY,
     title_fontsize_scale: titleScale, sub_fontsize: subSize, sub_color: subColor, sub_margin_v: subY,
+    sub_bg_enabled: subBgEnabled, sub_bg_color: subBgColor, sub_bg_opacity: subBgOpacity,
     channel_name: channelName.trim(),
-    font_name: 'NanumSquareRoundEB',
+    font_name: subFont,
     brightness, contrast, saturation, volume,
   })
   const getTitle = () => { const t1=title1.trim(),t2=title2.trim(); return t1&&t2?`${t1}\n${t2}`:(t1||t2||'') }
 
+  const getBgParams = () => ({
+    bgImage: bgType === 'image' ? bgImageName : '',
+    bgSolidColor: bgType === 'solid' ? bgSolidColor : undefined,
+  })
+
   const handlePreview = useCallback(async () => {
     if (!raw) return
     try {
-      const blob = await api.preview(raw.filename, getTitle(), getStyle(), 2.0, bgImage)
+      const { bgImage, bgSolidColor: bgSC } = getBgParams()
+      const blob = await api.preview(raw.filename, getTitle(), getStyle(), 2.0, bgImage, bgSC)
       const url = URL.createObjectURL(blob)
       const modal = document.createElement('div')
       modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer;'
@@ -562,13 +759,14 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
       img.src = url; img.style.cssText = 'max-height:90vh;max-width:90vw;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.4);'
       modal.appendChild(img); document.body.appendChild(modal)
     } catch { alert('미리보기 오류') }
-  }, [raw, title1, title2, t1Color, t2Color, titleY, titleScale, bgImage, templateId])
+  }, [raw, title1, title2, t1Color, t2Color, titleY, titleScale, bgType, bgSolidColor, bgImageName, templateId])
 
   const handleRender = async () => {
     if (!raw || isRendering) return
     setIsRendering(true); setRenderMsg('')
     try {
-      await api.render(raw.filename, getTitle(), subtitles, templateId, getStyle(), bgImage, narration, narrVoice)
+      const { bgImage, bgSolidColor: bgSC } = getBgParams()
+      await api.render(raw.filename, getTitle(), subtitles, templateId, getStyle(), bgImage, bgSC, narration, narrVoice)
       setRenderMsg(narration ? '✓ 나레이션 버전 렌더링 시작' : '✓ 렌더링 시작 — 완성 쇼츠 탭에서 확인')
       onStartPolling()
     } catch { setRenderMsg('오류가 발생했습니다') }
@@ -584,7 +782,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         {!raw
           ? <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: 8 }}>
               <div style={{ fontSize: 40, opacity: 0.15 }}>🎬</div>
-              <p style={{ fontSize: 13, color: 'var(--text2)' }}>목록에서 영상을 선택하세요</p>
+              <p style={{ fontSize: 15, color: 'var(--text2)' }}>목록에서 영상을 선택하세요</p>
             </div>
           : <div style={{ flex: 1, overflowY: 'auto' }}>
               {/* 캔버스 미리보기 — 전체 너비 */}
@@ -594,20 +792,20 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                     style={{ display: 'block', width: '100%', aspectRatio: '9/16' }} />
                   <button onClick={togglePlay} aria-label={isPlaying ? '일시정지' : '재생'} style={{
                     position: 'absolute', bottom: 8, right: 8, width: 30, height: 30, borderRadius: '50%',
-                    border: 'none', background: 'rgba(0,0,0,0.55)', color: 'white', fontSize: 13,
+                    border: 'none', background: 'rgba(0,0,0,0.55)', color: 'white', fontSize: 15,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
                   }}>
                     {isPlaying ? '⏸' : '▶'}
                   </button>
                 </div>
-                <button onClick={handlePreview} className="btn-outlined" style={{ width: '60%', maxWidth: 200, padding: '7px 0', fontSize: 12 }}>
+                <button onClick={handlePreview} className="btn-outlined" style={{ width: '60%', maxWidth: 200, padding: '7px 0', fontSize: 14 }}>
                   🔍 고화질 미리보기
                 </button>
               </div>
 
               {/* 컨트롤 */}
               <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <p style={{ fontSize: 11, color: 'var(--text2)', background: 'var(--surface2)', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}>
+                <p style={{ fontSize: 13, color: 'var(--text2)', background: 'var(--surface2)', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}>
                   {raw.filename}
                 </p>
 
@@ -635,23 +833,22 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <div className="section-label" style={{ margin: 0 }}>자막</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button onClick={() => setShowSrt(true)} className="btn-outlined" style={{ padding: '4px 10px', fontSize: 11 }}>✏️ 편집</button>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text2)', cursor: 'pointer' }}>
+                      <button onClick={() => setShowSrt(true)} className="btn-outlined" style={{ padding: '4px 10px', fontSize: 13 }}>✏️ 편집</button>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 14, color: 'var(--text2)', cursor: 'pointer' }}>
                         <input type="checkbox" checked={subtitles} onChange={e => setSubtitles(e.target.checked)} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
                         자동 삽입
                       </label>
                     </div>
                   </div>
-                  {subtitles && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'end' }}>
-                      <Slider label="크기" value={subSize} display={`${subSize}px`} min={16} max={80} step={2} onChange={setSubSize} />
-                      <div>
-                        <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
-                        <input type="color" value={subColor} onChange={e => setSubColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
-                      </div>
-                      <Slider label="하단 여백" value={subY} display={`${subY}px`} min={5} max={120} step={5} onChange={setSubY} />
-                    </div>
-                  )}
+                  {subtitles && <SubtitleStyleControls
+                    subSize={subSize} setSubSize={setSubSize}
+                    subColor={subColor} setSubColor={setSubColor}
+                    subY={subY} setSubY={setSubY}
+                    subFont={subFont} setSubFont={setSubFont}
+                    subBgEnabled={subBgEnabled} setSubBgEnabled={setSubBgEnabled}
+                    subBgColor={subBgColor} setSubBgColor={setSubBgColor}
+                    subBgOpacity={subBgOpacity} setSubBgOpacity={setSubBgOpacity}
+                  />}
                 </div>
 
                 {/* 출처 채널명 */}
@@ -661,14 +858,14 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                 </div>
 
                 {/* 배경 */}
-                <div>
-                  <div className="section-label">배경 이미지</div>
-                  <select value={bgImage} onChange={e => { setBgImage(e.target.value); if (e.target.value) loadBg(e.target.value) }}
-                    className="input-field" style={{ cursor: 'pointer' }}>
-                    <option value="">단색 배경</option>
-                    {bgOptions.map(n => <option key={n} value={n}>🖼 {n}.png</option>)}
-                  </select>
-                </div>
+                <BgSection
+                  bgType={bgType} setBgType={setBgType}
+                  bgSolidColor={bgSolidColor} setBgSolidColor={setBgSolidColor}
+                  bgImageName={bgImageName} setBgImageName={setBgImageName}
+                  bgOptions={bgOptions} setBgOptions={setBgOptions}
+                  bgUploadMsg={bgUploadMsg} setBgUploadMsg={setBgUploadMsg}
+                  bgFileInputRef={bgFileInputRef}
+                />
 
                 {/* 색감 & 음량 */}
                 <ColorVolumeControls
@@ -683,17 +880,17 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 16 }}>🎙</span>
-                      <span style={{ fontWeight: 600, fontSize: 13 }}>나레이션</span>
+                      <span style={{ fontWeight: 600, fontSize: 15 }}>나레이션</span>
                     </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text2)', cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 14, color: 'var(--text2)', cursor: 'pointer' }}>
                       <input type="checkbox" checked={narration} onChange={e => setNarration(e.target.checked)} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
                       포함
                     </label>
                   </div>
                   {narration && (
                     <div style={{ marginTop: 10 }}>
-                      <p style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8 }}>AI 분석 요약을 TTS로 변환해 도입부에 삽입합니다.</p>
-                      <select value={narrVoice} onChange={e => setNarrVoice(e.target.value)} className="input-field" style={{ cursor: 'pointer', fontSize: 12 }}>
+                      <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>AI 분석 요약을 TTS로 변환해 도입부에 삽입합니다.</p>
+                      <select value={narrVoice} onChange={e => setNarrVoice(e.target.value)} className="input-field" style={{ cursor: 'pointer', fontSize: 14 }}>
                         <option value="female">여성 (SunHi)</option>
                         <option value="male">남성 (InJoon)</option>
                       </select>
@@ -718,7 +915,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   </button>
                 </div>
                 {renderMsg && (
-                  <div style={{ fontSize: 12, color: renderMsg.startsWith('✓') ? 'var(--success)' : 'var(--error)', padding: '6px 10px', background: renderMsg.startsWith('✓') ? '#e6f4ea' : '#fce8e6', borderRadius: 6, border: `1px solid ${renderMsg.startsWith('✓') ? '#81c995' : '#f28b82'}` }}>
+                  <div style={{ fontSize: 14, color: renderMsg.startsWith('✓') ? 'var(--success)' : 'var(--error)', padding: '6px 10px', background: renderMsg.startsWith('✓') ? '#e6f4ea' : '#fce8e6', borderRadius: 6, border: `1px solid ${renderMsg.startsWith('✓') ? '#81c995' : '#f28b82'}` }}>
                     {renderMsg}
                   </div>
                 )}
@@ -738,8 +935,8 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
       {/* 왼쪽: 캔버스 미리보기 */}
       <div style={{ width: 420, flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface2)' }}>
         <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)' }}>실시간 미리보기</span>
-          {raw && <span style={{ fontSize: 10, color: 'var(--primary)', fontWeight: 600 }}>{raw.category}</span>}
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)' }}>실시간 미리보기</span>
+          {raw && <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>{raw.category}</span>}
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
@@ -750,7 +947,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   style={{ display: 'block', width: '100%', aspectRatio: '9/16', imageRendering: 'auto' }} />
                 <button onClick={togglePlay} aria-label={isPlaying ? '일시정지' : '재생'} style={{
                   position: 'absolute', bottom: 10, right: 10, width: 34, height: 34, borderRadius: '50%',
-                  border: 'none', background: 'rgba(0,0,0,0.55)', color: 'white', fontSize: 14,
+                  border: 'none', background: 'rgba(0,0,0,0.55)', color: 'white', fontSize: 16,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
                 }}>
                   {isPlaying ? '⏸' : '▶'}
@@ -758,7 +955,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
               </div>
 
               <details style={{ width: '100%' }} open={false}>
-                <summary style={{ fontSize: 11, color: 'var(--text2)', cursor: 'pointer', padding: '4px 2px', userSelect: 'none' }}>▸ 원본 영상</summary>
+                <summary style={{ fontSize: 13, color: 'var(--text2)', cursor: 'pointer', padding: '4px 2px', userSelect: 'none' }}>▸ 원본 영상</summary>
                 <div style={{ marginTop: 6, borderRadius: 8, overflow: 'hidden', background: '#000' }}>
                   <video key={raw.url} src={raw.url} controls style={{ width: '100%', maxHeight: 180, display: 'block' }} />
                 </div>
@@ -771,7 +968,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
           ) : (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: 10, padding: 20, minHeight: 300 }}>
               <div style={{ fontSize: 40, opacity: 0.15 }}>🎬</div>
-              <p style={{ fontSize: 12, textAlign: 'center', lineHeight: 1.6, color: 'var(--text2)' }}>왼쪽 목록에서<br/>영상을 선택하세요</p>
+              <p style={{ fontSize: 14, textAlign: 'center', lineHeight: 1.6, color: 'var(--text2)' }}>왼쪽 목록에서<br/>영상을 선택하세요</p>
             </div>
           )}
         </div>
@@ -782,10 +979,10 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         {!raw
           ? <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: 8 }}>
               <div style={{ fontSize: 32, opacity: 0.3 }}>✏️</div>
-              <p style={{ fontSize: 13, color: 'var(--text2)' }}>영상을 선택하면 편집 옵션이 나타납니다</p>
+              <p style={{ fontSize: 15, color: 'var(--text2)' }}>영상을 선택하면 편집 옵션이 나타납니다</p>
             </div>
           : <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 480 }}>
-              <p style={{ fontSize: 11, color: 'var(--text2)', background: 'var(--surface2)', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}>
+              <p style={{ fontSize: 13, color: 'var(--text2)', background: 'var(--surface2)', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}>
                 {raw.filename}
               </p>
 
@@ -813,23 +1010,22 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                   <div className="section-label" style={{ margin: 0 }}>자막</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button onClick={() => setShowSrt(true)} className="btn-outlined" style={{ padding: '4px 10px', fontSize: 11 }}>✏️ 자막 편집</button>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text2)', cursor: 'pointer' }}>
+                    <button onClick={() => setShowSrt(true)} className="btn-outlined" style={{ padding: '4px 10px', fontSize: 13 }}>✏️ 자막 편집</button>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 14, color: 'var(--text2)', cursor: 'pointer' }}>
                       <input type="checkbox" checked={subtitles} onChange={e => setSubtitles(e.target.checked)} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
                       자동 삽입
                     </label>
                   </div>
                 </div>
-                {subtitles && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'end' }}>
-                    <Slider label="크기" value={subSize} display={`${subSize}px`} min={16} max={80} step={2} onChange={setSubSize} />
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
-                      <input type="color" value={subColor} onChange={e => setSubColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
-                    </div>
-                    <Slider label="하단 여백" value={subY} display={`${subY}px`} min={5} max={120} step={5} onChange={setSubY} />
-                  </div>
-                )}
+                {subtitles && <SubtitleStyleControls
+                  subSize={subSize} setSubSize={setSubSize}
+                  subColor={subColor} setSubColor={setSubColor}
+                  subY={subY} setSubY={setSubY}
+                  subFont={subFont} setSubFont={setSubFont}
+                  subBgEnabled={subBgEnabled} setSubBgEnabled={setSubBgEnabled}
+                  subBgColor={subBgColor} setSubBgColor={setSubBgColor}
+                  subBgOpacity={subBgOpacity} setSubBgOpacity={setSubBgOpacity}
+                />}
               </div>
 
               {/* 출처 채널명 */}
@@ -839,14 +1035,14 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
               </div>
 
               {/* 배경 */}
-              <div>
-                <div className="section-label">배경 이미지</div>
-                <select value={bgImage} onChange={e => { setBgImage(e.target.value); if (e.target.value) loadBg(e.target.value) }}
-                  className="input-field" style={{ cursor: 'pointer' }}>
-                  <option value="">단색 배경 (템플릿 색상)</option>
-                  {bgOptions.map(n => <option key={n} value={n}>🖼 {n}.png</option>)}
-                </select>
-              </div>
+              <BgSection
+                bgType={bgType} setBgType={setBgType}
+                bgSolidColor={bgSolidColor} setBgSolidColor={setBgSolidColor}
+                bgImageName={bgImageName} setBgImageName={setBgImageName}
+                bgOptions={bgOptions} setBgOptions={setBgOptions}
+                bgUploadMsg={bgUploadMsg} setBgUploadMsg={setBgUploadMsg}
+                bgFileInputRef={bgFileInputRef}
+              />
 
               {/* 색감 & 음량 */}
               <ColorVolumeControls
@@ -861,17 +1057,17 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: narration ? 10 : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 16 }}>🎙</span>
-                    <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>나레이션</span>
+                    <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>나레이션</span>
                   </div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text2)', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 14, color: 'var(--text2)', cursor: 'pointer' }}>
                     <input type="checkbox" checked={narration} onChange={e => setNarration(e.target.checked)} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
                     포함
                   </label>
                 </div>
                 {narration && (
                   <div>
-                    <p style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8 }}>AI 분석의 요약문을 TTS로 변환해 영상 도입부에 삽입합니다.</p>
-                    <select value={narrVoice} onChange={e => setNarrVoice(e.target.value)} className="input-field" style={{ cursor: 'pointer', fontSize: 12 }}>
+                    <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>AI 분석의 요약문을 TTS로 변환해 영상 도입부에 삽입합니다.</p>
+                    <select value={narrVoice} onChange={e => setNarrVoice(e.target.value)} className="input-field" style={{ cursor: 'pointer', fontSize: 14 }}>
                       <option value="female">여성 목소리 (SunHi)</option>
                       <option value="male">남성 목소리 (InJoon)</option>
                     </select>
@@ -896,7 +1092,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                 </button>
               </div>
               {renderMsg && (
-                <div style={{ fontSize: 12, color: renderMsg.startsWith('✓') ? 'var(--success)' : 'var(--error)', padding: '6px 10px', background: renderMsg.startsWith('✓') ? '#e6f4ea' : '#fce8e6', borderRadius: 6, border: `1px solid ${renderMsg.startsWith('✓') ? '#81c995' : '#f28b82'}` }}>
+                <div style={{ fontSize: 14, color: renderMsg.startsWith('✓') ? 'var(--success)' : 'var(--error)', padding: '6px 10px', background: renderMsg.startsWith('✓') ? '#e6f4ea' : '#fce8e6', borderRadius: 6, border: `1px solid ${renderMsg.startsWith('✓') ? '#81c995' : '#f28b82'}` }}>
                   {renderMsg}
                 </div>
               )}
@@ -926,7 +1122,7 @@ function ColorVolumeControls({
         <div className="section-label" style={{ margin: 0 }}>색감 & 음량 보정</div>
         {!isDefault && (
           <button onClick={() => { setBrightness(0); setContrast(1); setSaturation(1); setVolume(1) }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--primary)', fontWeight: 600 }}>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
             ↺ 초기화
           </button>
         )}
@@ -945,18 +1141,152 @@ function ColorVolumeControls({
   )
 }
 
+function SubtitleStyleControls({
+  subSize, setSubSize, subColor, setSubColor, subY, setSubY, subFont, setSubFont,
+  subBgEnabled, setSubBgEnabled, subBgColor, setSubBgColor, subBgOpacity, setSubBgOpacity,
+}: {
+  subSize: number; setSubSize: (v: number) => void
+  subColor: string; setSubColor: (v: string) => void
+  subY: number; setSubY: (v: number) => void
+  subFont: string; setSubFont: (v: string) => void
+  subBgEnabled: boolean; setSubBgEnabled: (v: boolean) => void
+  subBgColor: string; setSubBgColor: (v: string) => void
+  subBgOpacity: number; setSubBgOpacity: (v: number) => void
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'end' }}>
+        <Slider label="크기" value={subSize} display={`${subSize}px`} min={16} max={80} step={2} onChange={setSubSize} />
+        <div>
+          <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
+          <input type="color" value={subColor} onChange={e => setSubColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+        </div>
+        <Slider label="하단 여백" value={subY} display={`${subY}px`} min={5} max={120} step={5} onChange={setSubY} />
+      </div>
+      <div>
+        <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>글꼴</div>
+        <select value={subFont} onChange={e => setSubFont(e.target.value)} className="input-field" style={{ fontSize: 14, padding: '7px 8px', width: '100%' }}>
+          {SUB_FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--text2)', cursor: 'pointer', marginBottom: subBgEnabled ? 8 : 0 }}>
+          <input type="checkbox" checked={subBgEnabled} onChange={e => setSubBgEnabled(e.target.checked)} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+          배경 표시
+        </label>
+        {subBgEnabled && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'end' }}>
+            <div>
+              <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>배경색</div>
+              <input type="color" value={subBgColor} onChange={e => setSubBgColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+            </div>
+            <Slider label="투명도" value={subBgOpacity} display={`${Math.round(subBgOpacity * 100)}%`} min={0.1} max={1} step={0.05} onChange={setSubBgOpacity} />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function Slider({ label, value, display, min, max, step, onChange }: {
   label: string; value: number; display: string; min: number; max: number; step: number; onChange: (v: number) => void
 }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>{label}</span>
-        <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700 }}>{display}</span>
+        <span style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 600 }}>{label}</span>
+        <span style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 700 }}>{display}</span>
       </div>
       <input type="range" min={min} max={max} step={step} value={value}
         onChange={e => onChange(parseFloat(e.target.value))}
         style={{ width: '100%', accentColor: 'var(--primary)' }} />
+    </div>
+  )
+}
+
+function BgSection({
+  bgType, setBgType,
+  bgSolidColor, setBgSolidColor,
+  bgImageName, setBgImageName,
+  bgOptions, setBgOptions,
+  bgUploadMsg, setBgUploadMsg,
+  bgFileInputRef,
+}: {
+  bgType: 'blur' | 'solid' | 'image'
+  setBgType: (v: 'blur' | 'solid' | 'image') => void
+  bgSolidColor: string; setBgSolidColor: (v: string) => void
+  bgImageName: string; setBgImageName: (v: string) => void
+  bgOptions: string[]; setBgOptions: (v: string[]) => void
+  bgUploadMsg: string; setBgUploadMsg: (v: string) => void
+  bgFileInputRef: RefObject<HTMLInputElement>
+}) {
+  const BG_TYPES = [
+    { key: 'blur' as const,  label: '블러' },
+    { key: 'solid' as const, label: '단색' },
+    { key: 'image' as const, label: '이미지' },
+  ]
+
+  const handleUpload = async (file: File) => {
+    setBgUploadMsg('업로드 중...')
+    try {
+      const r = await api.uploadBackground(file)
+      const res = await api.getBackgrounds()
+      setBgOptions(res.backgrounds)
+      setBgImageName(r.filename)
+      loadBg(r.filename)
+      setBgType('image')
+      setBgUploadMsg(`✓ ${r.filename}`)
+    } catch {
+      setBgUploadMsg('업로드 실패')
+    }
+  }
+
+  return (
+    <div>
+      <div className="section-label">배경</div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+        {BG_TYPES.map(({ key, label }) => (
+          <button key={key} onClick={() => setBgType(key)} style={{
+            flex: 1, padding: '6px 0', border: `1px solid ${bgType === key ? 'var(--primary)' : 'var(--border)'}`,
+            borderRadius: 8, background: bgType === key ? 'var(--primary-bg)' : 'transparent',
+            color: bgType === key ? 'var(--primary)' : 'var(--text2)',
+            cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+          }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {bgType === 'solid' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input type="color" value={bgSolidColor} onChange={e => setBgSolidColor(e.target.value)}
+            style={{ width: 44, height: 36, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2, flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: 'var(--text2)', fontFamily: 'monospace' }}>{bgSolidColor}</span>
+        </div>
+      )}
+
+      {bgType === 'image' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <select value={bgImageName} onChange={e => { setBgImageName(e.target.value); loadBg(e.target.value) }}
+              className="input-field" style={{ flex: 1, cursor: 'pointer' }}>
+              {bgOptions.length === 0 && <option value="">이미지 없음 (업로드하세요)</option>}
+              {bgOptions.map(n => <option key={n} value={n}>🖼 {n}</option>)}
+            </select>
+            <button onClick={() => bgFileInputRef.current?.click()} className="btn-outlined"
+              style={{ padding: '6px 12px', fontSize: 13, whiteSpace: 'nowrap', cursor: 'pointer' }}>
+              📤 업로드
+            </button>
+            <input ref={bgFileInputRef} type="file" accept=".png,.jpg,.jpeg,.webp" style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }} />
+          </div>
+          {bgUploadMsg && (
+            <div style={{ fontSize: 13, color: bgUploadMsg.startsWith('✓') ? 'var(--success)' : bgUploadMsg === '업로드 중...' ? 'var(--primary)' : 'var(--error)', fontWeight: 600 }}>
+              {bgUploadMsg}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

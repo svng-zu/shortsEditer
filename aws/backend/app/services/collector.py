@@ -227,6 +227,9 @@ class YoutubeCollector:
                     continue
                 if dur < 180:  # 3분 미만 제외
                     continue
+                if dur > 7200:  # 2시간 초과 제외 (라이브 재방송 등 — Whisper 처리 시 메모리 부족 유발)
+                    print(f"[Collector] 제외 (너무 긺, {dur}s): {v.get('title', v['video_id'])}")
+                    continue
                 v["duration"] = dur
                 filtered.append(v)
             print(f"[Collector] duration 필터 후 {len(filtered)}개")
@@ -235,6 +238,32 @@ class YoutubeCollector:
             # 인증 없음 → duration 필터 없이 전체 반환 (다운로드에서 실패할 수 있음)
             print("[Collector] 인증 없음 — duration 필터 건너뜀")
             return videos
+
+    def get_video_info(self, url: str) -> dict:
+        """다운로드 없이 영상 메타데이터만 조회 (yt-dlp extract_info)"""
+        opts = {
+            **_auth_opts(),
+            "quiet": True,
+            "skip_download": True,
+            "no_warnings": True,
+        }
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+        video_id = info.get("id", "")
+        thumbnail = info.get("thumbnail") or f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+        # filesize_approx: 포맷별 filesize 합산 추정 (없으면 None)
+        filesize = info.get("filesize_approx") or info.get("filesize")
+        if filesize is None:
+            formats = info.get("formats") or []
+            sizes = [f.get("filesize") or f.get("filesize_approx") or 0 for f in formats[-5:]]
+            filesize = max(sizes) if any(sizes) else None
+        return {
+            "title": info.get("title", ""),
+            "duration": info.get("duration") or 0,
+            "thumbnail_url": thumbnail,
+            "filesize_approx": filesize,
+            "video_id": video_id,
+        }
 
     def download_video(self, video_url: str, quality: str = "1080",
                        on_progress: callable = None) -> dict:

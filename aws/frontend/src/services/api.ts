@@ -93,6 +93,7 @@ export interface FileCounts {
 export interface Candidate {
   start: number
   end: number
+  title?: string
   reason: string
   score: number
   edit_order: number
@@ -136,6 +137,20 @@ export interface RawInfo {
   category: string
 }
 
+export interface VideoInfo {
+  title: string
+  duration: number
+  thumbnail_url: string
+  filesize_approx: number | null
+  video_id: string
+}
+
+export interface DownloadInfo {
+  filename: string
+  stem: string
+  category: string
+}
+
 export interface StyleParams {
   title1_color: string
   title2_color: string
@@ -144,6 +159,9 @@ export interface StyleParams {
   sub_fontsize: number
   sub_color: string
   sub_margin_v: number
+  sub_bg_enabled?: boolean
+  sub_bg_color?: string
+  sub_bg_opacity?: number
   channel_name?: string
   font_name?: string
   brightness?: number
@@ -277,6 +295,7 @@ export const api = {
     templateId: number,
     style: StyleParams,
     bgImage?: string,
+    bgSolidColor?: string,
     narration?: boolean,
     narrationVoice?: string,
   ): Promise<void> {
@@ -287,6 +306,7 @@ export const api = {
       template_id: templateId,
       style,
       bg_image: bgImage,
+      bg_solid_color: bgSolidColor ?? null,
       narration: narration ?? false,
       narration_voice: narrationVoice ?? 'female',
     })
@@ -297,7 +317,8 @@ export const api = {
     title: string,
     style: StyleParams,
     seek: number = 2.0,
-    bgImage?: string
+    bgImage?: string,
+    bgSolidColor?: string,
   ): Promise<Blob> {
     const { data } = await client.post(
       '/api/preview',
@@ -307,6 +328,7 @@ export const api = {
         style,
         seek,
         bg_image: bgImage,
+        bg_solid_color: bgSolidColor ?? null,
       },
       { responseType: 'blob' }
     )
@@ -315,6 +337,11 @@ export const api = {
 
   async rerender(templateId: number = 1): Promise<void> {
     await client.post('/api/rerender', { template_id: templateId })
+  },
+
+  async getVideoInfo(url: string): Promise<VideoInfo> {
+    const { data } = await client.get('/api/video-info', { params: { url } })
+    return data
   },
 
   async downloadUrl(url: string, category: string): Promise<void> {
@@ -326,12 +353,28 @@ export const api = {
     return data
   },
 
+  async getDownloads(): Promise<{ downloads: DownloadInfo[] }> {
+    const { data } = await client.get('/api/downloads')
+    return data
+  },
+
+  async processSelected(
+    items: { filename: string; category: string }[],
+    templateId: number = 1
+  ): Promise<void> {
+    await client.post('/api/process-selected', { items, template_id: templateId })
+  },
+
   async pause(): Promise<void> {
     await client.post('/api/pause')
   },
 
   async resume(): Promise<void> {
     await client.post('/api/resume')
+  },
+
+  async stop(): Promise<void> {
+    await client.post('/api/stop')
   },
 
   // YouTube
@@ -372,6 +415,13 @@ export const api = {
   // Backgrounds
   async getBackgrounds(): Promise<{ backgrounds: string[] }> {
     const { data } = await client.get('/api/backgrounds')
+    return data
+  },
+
+  async uploadBackground(file: File): Promise<{ filename: string; ok: boolean }> {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await client.post('/api/backgrounds/upload', form)
     return data
   },
 

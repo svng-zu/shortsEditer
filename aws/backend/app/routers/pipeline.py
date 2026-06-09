@@ -6,19 +6,23 @@ import json
 import os
 import re
 import subprocess
+import sys
 import threading
 from pathlib import Path
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 from app.config import settings
-from app.session import get_session, get_optional_user, make_session, SessionDirs
+from app.session import (
+    get_session, get_optional_user, make_session, SessionDirs,
+    load_video_id_map, save_video_id_map,
+)
 from app.models.user import User
 from app.models.schemas import (
-    CollectRequest, EditRequest, PipelineStatus, PipelineStep
+    CollectRequest, EditRequest, PipelineStatus, PipelineStep,
+    VideoInfoResponse, DownloadInfo, ProcessSelectedRequest, ProcessSelectedItem,
 )
 from app.services.collector import YoutubeCollector
-from app.services.transcriber import Transcriber
 from app.services.analyzer import Analyzer
 from app.services.editor import Editor
 from app.services.s3_manager import get_s3
@@ -91,6 +95,14 @@ async def remove_channel(req: ChannelDeleteRequest, session: SessionDirs = Depen
 # 세션별 파이프라인 상태
 _session_statuses: dict[str, PipelineStatus] = {}
 _session_paused: dict[str, bool] = {}
+_session_tasks: dict[str, asyncio.Task] = {}
+
+
+def _spawn(session_id: str, coro) -> asyncio.Task:
+    """파이프라인 작업을 asyncio Task로 실행하고 세션에 연결 — /stop으로 취소 가능하게 한다."""
+    task = asyncio.create_task(coro)
+    _session_tasks[session_id] = task
+    return task
 
 
 def is_paused(session_id: str) -> bool:
@@ -295,6 +307,11 @@ def _run_url_download(session_id: str, url: str, category: str):
                 cat_map[stem] = category
                 s.category_map_path.write_text(json.dumps(cat_map, ensure_ascii=False, indent=2))
 
+                if video_id:
+                    id_map = load_video_id_map(s)
+                    id_map[stem] = video_id
+                    save_video_id_map(s, id_map)
+
                 fname = os.path.basename(filename)
                 get_s3().upload(filename, s.s3_key("downloads", fname))
                 _dl_states[session_id] = {
@@ -321,12 +338,12 @@ class UrlDownloadRequest(BaseModel):
 
 
 @router.post("/download-url")
-async def download_url(req: UrlDownloadRequest, background_tasks: BackgroundTasks,
+async def download_url(req: UrlDownloadRequest,
                        session: SessionDirs = Depends(get_session),
                        user: User | None = Depends(get_optional_user)):
     check_collect_quota(session, user)
     _dl_states[session.session_id] = {"status": "starting", "message": "시작 중...", "filename": None, "error": None}
-    background_tasks.add_task(_run_url_download, session.session_id, req.url, req.category)
+    _spawn(session.session_id, _run_url_download(session.session_id, req.url, req.category))
     return {"ok": True}
 
 
@@ -372,6 +389,12 @@ async def _run_collect(session_id: str, clear_existing: bool, limit_per_channel:
         video_paths = {v["filepath"]: v["category"] for v in results if "filepath" in v}
         save_category_map(s, video_paths)
 
+        id_map = load_video_id_map(s)
+        for v in results:
+            if "filepath" in v and v.get("video_id"):
+                id_map[Path(v["filepath"]).stem] = v["video_id"]
+        save_video_id_map(s, id_map)
+
         s3 = get_s3()
         for v in results:
             if "filepath" in v and os.path.exists(v["filepath"]):
@@ -397,15 +420,27 @@ async def resume_pipeline(session: SessionDirs = Depends(get_session)):
     return {"ok": True, "paused": False}
 
 
+@router.post("/stop")
+async def stop_pipeline(session: SessionDirs = Depends(get_session)):
+    """실행 중인 파이프라인을 즉시 취소하고 대기 상태로 되돌린다."""
+    session_id = session.session_id
+    _session_paused[session_id] = False
+    task = _session_tasks.pop(session_id, None)
+    if task and not task.done():
+        task.cancel()
+    set_status(session_id, PipelineStep.IDLE, "사용자가 작업을 종료함", 0)
+    return {"ok": True}
+
+
 @router.post("/collect")
-async def collect(req: CollectRequest, background_tasks: BackgroundTasks,
+async def collect(req: CollectRequest,
                   session: SessionDirs = Depends(get_session),
                   user: User | None = Depends(get_optional_user)):
     check_collect_quota(session, user)
     status = get_session_status(session.session_id)
     if status.step not in (PipelineStep.IDLE, PipelineStep.DONE, PipelineStep.ERROR):
         raise HTTPException(400, "파이프라인이 실행 중입니다.")
-    background_tasks.add_task(_run_collect, session.session_id, req.clear_existing, req.limit_per_channel)
+    _spawn(session.session_id, _run_collect(session.session_id, req.clear_existing, req.limit_per_channel))
     return {"ok": True}
 
 
@@ -425,12 +460,23 @@ async def _run_transcribe(session_id: str):
             return
 
         set_status(session_id, PipelineStep.TRANSCRIBING, f"Whisper 실행 중 ({len(videos)}/{len(all_videos)}개)...", 10)
-        transcriber = Transcriber(transcript_dir=str(s.transcript_dir))
         s3 = get_s3()
         for i, v in enumerate(videos):
             set_status(session_id, PipelineStep.TRANSCRIBING, f"자막 생성 중: {v.name}",
                        int(10 + (i / len(videos)) * 85))
-            await asyncio.to_thread(transcriber.transcribe, str(v))
+            # 영상 1개당 별도 프로세스에서 처리 — faster-whisper가 누적시키는 메모리를
+            # 프로세스 종료 시 OS가 완전히 회수하게 하여, 여러 영상 연속 처리 시
+            # 백엔드 전체가 OOM kill 당해 파이프라인이 멈추는 문제를 방지한다.
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-m", "app.services.transcribe_worker", str(v), str(s.transcript_dir),
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+            )
+            out, _ = await proc.communicate()
+            for line in out.decode("utf-8", "replace").splitlines():
+                print(f"[{session_id[:8]}][TRANSCRIBING] {line}")
+            if proc.returncode != 0:
+                print(f"[{session_id[:8]}][TRANSCRIBING][SKIP] {v.name}: 워커 프로세스 종료 코드 {proc.returncode}")
+                continue
             json_file = s.transcript_dir / f"{v.stem}.json"
             if json_file.exists():
                 s3.upload(str(json_file), s.s3_key("transcripts", json_file.name))
@@ -441,11 +487,11 @@ async def _run_transcribe(session_id: str):
 
 
 @router.post("/transcribe")
-async def transcribe(background_tasks: BackgroundTasks, session: SessionDirs = Depends(get_session)):
+async def transcribe(session: SessionDirs = Depends(get_session)):
     status = get_session_status(session.session_id)
     if status.step not in (PipelineStep.IDLE, PipelineStep.DONE, PipelineStep.ERROR):
         raise HTTPException(400, "파이프라인이 실행 중입니다.")
-    background_tasks.add_task(_run_transcribe, session.session_id)
+    _spawn(session.session_id, _run_transcribe(session.session_id))
     return {"ok": True}
 
 
@@ -489,11 +535,11 @@ async def _run_analyze(session_id: str):
 
 
 @router.post("/analyze")
-async def analyze(background_tasks: BackgroundTasks, session: SessionDirs = Depends(get_session)):
+async def analyze(session: SessionDirs = Depends(get_session)):
     status = get_session_status(session.session_id)
     if status.step not in (PipelineStep.IDLE, PipelineStep.DONE, PipelineStep.ERROR):
         raise HTTPException(400, "파이프라인이 실행 중입니다.")
-    background_tasks.add_task(_run_analyze, session.session_id)
+    _spawn(session.session_id, _run_analyze(session.session_id))
     return {"ok": True}
 
 
@@ -524,12 +570,12 @@ async def _run_edit(session_id: str, template_id: int):
 
 
 @router.post("/edit")
-async def edit(req: EditRequest, background_tasks: BackgroundTasks,
+async def edit(req: EditRequest,
                session: SessionDirs = Depends(get_session)):
     status = get_session_status(session.session_id)
     if status.step not in (PipelineStep.IDLE, PipelineStep.DONE, PipelineStep.ERROR):
         raise HTTPException(400, "파이프라인이 실행 중입니다.")
-    background_tasks.add_task(_run_edit, session.session_id, req.template_id)
+    _spawn(session.session_id, _run_edit(session.session_id, req.template_id))
     return {"ok": True}
 
 
@@ -546,10 +592,124 @@ async def _run_full_edit(session_id: str, template_id: int):
 
 
 @router.post("/process")
-async def process_videos(req: EditRequest, background_tasks: BackgroundTasks,
+async def process_videos(req: EditRequest,
                          session: SessionDirs = Depends(get_session)):
     status = get_session_status(session.session_id)
     if status.step not in (PipelineStep.IDLE, PipelineStep.DONE, PipelineStep.ERROR):
         raise HTTPException(400, "파이프라인이 실행 중입니다.")
-    background_tasks.add_task(_run_full_edit, session.session_id, req.template_id)
+    _spawn(session.session_id, _run_full_edit(session.session_id, req.template_id))
+    return {"ok": True}
+
+
+# ── 영상 정보 조회 (다운로드 전 확인용) ────────────────────────────
+
+@router.get("/video-info")
+async def get_video_info(url: str, session: SessionDirs = Depends(get_session)):
+    """다운로드 없이 영상 메타데이터 조회"""
+    collector = YoutubeCollector()
+    try:
+        info = await asyncio.to_thread(collector.get_video_info, url)
+    except Exception as e:
+        raise HTTPException(400, f"영상 정보 조회 실패: {e}")
+    return VideoInfoResponse(**info)
+
+
+# ── 다운로드 목록 조회 ─────────────────────────────────────────────
+
+@router.get("/downloads")
+async def list_downloads(session: SessionDirs = Depends(get_session)):
+    """다운로드된 영상 목록 + 카테고리 반환"""
+    cat_map = load_category_map(session)
+    result = []
+    for f in sorted(session.download_dir.glob("*.mp4")):
+        result.append(DownloadInfo(
+            filename=f.name,
+            stem=f.stem,
+            category=cat_map.get(f.stem, "economy"),
+        ))
+    return {"downloads": [d.model_dump() for d in result]}
+
+
+# ── 선택 영상 편집 (자막→분석→편집 순차 처리) ────────────────────
+
+async def _run_process_selected(session_id: str, items: list[ProcessSelectedItem], template_id: int):
+    s = make_session(session_id)
+    total = len(items)
+    s3 = get_s3()
+
+    # category_map 업데이트
+    cat_map = load_category_map(s)
+    for item in items:
+        stem = Path(item.filename).stem
+        cat_map[stem] = item.category
+    s.category_map_path.write_text(json.dumps(cat_map, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    try:
+        # ── Step 1: 자막 생성 ──────────────────────────────────────
+        for i, item in enumerate(items):
+            video_path = s.download_dir / item.filename
+            if not video_path.exists():
+                print(f"[process-selected] 파일 없음: {item.filename}")
+                continue
+            stem = video_path.stem
+            transcript_path = s.transcript_dir / f"{stem}.json"
+            if transcript_path.exists():
+                print(f"[process-selected] 자막 이미 존재, 건너뜀: {stem}")
+                continue
+            set_status(session_id, PipelineStep.TRANSCRIBING,
+                       f"[{i+1}/{total}] 자막 생성 중: {item.filename}",
+                       int((i / total) * 30))
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-m", "app.services.transcribe_worker",
+                str(video_path), str(s.transcript_dir),
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+            )
+            out, _ = await proc.communicate()
+            for line in out.decode("utf-8", "replace").splitlines():
+                print(f"[{session_id[:8]}][TRANSCRIBING] {line}")
+            if transcript_path.exists():
+                s3.upload(str(transcript_path), s.s3_key("transcripts", transcript_path.name))
+
+        # ── Step 2: LLM 분석 ──────────────────────────────────────
+        analyzer = Analyzer()
+        for i, item in enumerate(items):
+            stem = Path(item.filename).stem
+            transcript_path = s.transcript_dir / f"{stem}.json"
+            if not transcript_path.exists():
+                continue
+            set_status(session_id, PipelineStep.ANALYZING,
+                       f"[{i+1}/{total}] LLM 분석 중: {item.filename}",
+                       30 + int((i / total) * 30))
+            before = set(s.analysis_dir.glob(f"{stem}*.json"))
+            await asyncio.to_thread(analyzer.analyze, str(transcript_path), item.category, s.analysis_dir)
+            after = set(s.analysis_dir.glob(f"{stem}*.json"))
+            for f in (after - before):
+                s3.upload(str(f), s.s3_key("analysis", f.name))
+
+        # ── Step 3: 영상 편집 ──────────────────────────────────────
+        editor = Editor(template_id=template_id, session_dirs=s)
+        for i, item in enumerate(items):
+            stem = Path(item.filename).stem
+            analyses = list(s.analysis_dir.glob(f"{stem}*.json"))
+            for a in analyses:
+                set_status(session_id, PipelineStep.EDITING,
+                           f"[{i+1}/{total}] 영상 편집 중: {a.name}",
+                           60 + int((i / total) * 35))
+                raw_path = await asyncio.to_thread(editor.edit_video, str(a))
+                if raw_path and os.path.exists(raw_path):
+                    s3.upload(raw_path, s.s3_key("raw", os.path.basename(raw_path)))
+
+        set_status(session_id, PipelineStep.DONE, f"선택 편집 완료 — {total}개 처리", 100)
+    except Exception as e:
+        set_status(session_id, PipelineStep.ERROR, f"선택 편집 오류: {e}", 0)
+
+
+@router.post("/process-selected")
+async def process_selected(req: ProcessSelectedRequest, session: SessionDirs = Depends(get_session)):
+    status = get_session_status(session.session_id)
+    if status.step not in (PipelineStep.IDLE, PipelineStep.DONE, PipelineStep.ERROR):
+        raise HTTPException(400, "파이프라인이 실행 중입니다.")
+    if not req.items:
+        raise HTTPException(400, "처리할 영상을 선택하세요.")
+    _spawn(session.session_id, _run_process_selected(session.session_id, req.items, req.template_id))
     return {"ok": True}

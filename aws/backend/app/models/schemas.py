@@ -36,9 +36,12 @@ class StyleParams(BaseModel):
     title2_color: str = "#FFFFFF"
     title_y_extra: int = 0
     title_fontsize_scale: float = 1.0
-    sub_fontsize: int = 28
+    sub_fontsize: int = 68
     sub_color: str = "#FFFFFF"
     sub_margin_v: int = 20
+    sub_bg_enabled: bool = False
+    sub_bg_color: str = "#000000"
+    sub_bg_opacity: float = 0.6
     channel_name: str = ""
     font_name: str = "NanumSquareRoundEB"
     brightness: float = 0.0
@@ -54,6 +57,7 @@ class RenderRequest(BaseModel):
     template_id: int = 1
     style: StyleParams = StyleParams()
     bg_image: Optional[str] = None
+    bg_solid_color: Optional[str] = None
     narration: bool = False
     narration_voice: str = "female"
 
@@ -64,6 +68,7 @@ class PreviewRequest(BaseModel):
     style: StyleParams = StyleParams()
     seek: float = 2.0
     bg_image: Optional[str] = None
+    bg_solid_color: Optional[str] = None
 
 
 class UpdateTitleRequest(BaseModel):
@@ -82,9 +87,34 @@ class SrtSaveRequest(BaseModel):
     entries: List[SrtEntry]
 
 
+class VideoInfoResponse(BaseModel):
+    title: str
+    duration: int
+    thumbnail_url: str
+    filesize_approx: Optional[int] = None
+    video_id: str
+
+
+class DownloadInfo(BaseModel):
+    filename: str
+    stem: str
+    category: str
+
+
+class ProcessSelectedItem(BaseModel):
+    filename: str
+    category: str
+
+
+class ProcessSelectedRequest(BaseModel):
+    items: List[ProcessSelectedItem]
+    template_id: int = 1
+
+
 class Candidate(BaseModel):
     start: float
     end: float
+    title: Optional[str] = None
     reason: str
     score: int
     edit_order: int

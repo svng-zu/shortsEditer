@@ -52,7 +52,7 @@ export default function RightPanel({ activeTab, selectedRaw, selectedShort, onUp
       display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
       {/* 헤더 */}
-      <div style={{ padding: '14px 16px 10px', fontWeight: 700, fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+      <div style={{ padding: '14px 16px 10px', fontWeight: 700, fontSize: 13, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         상세 정보
       </div>
 
@@ -60,9 +60,9 @@ export default function RightPanel({ activeTab, selectedRaw, selectedShort, onUp
 
         {/* ① 제목 편집 */}
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)' }}>
             제목
-            {saved && <span style={{ color: '#3ddc84', fontSize: 10 }}>✓ 저장됨</span>}
+            {saved && <span style={{ color: '#3ddc84', fontSize: 12 }}>✓ 저장됨</span>}
           </div>
           <textarea
             value={title}
@@ -74,7 +74,7 @@ export default function RightPanel({ activeTab, selectedRaw, selectedShort, onUp
               background: 'var(--surface2)', border: '1px solid var(--border)',
               borderRadius: 8, padding: '10px 12px',
               color: 'var(--text)', fontFamily: "'Noto Sans KR', sans-serif",
-              fontSize: 13, lineHeight: 1.6, resize: 'vertical', outline: 'none',
+              fontSize: 15, lineHeight: 1.6, resize: 'vertical', outline: 'none',
               transition: 'border-color .2s',
             }}
             onFocus={e => { e.target.style.borderColor = 'var(--accent)' }}
@@ -87,7 +87,7 @@ export default function RightPanel({ activeTab, selectedRaw, selectedShort, onUp
                 padding: '7px 0', background: saving ? 'var(--border)' : 'var(--accent)',
                 color: saving ? 'var(--muted)' : '#000', border: 'none',
                 borderRadius: 7, fontFamily: "'Noto Sans KR', sans-serif",
-                fontWeight: 700, fontSize: 12, cursor: saving ? 'not-allowed' : 'pointer',
+                fontWeight: 700, fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer',
               }}>
               {saving ? '저장 중...' : activeTab === 'shorts' ? '저장 (재편집 시 반영)' : '저장'}
             </button>
@@ -96,20 +96,25 @@ export default function RightPanel({ activeTab, selectedRaw, selectedShort, onUp
 
         {/* ② 편집 구간 타임라인 */}
         <div style={{ padding: '14px 16px' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 10 }}>
             편집 구간 타임라인
           </div>
           {candidates.length === 0
-            ? <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--muted)', fontSize: 11, lineHeight: 1.6 }}>
+            ? <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--muted)', fontSize: 13, lineHeight: 1.6 }}>
                 {item ? '타임라인 정보 없음' : '쇼츠를 선택하면\n타임라인이 표시됩니다.'}
               </div>
             : candidates.map((c, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--accent)', color: '#000', fontSize: 12, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
                     {c.edit_order || i + 1}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700 }}>
+                    {c.title && (
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>
+                        "{c.title}"
+                      </div>
+                    )}
+                    <div style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 700 }}>
                       {fmt(c.start)} ~ {fmt(c.end)}
                       {c.score !== undefined && <span style={{ color: 'var(--muted)', fontWeight: 400, marginLeft: 6 }}>{c.score}점</span>}
                     </div>
@@ -118,7 +123,7 @@ export default function RightPanel({ activeTab, selectedRaw, selectedShort, onUp
                         <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 2, width: `${Math.min(c.score, 100)}%` }} />
                       </div>
                     )}
-                    {c.reason && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, lineHeight: 1.4 }}>{c.reason}</div>}
+                    {c.reason && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2, lineHeight: 1.4 }}>{c.reason}</div>}
                   </div>
                 </div>
               ))

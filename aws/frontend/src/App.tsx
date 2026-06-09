@@ -5,7 +5,7 @@ import ShortsPanel from './components/ShortsPanel'
 import AuthModal from './components/AuthModal'
 import LandingPage from './components/LandingPage'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { api, PipelineStatus, FileCounts, ShortInfo, RawInfo, Quota } from './services/api'
+import { api, PipelineStatus, ShortInfo, RawInfo, Quota, DownloadInfo } from './services/api'
 
 type MobileView = 'pipeline' | 'shorts'
 
@@ -28,12 +28,12 @@ const MOBILE_TABS: { key: MobileView; icon: string; label: string }[] = [
 
 function ShortsStudio() {
   const [status, setStatus]     = useState<PipelineStatus>({ step: 'idle', message: '대기 중', progress: 0 })
-  const [fileCounts, setFileCounts] = useState<FileCounts>({ downloads: [], videos: [], transcripts: [], analyses: [], shorts: [] })
   const [shorts, setShorts]     = useState<ShortInfo[]>([])
   const [raws, setRaws]         = useState<RawInfo[]>([])
   const [selectedShort, setSelectedShort] = useState<ShortInfo | null>(null)
   const [selectedRaw, setSelectedRaw]     = useState<RawInfo | null>(null)
-  const [activeTab, setActiveTab] = useState<'raws' | 'shorts'>('raws')
+  const [activeTab, setActiveTab] = useState<'downloads' | 'raws' | 'shorts'>('raws')
+  const [downloads, setDownloads] = useState<DownloadInfo[]>([])
   const [isPolling, setIsPolling] = useState(false)
   const [isPaused, setIsPaused]   = useState(false)
   const [mobileView, setMobileView] = useState<MobileView>('pipeline')
@@ -46,16 +46,17 @@ function ShortsStudio() {
   const fetchStatus = useCallback(async () => {
     try { const d = await api.getStatus(); setStatus(d); return d } catch { return null }
   }, [])
-  const fetchFiles  = useCallback(async () => { try { setFileCounts(await api.getFiles()) } catch {} }, [])
+  const fetchFiles  = useCallback(async () => { try { await api.getFiles() } catch {} }, [])
   const fetchShorts = useCallback(async () => { try { setShorts((await api.getShorts()).shorts) } catch {} }, [])
   const fetchRaws   = useCallback(async () => { try { setRaws((await api.getRaws()).raws) } catch {} }, [])
   const fetchQuota  = useCallback(async () => { try { setQuota(await api.getQuota()) } catch {} }, [])
+  const fetchDownloads = useCallback(async () => { try { setDownloads((await api.getDownloads()).downloads) } catch {} }, [])
   const startPolling = useCallback(() => setIsPolling(true), [])
   const onQuotaError = useCallback(() => { setQuotaNotice(true); fetchQuota() }, [fetchQuota])
 
   useEffect(() => {
-    fetchStatus(); fetchFiles(); fetchShorts(); fetchRaws(); fetchQuota()
-  }, [fetchStatus, fetchFiles, fetchShorts, fetchRaws, fetchQuota])
+    fetchStatus(); fetchFiles(); fetchShorts(); fetchRaws(); fetchQuota(); fetchDownloads()
+  }, [fetchStatus, fetchFiles, fetchShorts, fetchRaws, fetchQuota, fetchDownloads])
 
   useEffect(() => {
     if (!isPolling) return
@@ -64,17 +65,18 @@ function ShortsStudio() {
       await fetchFiles()
       if (d && ['idle', 'done', 'error'].includes(d.step)) {
         setIsPolling(false); setIsPaused(false)
-        await fetchShorts(); await fetchRaws()
+        await fetchShorts(); await fetchRaws(); await fetchDownloads()
       }
     }, 2000)
     return () => clearInterval(iv)
   }, [isPolling, fetchStatus, fetchFiles, fetchShorts, fetchRaws])
 
-  const handleRefresh = async () => { await fetchFiles(); await fetchShorts(); await fetchRaws() }
+  const handleRefresh = async () => { await fetchFiles(); await fetchShorts(); await fetchRaws(); await fetchDownloads() }
+  const handleStop = async () => { await api.stop(); setIsPaused(false); setIsPolling(false); await fetchStatus() }
 
   const shortsPanelProps = {
     activeTab, onTabChange: setActiveTab,
-    shorts, raws,
+    shorts, raws, downloads,
     selectedShort, selectedRaw,
     onSelectShort: (s: ShortInfo | null) => setSelectedShort(s),
     onSelectRaw:   (r: RawInfo | null)   => setSelectedRaw(r),
@@ -97,6 +99,7 @@ function ShortsStudio() {
             status={status} isRunning={isRunning} isPaused={isPaused}
             onPause={async () => { await api.pause(); setIsPaused(true) }}
             onResume={async () => { await api.resume(); setIsPaused(false) }}
+            onStop={handleStop}
             quota={quota} quotaNotice={quotaNotice}
             compact
           />
@@ -107,7 +110,7 @@ function ShortsStudio() {
         <div style={{ paddingBottom: 70 }}>
           {mobileView === 'pipeline' && (
             <Pipeline
-              status={status} fileCounts={fileCounts} isRunning={isRunning}
+              status={status} isRunning={isRunning}
               onStartPolling={startPolling} onRefresh={handleRefresh} isMobile
               onQuotaError={onQuotaError}
             />
@@ -131,7 +134,7 @@ function ShortsStudio() {
               transition: 'color .15s', fontFamily: 'inherit',
             }}>
               <span style={{ fontSize: 20, lineHeight: 1 }}>{tab.icon}</span>
-              <span style={{ fontSize: 10, fontWeight: 600 }}>{tab.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>{tab.label}</span>
             </button>
           ))}
         </nav>
@@ -146,6 +149,7 @@ function ShortsStudio() {
           status={status} isRunning={isRunning} isPaused={isPaused}
           onPause={async () => { await api.pause(); setIsPaused(true) }}
           onResume={async () => { await api.resume(); setIsPaused(false) }}
+          onStop={handleStop}
           quota={quota} quotaNotice={quotaNotice}
         />
         {progressBar}
@@ -153,7 +157,7 @@ function ShortsStudio() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '16px 32px', maxWidth: 1440, margin: '0 auto', width: '100%' }}>
         <Pipeline
-          status={status} fileCounts={fileCounts} isRunning={isRunning}
+          status={status} isRunning={isRunning}
           onStartPolling={startPolling} onRefresh={handleRefresh} isMobile={false}
           onQuotaError={onQuotaError}
         />
