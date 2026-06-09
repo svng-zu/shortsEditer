@@ -21,7 +21,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -e
-            cd ~/shortsai
+            cd ~/short_editor/shortsEditer
 
             echo "== 코드 최신화 =="
             git pull origin main
