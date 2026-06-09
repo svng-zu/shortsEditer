@@ -287,8 +287,7 @@ class YoutubeCollector:
         except Exception:
             return {"thumbnail_url": ""}
 
-    def download_video(self, video_url: str, quality: str = "1080",
-                       on_progress: callable = None) -> dict:
+    def download_video(self, video_url: str, on_progress: callable = None) -> dict:
         """영상 다운로드 (yt-dlp + 인증)"""
         hooks = []
         if on_progress:
@@ -302,10 +301,10 @@ class YoutubeCollector:
         ydl_opts = {
             **_auth_opts(),
             "format": (
-                f"bestvideo[height>={quality}][height<=2160][ext=mp4][vcodec^=avc]"
-                f"+bestaudio[ext=m4a]"
-                f"/bestvideo[height>={quality}][height<=2160][ext=mp4]+bestaudio[ext=m4a]"
-                f"/best[ext=mp4]"
+                "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]"
+                "/bestvideo[height<=1080]+bestaudio[ext=m4a]"
+                "/bestvideo[height<=1080]+bestaudio"
+                "/bestvideo+bestaudio/best"
             ),
             "outtmpl": f"{self.download_dir}/%(title)s.%(ext)s",
             "merge_output_format": "mp4",
