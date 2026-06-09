@@ -300,10 +300,10 @@ export default function ShortsPanel({
                         <input type="checkbox" checked={dlSelected.has(d.filename)} onChange={() => dlToggle(d.filename)}
                           style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer', marginTop: 3 }} />
                         {/* 썸네일 */}
-                        <div style={{ width: 72, height: 48, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
+                        <div style={{ width: 144, height: 96, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
                           {d.thumbnail_url
                             ? <img src={d.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🎬</div>}
+                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>🎬</div>}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 5, wordBreak: 'break-word' }}>
@@ -455,10 +455,10 @@ export default function ShortsPanel({
                       <input type="checkbox" checked={dlSelected.has(d.filename)} onChange={() => dlToggle(d.filename)}
                         style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer', marginTop: 3 }} />
                       {/* 썸네일 */}
-                      <div style={{ width: 80, height: 52, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
+                      <div style={{ width: 160, height: 104, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
                         {d.thumbnail_url
                           ? <img src={d.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🎬</div>}
+                          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 }}>🎬</div>}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 6, wordBreak: 'break-word' }}>

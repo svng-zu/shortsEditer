@@ -17,9 +17,9 @@ aws/
       auth.py          # 소셜 로그인 (준비중)
     services/
       s3_manager.py    # S3 업로드/다운로드/presigned URL (get_s3() 싱글톤)
-      collector.py     # yt-dlp YouTube 다운로더
+      collector.py     # yt-dlp YouTube 다운로더 + get_video_info() 메타데이터 조회
       transcriber.py   # Whisper 자막 생성 (S3 업로드는 pipeline.py에서 처리)
-      analyzer.py      # Gemini 2.5 Flash LLM 분석 (analysis_dir 파라미터 필수)
+      analyzer.py      # Gemini 2.5 Flash LLM 분석 (chunk 요약은 gemini-2.0-flash-lite 사용)
       editor.py        # 카테고리별 에디터 디스패처
       editor_base.py   # FFmpeg 편집 공통 로직 (얼굴 감지 crop, 오버레이)
       editor_sports/economy/politics.py  # 카테고리별 템플릿
@@ -67,6 +67,8 @@ S3에 없으면 로컬 파일 서빙으로 폴백.
 - `X-Session-Id` 헤더로 세션 구분 (기본값: `"default"`)
 - `SessionDirs.s3_key(subdir, filename)` → `sessions/{id}/{subdir}/{filename}`
 - 로컬 경로: `aws/data/sessions/{session_id}/{subdir}/`
+- `video_ids.json` — 세션별 `stem → video_id` 매핑 (썸네일 URL 조회에 사용)
+- `category_map.json` — 세션별 `stem → category` 매핑
 
 ## 주요 환경변수 (.env)
 
@@ -96,3 +98,30 @@ EC2 IAM Role에 S3 읽기/쓰기 권한 필요 (`aishortsbucket`).
 - S3는 영구 백업 + 미디어 서빙용 (EC2 디스크 절약)
 - bgutil 컨테이너: YouTube 다운로드 POT 우회용 (port 4416)
 - 카테고리: `economy`, `politics`, `sports`
+
+## 최근 변경사항
+
+### Gemini 비용 절감 + 분석 품질 향상 (`analyzer.py`)
+- **두 모델 전략**: chunk 요약은 `gemini-2.0-flash-lite`(저비용), 최종 분석은 `gemini-2.5-flash` 사용
+- **Few-shot 프롬프트**: `HIGH_PERFORMING_EXAMPLES` 딕셔너리에 카테고리별 고성능 쇼츠 예시 삽입
+- **`title` 필드 추가**: 각 `Candidate`에 쇼츠 제목 생성 (Pydantic 모델 + 프론트엔드 RightPanel 표시)
+
+### 긴 영상 다운로드 확인 플로우 (`pipeline.py`, `collector.py`, `Pipeline.tsx`)
+- `GET /api/video-info` — yt-dlp `extract_info(download=False)`로 제목/길이/용량/썸네일 조회
+- URL 입력 → "확인" → 인포카드(썸네일+제목+길이+용량) → 1시간 이상이면 경고 배너
+- `collector.get_video_info()` 반환: `{title, duration, thumbnail_url, filesize_approx, video_id}`
+
+### 수집됨 탭 + 선택 편집 (`ShortsPanel.tsx`, `pipeline.py`)
+- `GET /api/downloads` — 다운로드 목록 + 카테고리 + YouTube 썸네일 URL 반환
+  - `video_ids.json`에서 `stem → video_id` 조회 → `img.youtube.com/vi/{id}/mqdefault.jpg`
+- `POST /api/process-selected` — 선택된 영상들 자막→분석→편집 순차 처리
+- `DELETE /api/downloads/{filename}` — 로컬 + S3 파일 삭제
+- ShortsPanel "수집됨" 탭: 체크박스 다중선택, 카테고리 드롭다운, YouTube 썸네일(160×104), 삭제버튼, 제목 줄바꿈
+
+### 모바일 Pipeline 레이아웃 통일 (`Pipeline.tsx`)
+- "채널 수집" / "편집 시작" 버튼을 채널 섹션 외부에 항상 노출 (PC/모바일 동일 구조)
+- `steps` 배열 제거, `isMobile` 조건부 분기 제거
+
+### CI/CD 수정 (`.github/workflows/deploy.yml`)
+- EC2 경로 수정: `~/shortsai` → `~/short_editor/shortsEditer`
+- `git pull` → `git fetch && git reset --hard origin/main` (로컬 충돌 방지)
