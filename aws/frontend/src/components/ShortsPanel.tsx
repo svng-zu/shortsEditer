@@ -192,6 +192,13 @@ export default function ShortsPanel({
     onRefresh()
   }
 
+  const deleteDownload = async (fn: string, e: React.MouseEvent) => {
+    e.stopPropagation(); if (!confirm('수집된 영상을 삭제할까요?')) return
+    await api.deleteDownload(fn)
+    setDlSelected(prev => { const next = new Set(prev); next.delete(fn); return next })
+    onRefresh()
+  }
+
   // 모바일: 선택된 항목이 있으면 해당 상세/편집 화면으로 전환
   const mobileShowEdit = isMobile && activeTab === 'raws' && selectedRaw !== null
   const mobileShowPlayer = isMobile && activeTab === 'shorts' && selectedShort !== null
@@ -289,20 +296,30 @@ export default function ShortsPanel({
                       </button>
                     </div>
                     {downloads.map(d => (
-                      <div key={d.filename} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+                      <div key={d.filename} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
                         <input type="checkbox" checked={dlSelected.has(d.filename)} onChange={() => dlToggle(d.filename)}
-                          style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }} />
+                          style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer', marginTop: 3 }} />
+                        {/* 썸네일 */}
+                        <div style={{ width: 72, height: 48, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
+                          {d.thumbnail_url
+                            ? <img src={d.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🎬</div>}
+                        </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 5, wordBreak: 'break-word' }}>
                             {d.stem}
                           </div>
                           <select value={dlCategories[d.filename] || d.category}
                             onChange={e => setDlCategories(prev => ({ ...prev, [d.filename]: e.target.value }))}
                             onClick={e => e.stopPropagation()}
-                            style={{ fontSize: 13, padding: '3px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'white', color: 'var(--text2)', cursor: 'pointer', outline: 'none' }}>
+                            style={{ fontSize: 12, padding: '3px 7px', border: '1px solid var(--border)', borderRadius: 6, background: 'white', color: 'var(--text2)', cursor: 'pointer', outline: 'none' }}>
                             {CATEGORIES_DL.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                           </select>
                         </div>
+                        <button onClick={e => deleteDownload(d.filename, e)}
+                          style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }}>
+                          삭제
+                        </button>
                       </div>
                     ))}
                   </>
@@ -434,20 +451,30 @@ export default function ShortsPanel({
                     </button>
                   </div>
                   {downloads.map(d => (
-                    <div key={d.filename} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+                    <div key={d.filename} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
                       <input type="checkbox" checked={dlSelected.has(d.filename)} onChange={() => dlToggle(d.filename)}
-                        style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }} />
+                        style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer', marginTop: 3 }} />
+                      {/* 썸네일 */}
+                      <div style={{ width: 80, height: 52, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
+                        {d.thumbnail_url
+                          ? <img src={d.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🎬</div>}
+                      </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 6, wordBreak: 'break-word' }}>
                           {d.stem}
                         </div>
+                        <select
+                          value={dlCategories[d.filename] || d.category}
+                          onChange={e => setDlCategories(prev => ({ ...prev, [d.filename]: e.target.value }))}
+                          style={{ fontSize: 12, padding: '3px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'white', color: 'var(--text2)', cursor: 'pointer', outline: 'none' }}>
+                          {CATEGORIES_DL.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                        </select>
                       </div>
-                      <select
-                        value={dlCategories[d.filename] || d.category}
-                        onChange={e => setDlCategories(prev => ({ ...prev, [d.filename]: e.target.value }))}
-                        style={{ fontSize: 13, padding: '5px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'white', color: 'var(--text2)', cursor: 'pointer', outline: 'none', flexShrink: 0 }}>
-                        {CATEGORIES_DL.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                      </select>
+                      <button onClick={e => deleteDownload(d.filename, e)}
+                        style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }}>
+                        삭제
+                      </button>
                     </div>
                   ))}
                 </div>

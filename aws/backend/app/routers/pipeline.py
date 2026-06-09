@@ -618,16 +618,41 @@ async def get_video_info(url: str, session: SessionDirs = Depends(get_session)):
 
 @router.get("/downloads")
 async def list_downloads(session: SessionDirs = Depends(get_session)):
-    """다운로드된 영상 목록 + 카테고리 반환"""
+    """다운로드된 영상 목록 + 카테고리 + 썸네일 반환"""
     cat_map = load_category_map(session)
+    id_map = load_video_id_map(session)
     result = []
     for f in sorted(session.download_dir.glob("*.mp4")):
+        video_id = id_map.get(f.stem)
+        thumbnail_url = (
+            f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"
+            if video_id else None
+        )
         result.append(DownloadInfo(
             filename=f.name,
             stem=f.stem,
             category=cat_map.get(f.stem, "economy"),
+            thumbnail_url=thumbnail_url,
         ))
     return {"downloads": [d.model_dump() for d in result]}
+
+
+@router.delete("/downloads/{filename}")
+async def delete_download(filename: str, session: SessionDirs = Depends(get_session)):
+    """수집된 영상 파일 삭제"""
+    filepath = session.download_dir / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    filepath.unlink()
+    # S3에서도 삭제
+    s3 = get_s3()
+    if s3:
+        s3_key = session.s3_key("downloads", filename)
+        try:
+            s3.delete(s3_key)
+        except Exception:
+            pass
+    return {"ok": True}
 
 
 # ── 선택 영상 편집 (자막→분석→편집 순차 처리) ────────────────────

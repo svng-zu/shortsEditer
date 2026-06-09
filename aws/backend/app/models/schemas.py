@@ -99,6 +99,7 @@ class DownloadInfo(BaseModel):
     filename: str
     stem: str
     category: str
+    thumbnail_url: Optional[str] = None
 
 
 class ProcessSelectedItem(BaseModel):

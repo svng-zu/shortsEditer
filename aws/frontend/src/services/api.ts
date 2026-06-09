@@ -149,6 +149,7 @@ export interface DownloadInfo {
   filename: string
   stem: string
   category: string
+  thumbnail_url: string | null
 }
 
 export interface StyleParams {
