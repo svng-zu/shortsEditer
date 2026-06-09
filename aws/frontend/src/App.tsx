@@ -22,7 +22,7 @@ function useIsMobile() {
 }
 
 const MOBILE_TABS: { key: MobileView; icon: string; label: string }[] = [
-  { key: 'pipeline', icon: '⚙️', label: '파이프라인' },
+  { key: 'pipeline', icon: '⚙️', label: '영상수집' },
   { key: 'shorts',   icon: '🎬', label: '편집실' },
 ]
 

@@ -207,15 +207,13 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
     catch (e: any) { if (isQuotaError(e)) { onQuotaError() } else throw e }
   }
   const isCollecting = status.step === 'collecting'
-  const isEditing    = ['transcribing', 'analyzing', 'editing'].includes(status.step)
   const handleCollect = runAction(() => api.collect(clearExisting, collectLimit))
-  const handleProcess = runAction(() => api.process(1))
 
   // ── 공통 레이아웃 (모바일/데스크톱 동일) ──
   return (
     <aside className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>Pipeline</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>영상수집</span>
         <button onClick={onRefresh} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '2px 4px', borderRadius: 4 }}
           title="새로고침">↻</button>
       </div>
@@ -352,10 +350,12 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
           onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) uploadFile(f) }}
           onClick={() => fileInputRef.current?.click()}
           style={{
+            width: '100%', maxWidth: 720,
             border: `1.5px dashed ${dragOver ? 'var(--primary)' : 'var(--border)'}`,
             borderRadius: 999, padding: '8px 18px', cursor: 'pointer',
             fontSize: 14, fontWeight: 600, color: dragOver ? 'var(--primary)' : 'var(--text2)',
             background: dragOver ? 'var(--primary-bg)' : 'var(--surface2)', transition: 'all .15s',
+            boxSizing: 'border-box', textAlign: 'center',
           }}>
           <input ref={fileInputRef} type="file" accept=".mp4,.mkv,.mov,.avi" style={{ display: 'none' }}
             onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f) }} />
@@ -470,23 +470,6 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
           )}
         </div>
 
-        {/* ── 실행 버튼 영역 — 항상 보임 ── */}
-        <div style={{ width: '100%', maxWidth: 720, display: 'flex', gap: 10 }}>
-          <button onClick={handleCollect} disabled={isRunning}
-            className={isRunning ? 'btn-outlined' : 'btn-primary'}
-            style={{ flex: 1, borderRadius: 999, padding: '12px 0', fontSize: 15, fontWeight: 700, opacity: isRunning && !isCollecting ? 0.5 : 1 }}>
-            {isCollecting
-              ? <><div className="spinner spinner-sm" style={{ borderTopColor: 'white', display: 'inline-block', verticalAlign: 'middle', marginRight: 6 }} />수집 중...</>
-              : '⬇ 채널 수집'}
-          </button>
-          <button onClick={handleProcess} disabled={isRunning}
-            className={isRunning ? 'btn-outlined' : 'btn-outlined'}
-            style={{ flex: 1, borderRadius: 999, padding: '12px 0', fontSize: 15, fontWeight: 700, opacity: isRunning && !isEditing ? 0.5 : 1 }}>
-            {isEditing
-              ? <><div className="spinner spinner-sm" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 6 }} />편집 중...</>
-              : '✂️ 편집 시작'}
-          </button>
-        </div>
       </div>
 
       {isRunning && (
