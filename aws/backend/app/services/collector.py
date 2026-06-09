@@ -300,12 +300,7 @@ class YoutubeCollector:
 
         ydl_opts = {
             **_auth_opts(),
-            "format": (
-                "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]"
-                "/bestvideo[height<=1080]+bestaudio[ext=m4a]"
-                "/bestvideo[height<=1080]+bestaudio"
-                "/bestvideo+bestaudio/best"
-            ),
+            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
             "outtmpl": f"{self.download_dir}/%(title)s.%(ext)s",
             "merge_output_format": "mp4",
             "noplaylist": True,
