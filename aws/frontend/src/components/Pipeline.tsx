@@ -49,7 +49,8 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
     try {
       const r = await apiClient.get('/api/oauth-status')
       const d = r.data
-      if (d.token_saved) { setOauthState({ status: 'done' }); clearInterval(oauthPollRef.current!); oauthPollRef.current = null }
+      if (d.token_saved && !d.token_expired) { setOauthState({ status: 'done' }); clearInterval(oauthPollRef.current!); oauthPollRef.current = null }
+      else if (d.token_saved && d.token_expired) { setOauthState({ status: 'expired' }); clearInterval(oauthPollRef.current!); oauthPollRef.current = null }
       else if (d.status === 'waiting') setOauthState({ status: 'waiting', url: d.url, code: d.code })
       else if (d.status === 'error')   { setOauthState({ status: 'error' }); clearInterval(oauthPollRef.current!); oauthPollRef.current = null }
       else setOauthState({ status: d.status })
@@ -219,7 +220,19 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
           title="새로고침">↻</button>
       </div>
 
-      {!oauthDone ? (
+      {oauthState?.status === 'expired' ? (
+        <div style={{ padding: '10px 14px', background: '#fce8e6', borderBottom: '1px solid #f28b82', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14, color: '#c5221f' }}>⚠ YouTube 인증 만료됨</div>
+              <div style={{ fontSize: 12, color: '#5f6368', marginTop: 1 }}>토큰이 만료되어 영상 수집이 실패합니다. 재인증이 필요합니다.</div>
+            </div>
+            <button onClick={startOauth} className="btn-primary" style={{ fontSize: 13, padding: '5px 10px', background: '#c5221f', whiteSpace: 'nowrap' }}>
+              🔑 재인증
+            </button>
+          </div>
+        </div>
+      ) : !oauthDone ? (
         <div style={{ padding: '10px 14px', background: '#fff8e1', borderBottom: '1px solid #ffe082', flexShrink: 0 }}>
           {oauthState?.status === 'waiting' && oauthState.url ? (
             <div>

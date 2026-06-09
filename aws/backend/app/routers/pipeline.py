@@ -211,9 +211,18 @@ async def oauth_init():
 
 @router.get("/oauth-status")
 async def oauth_status():
+    import time
     token_file = OAUTH_TOKEN_DIR / "token_data.json"
     is_saved = token_file.exists()
-    return {**_oauth_state, "token_saved": is_saved}
+    is_expired = False
+    if is_saved:
+        try:
+            data = json.loads(token_file.read_text())
+            expires = data.get("data", {}).get("expires", 0)
+            is_expired = time.time() > expires
+        except Exception:
+            is_expired = True
+    return {**_oauth_state, "token_saved": is_saved, "token_expired": is_expired}
 
 
 @router.post("/upload-video")
