@@ -54,7 +54,7 @@ services:
       - ./data:/app/data
       - ./static:/app/static
       - faster_whisper_cache:/root/.cache/huggingface
-      - /home/ubuntu/.cache/yt-dlp:/root/.cache/yt-dlp:ro
+      - /home/ubuntu/.cache/yt-dlp:/root/.cache/yt-dlp
     depends_on:
       bgutil:
         condition: service_started
