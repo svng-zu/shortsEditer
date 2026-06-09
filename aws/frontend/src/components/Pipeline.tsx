@@ -255,11 +255,7 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
             </div>
           )}
         </div>
-      ) : (
-        <div style={{ padding: '6px 14px', background: '#e6f4ea', borderBottom: '1px solid #81c995', flexShrink: 0, fontSize: 13, color: '#34a853', fontWeight: 600 }}>
-          ✓ YouTube 인증 완료
-        </div>
-      )}
+      ) : null}
 
       {/* ── 검색창(구글 스타일) — URL로 영상 가져오기 ── */}
       <div style={{ padding: '40px 24px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, borderBottom: '1px solid var(--border)' }}>

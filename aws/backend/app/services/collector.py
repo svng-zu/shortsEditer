@@ -102,11 +102,11 @@ def _auth_opts() -> dict:
             "js_runtimes": {"node": {}},  # n-challenge 해결용
         }
         # bgutil POT 서버가 살아있으면 extractor_args에 추가
+        ea: dict = {"youtube": {"lang": ["ko"]}}
         if _bgutil_alive():
             print(f"[Auth] bgutil POT 서버 사용: {BGUTIL_URL}")
-            opts["extractor_args"] = {
-                "youtubepot-bgutilhttp": {"base_url": [BGUTIL_URL]}
-            }
+            ea["youtubepot-bgutilhttp"] = {"base_url": [BGUTIL_URL]}
+        opts["extractor_args"] = ea
         if YTDLP_PROXY:
             opts["proxy"] = YTDLP_PROXY
         return opts
@@ -115,7 +115,7 @@ def _auth_opts() -> dict:
         print("[Auth] 쿠키 파일 사용")
         opts = {
             "cookiefile": cookies,
-            "extractor_args": {"youtube": {"player_client": ["web"]}},
+            "extractor_args": {"youtube": {"player_client": ["web"], "lang": ["ko"]}},
         }
         if YTDLP_PROXY:
             opts["proxy"] = YTDLP_PROXY
@@ -324,6 +324,7 @@ class YoutubeCollector:
                 "filepath": ydl.prepare_filename(info),
                 "duration": info.get("duration"),
                 "channel":  info.get("channel"),
+                "video_id": info.get("id"),
             }
 
     def run(self, limit_per_channel: int = None, custom_channels: list[dict] = None,
