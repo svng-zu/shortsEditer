@@ -448,14 +448,20 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 14, color: 'var(--text2)', whiteSpace: 'nowrap' }}>
                   채널당
-                  <input type="number" min={1} max={20} value={collectLimit}
-                    onChange={e => setCollectLimit(Math.max(1, Math.min(20, Number(e.target.value))))}
-                    style={{ width: 48, padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 5, fontSize: 14, textAlign: 'center', color: 'var(--text)', background: 'white', outline: 'none' }} />
+                  <input type="text" inputMode="numeric" value={collectLimit === 0 ? '' : collectLimit}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/[^0-9]/g, '')
+                      if (raw === '') { setCollectLimit(0); return }
+                      const n = Math.min(20, parseInt(raw, 10))
+                      setCollectLimit(n)
+                    }}
+                    onBlur={() => { if (collectLimit === 0) alert('1개 이상의 값을 설정해주세요') }}
+                    style={{ width: 48, padding: '4px 6px', border: `1px solid ${collectLimit === 0 ? '#e53935' : 'var(--border)'}`, borderRadius: 5, fontSize: 14, textAlign: 'center', color: 'var(--text)', background: 'white', outline: 'none' }} />
                   개
                 </label>
               </div>
 
-              <button onClick={handleCollect} disabled={isRunning} className="btn-primary" style={{ padding: '10px 0', fontSize: 15, fontWeight: 700, borderRadius: 999 }}>
+              <button onClick={() => { if (collectLimit === 0) { alert('1개 이상의 값을 설정해주세요'); return } handleCollect() }} disabled={isRunning} className="btn-primary" style={{ padding: '10px 0', fontSize: 15, fontWeight: 700, borderRadius: 999 }}>
                 {isCollecting
                   ? <><div className="spinner spinner-sm" style={{ borderTopColor: 'white', marginRight: 6 }} />수집 중...</>
                   : '⬇ 채널 수집'}
