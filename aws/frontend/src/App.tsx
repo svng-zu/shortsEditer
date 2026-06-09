@@ -116,6 +116,9 @@ function ShortsStudio() {
             />
           )}
           {mobileView === 'shorts' && <ShortsPanel {...shortsPanelProps} />}
+          <div style={{ textAlign: 'center', padding: '20px 0', fontSize: 12, color: 'var(--muted)' }}>
+            © 2026 고릴라AI. All rights reserved.
+          </div>
         </div>
 
         {/* 하단 탭 — fixed */}
@@ -163,6 +166,9 @@ function ShortsStudio() {
         />
         <div style={{ display: 'grid', height: '78vh', minHeight: 520 }}>
           <ShortsPanel {...shortsPanelProps} />
+        </div>
+        <div style={{ textAlign: 'center', padding: '12px 0 20px', fontSize: 12, color: 'var(--muted)' }}>
+          © 2026 고릴라AI. All rights reserved.
         </div>
       </div>
     </div>

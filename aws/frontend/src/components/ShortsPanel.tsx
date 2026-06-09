@@ -609,7 +609,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
       modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer;'
       modal.onclick = () => { modal.remove(); URL.revokeObjectURL(url) }
       const img = document.createElement('img')
-      img.src = url; img.style.cssText = 'max-height:90vh;max-width:90vw;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.4);'
+      img.src = url; img.style.cssText = 'height:min(90vh,600px);width:auto;aspect-ratio:9/16;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.4);'
       modal.appendChild(img); document.body.appendChild(modal)
     } catch { alert('미리보기 오류') }
   }, [raw, title1, title2, t1Color, t2Color, titleY, titleScale, bgType, bgSolidColor, bgImageName, templateId])
@@ -786,7 +786,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
       <video ref={hidVidRef} style={{ display: 'none' }} playsInline />
 
       {/* 왼쪽: 캔버스 미리보기 */}
-      <div style={{ width: 420, flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface2)' }}>
+      <div style={{ width: 'clamp(220px, 28vw, 380px)', flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface2)' }}>
         <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)' }}>실시간 미리보기</span>
           {raw && <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>{raw.category}</span>}
@@ -795,9 +795,9 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
           {raw ? (
             <>
-              <div style={{ position: 'relative', width: '100%', borderRadius: 10, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+              <div style={{ position: 'relative', display: 'inline-block', borderRadius: 10, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
                 <canvas ref={canvasRef} width={CV_W} height={CV_H}
-                  style={{ display: 'block', width: '100%', aspectRatio: '9/16', imageRendering: 'auto' }} />
+                  style={{ display: 'block', height: 'min(60vh, 520px)', width: 'auto', aspectRatio: '9/16', imageRendering: 'auto' }} />
                 <button onClick={togglePlay} aria-label={isPlaying ? '일시정지' : '재생'} style={{
                   position: 'absolute', bottom: 10, right: 10, width: 34, height: 34, borderRadius: '50%',
                   border: 'none', background: 'rgba(0,0,0,0.55)', color: 'white', fontSize: 16,

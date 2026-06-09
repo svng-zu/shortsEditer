@@ -509,16 +509,14 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
                 아직 수집된 영상이 없어요
               </div>
             : downloads.map(d => {
-                const thumbW = isMobile ? 144 : 240
-                const thumbH = isMobile ? 96 : 160
                 return (
                   <div key={d.filename} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
                     <input type="checkbox" checked={dlSelected.has(d.filename)} onChange={() => dlToggle(d.filename)}
                       style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer', marginTop: 3 }} />
-                    <div style={{ width: thumbW, height: thumbH, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
+                    <div style={{ width: isMobile ? 'clamp(90px, 26vw, 144px)' : 'clamp(160px, 18vw, 240px)', aspectRatio: '16/9', borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
                       {d.thumbnail_url
                         ? <img src={d.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? 36 : 52 }}>🎬</div>}
+                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? 28 : 40 }}>🎬</div>}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 6, wordBreak: 'break-word' }}>
