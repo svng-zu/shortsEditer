@@ -80,6 +80,7 @@ def _has_oauth() -> bool:
 
 
 BGUTIL_URL = os.environ.get("BGUTIL_URL", "http://127.0.0.1:4416")
+YTDLP_PROXY = os.environ.get("YTDLP_PROXY", "")
 
 
 def _bgutil_alive() -> bool:
@@ -106,15 +107,22 @@ def _auth_opts() -> dict:
             opts["extractor_args"] = {
                 "youtubepot-bgutilhttp": {"base_url": [BGUTIL_URL]}
             }
+        if YTDLP_PROXY:
+            opts["proxy"] = YTDLP_PROXY
         return opts
     cookies = _prepare_cookies()
     if cookies:
         print("[Auth] 쿠키 파일 사용")
-        return {
+        opts = {
             "cookiefile": cookies,
             "extractor_args": {"youtube": {"player_client": ["web"]}},
         }
+        if YTDLP_PROXY:
+            opts["proxy"] = YTDLP_PROXY
+        return opts
     print("[Auth] 인증 수단 없음 — 차단될 수 있음")
+    if YTDLP_PROXY:
+        return {"proxy": YTDLP_PROXY}
     return {}
 
 

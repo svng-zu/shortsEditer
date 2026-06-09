@@ -43,6 +43,7 @@ services:
       - YOUTUBE_CLIENT_SECRET=${YOUTUBE_CLIENT_SECRET:-}
       - YOUTUBE_REDIRECT_URI=${YOUTUBE_REDIRECT_URI:-}
       - BGUTIL_URL=http://bgutil:4416
+      - YTDLP_PROXY=socks5://host.docker.internal:1080
       - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg2://shortsai:${POSTGRES_PASSWORD:-shortsai}@postgres:5432/shortsai}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
       - GOOGLE_AUTH_CLIENT_ID=${GOOGLE_AUTH_CLIENT_ID:-}
@@ -50,6 +51,8 @@ services:
       - GOOGLE_AUTH_REDIRECT_URI=${GOOGLE_AUTH_REDIRECT_URI:-}
       - FRONTEND_URL=${FRONTEND_URL:-https://gorilai.duckdns.org}
       - SES_SENDER_EMAIL=${SES_SENDER_EMAIL:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/app/data
       - ./static:/app/static
