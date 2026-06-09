@@ -53,7 +53,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./static:/app/static
-      - whisper_cache:/root/.cache/whisper
+      - faster_whisper_cache:/root/.cache/huggingface
       - /home/ubuntu/.cache/yt-dlp:/root/.cache/yt-dlp:ro
     depends_on:
       bgutil:
@@ -84,5 +84,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  whisper_cache:
+  faster_whisper_cache:
   postgres_data:

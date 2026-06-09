@@ -24,7 +24,8 @@ jobs:
             cd ~/short_editor/shortsEditer
 
             echo "== 코드 최신화 =="
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             echo "== Docker 재빌드 및 재시작 =="
             cd aws

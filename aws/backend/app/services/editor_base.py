@@ -22,7 +22,7 @@ VIDEO_Y = TOP_H
 
 BUFFER_SEC = 2
 MIN_SEGMENT_SEC = 5
-MAX_TOTAL_SEC = 120
+MAX_TOTAL_SEC = 90
 FACE_SAMPLE_FRAMES = 10
 
 TEMP_DIR = settings.BASE_DIR / "data" / "temp"
@@ -65,10 +65,13 @@ class EditorBase:
             raise RuntimeError("FFmpeg가 설치되어 있지 않습니다.")
 
     FONT_MAP = {
-        "NanumSquareRoundEB": "/usr/share/fonts/truetype/nanum/NanumSquareRoundEB.ttf",
-        "NanumSquareRoundB":  "/usr/share/fonts/truetype/nanum/NanumSquareRoundB.ttf",
-        "NanumSquareB":       "/usr/share/fonts/truetype/nanum/NanumSquareB.ttf",
-        "NanumGothicBold":    "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+        "NanumSquareRoundEB":   "/usr/share/fonts/truetype/nanum/NanumSquareRoundEB.ttf",
+        "NanumSquareRoundB":    "/usr/share/fonts/truetype/nanum/NanumSquareRoundB.ttf",
+        "NanumSquareB":         "/usr/share/fonts/truetype/nanum/NanumSquareB.ttf",
+        "NanumGothicBold":      "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+        "NanumGothic":          "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+        "NanumBarunGothicBold": "/usr/share/fonts/truetype/nanum/NanumBarunGothicBold.ttf",
+        "NanumMyeongjoBold":    "/usr/share/fonts/truetype/nanum/NanumMyeongjoBold.ttf",
     }
 
     def _resolve_font(self, font_name: str = None):
@@ -220,10 +223,11 @@ class EditorBase:
             f"setsar=1"
         )
 
-    def _build_overlay_vf(self, title_text, style=None):
+    def _build_overlay_vf(self, title_text, style=None, bg_color_override=None):
         t = self.template
         s = style or {}
-        filters = [f"pad={CANVAS_W}:{CANVAS_H}:0:{VIDEO_Y}:color={t['bg_color']}"]
+        bg_color = bg_color_override if bg_color_override else t['bg_color']
+        filters = [f"pad={CANVAS_W}:{CANVAS_H}:0:{VIDEO_Y}:color={bg_color}"]
         if t.get("top_bg_color"):
             filters.append(f"drawbox=x=0:y=0:w={CANVAS_W}:h={TOP_H}:color={t['top_bg_color']}:t=fill")
         if t.get("divider"):
@@ -326,6 +330,13 @@ class EditorBase:
         line_h = int(fontsize * 1.35)
         base_y = VIDEO_Y + VIDEO_H - margin_v
 
+        fontcolor = self._css_to_ffmpeg(s.get("sub_color", "#FFFFFF"))
+        box_opt = ""
+        if s.get("sub_bg_enabled"):
+            bg_color = self._css_to_ffmpeg(s.get("sub_bg_color", "#000000"))
+            bg_opacity = max(0.0, min(1.0, s.get("sub_bg_opacity", 0.6)))
+            box_opt = f":box=1:boxcolor={bg_color}@{bg_opacity:.2f}:boxborderw=14"
+
         filters = []
         for (t_start, t_end, text) in entries:
             raw_lines = [l for l in text.replace("\\n", "\n").split("\n") if l.strip()]
@@ -342,9 +353,10 @@ class EditorBase:
                 esc = line.replace("'", "\\'").replace(":", "\\:").replace("%", "\\%")
                 filters.append(
                     f"drawtext=text='{esc}'{font_opt}"
-                    f":fontsize={fontsize}:fontcolor=white"
+                    f":fontsize={fontsize}:fontcolor={fontcolor}"
                     f":borderw=4:bordercolor=black@0.95"
                     f":shadowx=3:shadowy=3:shadowcolor=black@0.7"
+                    f"{box_opt}"
                     f":x=(w-text_w)/2:y={y}"
                     f":enable='{enable}'"
                 )
@@ -413,12 +425,15 @@ class EditorBase:
         return True
 
     def _resolve_bg_path(self, category: str, bg_image: str = None) -> str | None:
-        # bg_image == "" → 사용자가 "단색 배경"을 명시적으로 선택한 것 (이미지 없이 단색으로)
-        # bg_image is None → 선택하지 않음 (카테고리 기본 배경 이미지 사용)
         if bg_image == "":
             return None
         stem = bg_image if bg_image else category
-        return str(settings.STATIC_DIR / "backgrounds" / f"{stem}.png")
+        bg_dir = settings.STATIC_DIR / "backgrounds"
+        for ext in (".png", ".jpg", ".jpeg", ".webp"):
+            p = bg_dir / f"{stem}{ext}"
+            if p.exists():
+                return str(p)
+        return str(bg_dir / f"{stem}.png")
 
     def _get_logo_path(self) -> str:
         return None
@@ -518,6 +533,7 @@ class EditorBase:
                       subtitles: bool = False,
                       style: dict = None,
                       bg_image: str = None,
+                      bg_solid_color: str = None,
                       narration: bool = False,
                       narration_voice: str = "female") -> str:
         # style의 font_name으로 폰트 갱신
@@ -539,7 +555,7 @@ class EditorBase:
 
         print(f"  [Stage 2] '{title[:20]}' | 자막={'O' if sub_entries else 'X'}")
 
-        bg_path = self._resolve_bg_path(category, bg_image)
+        bg_path = self._resolve_bg_path(category, bg_image) if not bg_solid_color else None
         logo_path = self._get_logo_path()
         has_logo = bool(logo_path and os.path.exists(logo_path))
 
@@ -548,6 +564,7 @@ class EditorBase:
         af_opts = ["-af", f"volume={volume}"] if volume is not None else []
 
         if bg_path and os.path.exists(bg_path):
+            # 이미지 배경
             text_filters = self._build_text_filters(title, style=style)
             parts = [f for f in [",".join(text_filters), sub_str] if f]
             all_vf_str = ",".join(parts)
@@ -575,6 +592,36 @@ class EditorBase:
             inputs = ["-i", raw_path, "-i", bg_path]
             if has_logo:
                 inputs += ["-i", logo_path]
+            cmd = (
+                ["ffmpeg", "-y"] + inputs +
+                ["-filter_complex", fc,
+                 "-map", "[out]", "-map", "0:a?",
+                 "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                 "-c:a", "aac", "-b:a", "128k"] + af_opts +
+                [output_path]
+            )
+        elif bg_solid_color:
+            # 단색 배경
+            solid = bg_solid_color.strip()
+            text_filters = self._build_text_filters(title, style=style)
+            all_filters = text_filters + sub_filters
+            color_pre = f"{color_f}," if color_f else ""
+            all_str = ",".join(all_filters) if all_filters else "null"
+            mid_label = "prelogo" if has_logo else "out"
+
+            fc = (
+                f"[0:v]{color_pre}"
+                f"pad={CANVAS_W}:{CANVAS_H}:0:{VIDEO_Y}:color={solid},setsar=1[base];"
+                f"[base]{all_str}[{mid_label}]"
+            )
+            inputs = ["-i", raw_path]
+            if has_logo:
+                fc += (
+                    f";[1]scale=200:-1[logo]"
+                    f";[prelogo][logo]overlay=W-w-16:{VIDEO_Y+16}[out]"
+                )
+                inputs += ["-i", logo_path]
+
             cmd = (
                 ["ffmpeg", "-y"] + inputs +
                 ["-filter_complex", fc,
@@ -640,7 +687,7 @@ class EditorBase:
 
         return output_path
 
-    def preview_frame(self, raw_path, analysis_path, title=None, style=None, seek=2.0, bg_image=None):
+    def preview_frame(self, raw_path, analysis_path, title=None, style=None, seek=2.0, bg_image=None, bg_solid_color=None):
         if style and style.get("font_name"):
             self.font = self._resolve_font(style["font_name"])
         with open(analysis_path, "r", encoding="utf-8") as f:
@@ -651,7 +698,7 @@ class EditorBase:
         category = analysis.get("category", "")
 
         preview_path = str(TEMP_DIR / "preview_frame.png")
-        bg_path = self._resolve_bg_path(category, bg_image)
+        bg_path = self._resolve_bg_path(category, bg_image) if not bg_solid_color else None
         logo_path = self._get_logo_path()
         has_logo = bool(logo_path and os.path.exists(logo_path))
 
@@ -681,6 +728,15 @@ class EditorBase:
                 ["-filter_complex", fc, "-map", "[out]",
                  "-vframes", "1", "-update", "1", preview_path]
             )
+        elif bg_solid_color:
+            # 단색 배경 미리보기
+            vf = self._build_overlay_vf(title, style=style, bg_color_override=bg_solid_color.strip())
+            if color_f:
+                vf = f"{color_f},{vf}"
+            cmd = [
+                "ffmpeg", "-y", "-ss", str(seek), "-i", raw_path,
+                "-vf", vf, "-vframes", "1", "-update", "1", preview_path
+            ]
         else:
             vf = self._build_overlay_vf(title, style=style)
             if color_f:
@@ -698,7 +754,7 @@ class EditorBase:
             return None
         return preview_path if os.path.exists(preview_path) else None
 
-    def rerender(self, analysis_path, title_override=None, subtitles=False, style=None, bg_image=None):
+    def rerender(self, analysis_path, title_override=None, subtitles=False, style=None, bg_image=None, bg_solid_color=None):
         with open(analysis_path, "r", encoding="utf-8") as f:
             analysis = json.load(f)
         base_name = os.path.splitext(os.path.basename(analysis_path))[0]
@@ -711,7 +767,8 @@ class EditorBase:
                                   title_override=title_override,
                                   subtitles=subtitles,
                                   style=style,
-                                  bg_image=bg_image)
+                                  bg_image=bg_image,
+                                  bg_solid_color=bg_solid_color)
 
     def edit(self, analysis_path):
         raw_path = self.edit_video(analysis_path)

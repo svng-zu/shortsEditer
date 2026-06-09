@@ -17,6 +17,7 @@ router = APIRouter()
 
 async def _run_render(session_id: str, filename: str, title: str, subtitles: bool,
                       template_id: int, style: dict = None, bg_image: str = None,
+                      bg_solid_color: str = None,
                       narration: bool = False, narration_voice: str = "female"):
     s = make_session(session_id)
     try:
@@ -40,6 +41,7 @@ async def _run_render(session_id: str, filename: str, title: str, subtitles: boo
             subtitles=subtitles,
             style=style,
             bg_image=bg_image,
+            bg_solid_color=bg_solid_color,
             narration=narration,
             narration_voice=narration_voice,
         )
@@ -59,7 +61,7 @@ async def render(req: RenderRequest, background_tasks: BackgroundTasks,
     background_tasks.add_task(
         _run_render, session.session_id, req.filename, req.title,
         req.subtitles, req.template_id, req.style.model_dump(), req.bg_image,
-        req.narration, req.narration_voice,
+        req.bg_solid_color, req.narration, req.narration_voice,
     )
     return {"ok": True}
 
@@ -84,6 +86,7 @@ async def preview(req: PreviewRequest, session: SessionDirs = Depends(get_sessio
         style=style,
         seek=req.seek,
         bg_image=req.bg_image,
+        bg_solid_color=req.bg_solid_color,
     )
     if not png_path:
         raise HTTPException(500, "미리보기 생성 실패")

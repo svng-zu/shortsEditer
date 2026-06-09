@@ -73,10 +73,10 @@ export default function AuthModal() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <img src="/static/gorila_ai.png" alt="고릴라AI" style={{ height: 40, width: 'auto', borderRadius: 8 }} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>
+            <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--text)' }}>
               고릴라<span style={{ color: 'var(--primary)' }}>AI</span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Shorts Studio</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Shorts Studio</div>
           </div>
         </div>
 
@@ -88,7 +88,7 @@ export default function AuthModal() {
                 type="button"
                 onClick={() => switchMode(m)}
                 className={m === mode ? 'btn-primary' : 'btn-outlined'}
-                style={{ flex: 1, padding: '8px 0', fontSize: 12, border: m === mode ? 'none' : '1px solid transparent' }}
+                style={{ flex: 1, padding: '8px 0', fontSize: 14, border: m === mode ? 'none' : '1px solid transparent' }}
               >
                 {m === 'login' ? '로그인' : '회원가입'}
               </button>
@@ -97,7 +97,7 @@ export default function AuthModal() {
         )}
 
         {!isAccountMode && (
-          <div style={{ margin: '20px 0 4px', fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+          <div style={{ margin: '20px 0 4px', fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>
             {mode === 'forgot' ? '비밀번호 재설정' : '새 비밀번호 설정'}
           </div>
         )}
@@ -141,24 +141,24 @@ export default function AuthModal() {
             <button
               type="button"
               onClick={() => { switchMode('forgot'); setEmail('') }}
-              style={{ alignSelf: 'flex-end', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--muted)', padding: 0 }}
+              style={{ alignSelf: 'flex-end', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--muted)', padding: 0 }}
             >
               비밀번호를 잊으셨나요?
             </button>
           )}
 
           {message && (
-            <div style={{ fontSize: 12, color: '#1e8e3e', background: '#e6f4ea', borderRadius: 6, padding: '8px 10px' }}>
+            <div style={{ fontSize: 14, color: '#1e8e3e', background: '#e6f4ea', borderRadius: 6, padding: '8px 10px' }}>
               {message}
             </div>
           )}
           {error && (
-            <div style={{ fontSize: 12, color: 'var(--error)', background: '#fce8e6', borderRadius: 6, padding: '8px 10px' }}>
+            <div style={{ fontSize: 14, color: 'var(--error)', background: '#fce8e6', borderRadius: 6, padding: '8px 10px' }}>
               {error}
             </div>
           )}
 
-          <button type="submit" className="btn-primary" disabled={submitting} style={{ marginTop: 4, padding: '10px 0', fontSize: 13 }}>
+          <button type="submit" className="btn-primary" disabled={submitting} style={{ marginTop: 4, padding: '10px 0', fontSize: 15 }}>
             {submitting ? '처리 중...' : (
               mode === 'login' ? '로그인'
               : mode === 'signup' ? '회원가입'
@@ -171,7 +171,7 @@ export default function AuthModal() {
             <button
               type="button"
               onClick={() => switchMode('login')}
-              style={{ alignSelf: 'center', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--muted)', padding: 4 }}
+              style={{ alignSelf: 'center', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--muted)', padding: 4 }}
             >
               ← 로그인으로 돌아가기
             </button>
@@ -182,7 +182,7 @@ export default function AuthModal() {
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '18px 0' }}>
               <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>또는</span>
+              <span style={{ fontSize: 13, color: 'var(--muted)' }}>또는</span>
               <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
             </div>
 
@@ -190,12 +190,12 @@ export default function AuthModal() {
               type="button"
               onClick={loginWithGoogle}
               className="btn-outlined"
-              style={{ width: '100%', padding: '10px 0', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              style={{ width: '100%', padding: '10px 0', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
               <span>🔵</span> Google로 계속하기
             </button>
 
-            <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 16, lineHeight: 1.5, textAlign: 'center' }}>
+            <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 16, lineHeight: 1.5, textAlign: 'center' }}>
               {mode === 'login'
                 ? '계정이 없으신가요? 회원가입 시 이 브라우저의 기존 데이터가 자동으로 연결됩니다.'
                 : '가입하면 이 브라우저에서 모았던 영상·쇼츠 데이터가 새 계정에 그대로 연결됩니다.'}

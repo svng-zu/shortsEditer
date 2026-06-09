@@ -3,12 +3,13 @@
 
 import json
 import subprocess
+import requests
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse, RedirectResponse
 
 from app.config import settings
-from app.session import get_session, SessionDirs
+from app.session import get_session, SessionDirs, load_video_id_map
 from app.models.schemas import ShortInfo, RawInfo, UpdateTitleRequest, SrtSaveRequest
 from app.services.s3_manager import get_s3
 
@@ -127,20 +128,37 @@ def _thumb_path(session: SessionDirs, filename: str) -> Path:
     return thumbs_dir / f"{Path(filename).stem}.jpg"
 
 
+def _fetch_youtube_thumbnail(video_id: str, dest: Path) -> bool:
+    """YouTube 썸네일 CDN에서 원본 가로 썸네일을 받아 캐싱 (maxres 없으면 hq로 폴백)"""
+    for quality in ("maxresdefault", "hqdefault"):
+        url = f"https://img.youtube.com/vi/{video_id}/{quality}.jpg"
+        try:
+            resp = requests.get(url, timeout=10)
+            if resp.status_code == 200 and len(resp.content) > 1000:
+                dest.write_bytes(resp.content)
+                return True
+        except Exception:
+            continue
+    return False
+
+
 @router.get("/media/downloads/{session_id}/{filename}/thumbnail")
 async def serve_download_thumbnail(session_id: str, filename: str):
-    """다운로드된 영상의 미리보기 이미지 — 1초 지점 프레임을 ffmpeg로 추출해 캐싱"""
+    """다운로드된 영상의 미리보기 이미지 — YouTube 원본 썸네일(가로) 우선,
+    video_id를 모르거나 가져오기 실패 시 1초 지점 프레임을 ffmpeg로 추출해 캐싱"""
     from app.session import make_session
     s = make_session(session_id)
     thumb_path = _thumb_path(s, filename)
     if not thumb_path.exists():
-        video_path = s.download_dir / filename
-        if not video_path.exists():
-            raise HTTPException(404, "파일 없음")
-        subprocess.run(
-            ["ffmpeg", "-y", "-ss", "1", "-i", str(video_path), "-frames:v", "1", "-vf", "scale=240:-1", str(thumb_path)],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30,
-        )
+        video_id = load_video_id_map(s).get(Path(filename).stem)
+        if not (video_id and _fetch_youtube_thumbnail(video_id, thumb_path)):
+            video_path = s.download_dir / filename
+            if not video_path.exists():
+                raise HTTPException(404, "파일 없음")
+            subprocess.run(
+                ["ffmpeg", "-y", "-ss", "1", "-i", str(video_path), "-frames:v", "1", "-vf", "scale=480:-1", str(thumb_path)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30,
+            )
     if not thumb_path.exists():
         raise HTTPException(404, "썸네일 생성 실패")
     return FileResponse(str(thumb_path), media_type="image/jpeg")
@@ -216,5 +234,25 @@ async def save_srt(req: SrtSaveRequest, session: SessionDirs = Depends(get_sessi
 async def list_backgrounds():
     backgrounds_dir = settings.STATIC_DIR / "backgrounds"
     backgrounds_dir.mkdir(parents=True, exist_ok=True)
-    images = sorted(p.stem for p in backgrounds_dir.glob("*.png"))
+    exts = {".png", ".jpg", ".jpeg", ".webp"}
+    images = sorted(p.stem for p in backgrounds_dir.iterdir() if p.suffix.lower() in exts)
     return {"backgrounds": images}
+
+
+@router.post("/backgrounds/upload")
+async def upload_background(file: UploadFile = File(...)):
+    import re as _re
+    ext = Path(file.filename).suffix.lower() if file.filename else ".png"
+    if ext not in {".png", ".jpg", ".jpeg", ".webp"}:
+        raise HTTPException(400, "PNG/JPG/JPEG/WEBP 파일만 지원합니다")
+
+    stem = Path(file.filename).stem if file.filename else "bg"
+    stem = _re.sub(r"[^a-zA-Z0-9_\-가-힣]", "_", stem)[:64]
+
+    bg_dir = settings.STATIC_DIR / "backgrounds"
+    bg_dir.mkdir(parents=True, exist_ok=True)
+    save_path = bg_dir / f"{stem}{ext}"
+
+    content = await file.read()
+    save_path.write_bytes(content)
+    return {"filename": stem, "ok": True}

@@ -19,11 +19,9 @@ botocore>=1.34.0
 # Gemini API
 google-generativeai>=0.8.0
 
-# Whisper (로컬 STT) - CPU 전용 torch (CUDA 제외, 디스크 ~2GB 절약)
---extra-index-url https://download.pytorch.org/whl/cpu
-torch>=2.0.0
-torchaudio>=2.0.0
-openai-whisper>=20231117
+# Whisper (로컬 STT) - faster-whisper: CTranslate2 기반 재구현으로 torch 불필요,
+# CPU int8 추론이 openai-whisper 대비 약 4배 빠르고 VAD 필터 내장 (디스크 ~2GB 절약)
+faster-whisper>=1.2.0
 
 # YouTube Download
 yt-dlp>=2026.3.0
@@ -40,8 +38,7 @@ google-api-python-client>=2.100.0
 google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.1.0
 
-# TTS
-edge-tts>=7.0.0
+# TTS: Amazon Polly Neural (boto3로 호출, 위 boto3>=1.34.0 사용)
 
 # Utilities
 httpx>=0.26.0

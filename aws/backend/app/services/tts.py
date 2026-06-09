@@ -1,14 +1,25 @@
 # backend/app/services/tts.py
-"""edge-tts 기반 한국어 TTS 나레이션 생성"""
+"""Amazon Polly Neural 기반 한국어 TTS 나레이션 생성"""
 
-import asyncio
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 
+import boto3
+
+from app.config import settings
+
+# Polly 한국어(ko-KR) 음성은 Seoyeon/Jihye 둘 다 여성 음성뿐이라
+# (남성 한국어 Neural 음성 없음) 톤 차이를 두는 용도로만 구분한다.
 VOICES = {
-    "female": "ko-KR-SunHiNeural",
-    "male":   "ko-KR-InJoonNeural",
+    "female": "Seoyeon",
+    "male":   "Jihye",
 }
+
+
+@lru_cache(maxsize=1)
+def _polly_client():
+    return boto3.client("polly", region_name=settings.AWS_REGION)
 
 
 def generate_narration(text: str, output_path: str, voice: str = "female") -> bool:
@@ -18,13 +29,16 @@ def generate_narration(text: str, output_path: str, voice: str = "female") -> bo
     if not text:
         return False
 
-    async def _run():
-        import edge_tts
-        communicate = edge_tts.Communicate(text, voice_name, rate="+0%", volume="+0%")
-        await communicate.save(output_path)
-
     try:
-        asyncio.run(_run())
+        response = _polly_client().synthesize_speech(
+            Text=text,
+            OutputFormat="mp3",
+            VoiceId=voice_name,
+            Engine="neural",
+            LanguageCode="ko-KR",
+        )
+        with open(output_path, "wb") as f:
+            f.write(response["AudioStream"].read())
         return Path(output_path).exists() and Path(output_path).stat().st_size > 0
     except Exception as e:
         print(f"[TTS] 생성 실패: {e}")

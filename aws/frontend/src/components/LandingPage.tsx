@@ -49,7 +49,7 @@ function ScrollHint() {
     <div style={{
       position: 'absolute', bottom: 36, left: '50%', transform: 'translateX(-50%)',
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-      color: 'var(--muted)', fontSize: 12, animation: 'pulse 1.8s infinite',
+      color: 'var(--muted)', fontSize: 14, animation: 'pulse 1.8s infinite',
     }}>
       <span>스크롤해서 더 알아보기</span>
       <span style={{ fontSize: 16 }}>↓</span>
@@ -84,13 +84,13 @@ function FeatureSection({ feature, index }: { feature: Feature; index: number })
           {feature.icon}
         </div>
         <div style={{ maxWidth: 460, textAlign: reverse ? 'right' : 'left' }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: feature.color, letterSpacing: 1, marginBottom: 10 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: feature.color, letterSpacing: 1, marginBottom: 10 }}>
             STEP {feature.step}
           </div>
           <h2 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)', lineHeight: 1.35, marginBottom: 14 }}>
             {feature.title}
           </h2>
-          <p style={{ fontSize: 15, color: 'var(--text2)', lineHeight: 1.7 }}>
+          <p style={{ fontSize: 17, color: 'var(--text2)', lineHeight: 1.7 }}>
             {feature.desc}
           </p>
         </div>
@@ -113,7 +113,7 @@ export default function LandingPage({ onStart }: Props) {
         padding: '24px',
       }}>
         <img src="/static/gorila_ai.png" alt="고릴라AI" style={{ height: 88, width: 'auto', borderRadius: 18, marginBottom: 28, boxShadow: '0 8px 28px rgba(0,0,0,0.12)' }} />
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--primary)', letterSpacing: 2, marginBottom: 14 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--primary)', letterSpacing: 2, marginBottom: 14 }}>
           고릴라AI · SHORTS STUDIO
         </div>
         <h1 style={{ fontSize: 40, fontWeight: 800, color: 'var(--text)', lineHeight: 1.35, maxWidth: 640, marginBottom: 18 }}>
@@ -125,11 +125,11 @@ export default function LandingPage({ onStart }: Props) {
           지금 바로 무료로 체험해보세요.
         </p>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button onClick={onStart} className="btn-primary" style={{ padding: '14px 32px', fontSize: 15, borderRadius: 10 }}>
+          <button onClick={onStart} className="btn-primary" style={{ padding: '14px 32px', fontSize: 17, borderRadius: 10 }}>
             무료로 시작하기 →
           </button>
           {!user && (
-            <button onClick={() => openAuthModal('signup')} className="btn-outlined" style={{ padding: '14px 28px', fontSize: 15, borderRadius: 10 }}>
+            <button onClick={() => openAuthModal('signup')} className="btn-outlined" style={{ padding: '14px 28px', fontSize: 17, borderRadius: 10 }}>
               회원가입하고 더 받기
             </button>
           )}
@@ -155,10 +155,10 @@ export default function LandingPage({ onStart }: Props) {
           <h2 style={{ fontSize: 30, fontWeight: 800, color: 'var(--text)', marginBottom: 16, lineHeight: 1.4 }}>
             지금 바로 첫 쇼츠를<br />만들어보세요
           </h2>
-          <p style={{ fontSize: 15, color: 'var(--text2)', lineHeight: 1.7, marginBottom: 30 }}>
+          <p style={{ fontSize: 17, color: 'var(--text2)', lineHeight: 1.7, marginBottom: 30 }}>
             로그인 없이도 바로 체험할 수 있어요. 계정을 만들면 더 많은 영상을 처리할 수 있는 한도가 주어져요.
           </p>
-          <button onClick={onStart} className="btn-primary" style={{ padding: '14px 36px', fontSize: 15, borderRadius: 10 }}>
+          <button onClick={onStart} className="btn-primary" style={{ padding: '14px 36px', fontSize: 17, borderRadius: 10 }}>
             고릴라AI 시작하기 →
           </button>
         </div>

@@ -1,5 +1,6 @@
 """세션별 파일 경로 관리 + 로그인 사용자 인증"""
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,8 +30,28 @@ class SessionDirs:
     def channels_path(self) -> Path:
         return self.download_dir.parent / "channels.json"
 
+    @property
+    def video_id_map_path(self) -> Path:
+        return self.download_dir.parent / "video_ids.json"
+
     def s3_key(self, subdir: str, filename: str) -> str:
         return f"sessions/{self.session_id}/{subdir}/{filename}"
+
+
+def load_video_id_map(s: SessionDirs) -> dict:
+    """다운로드 파일명(stem) → YouTube video_id 매핑 (썸네일 CDN 조회용)"""
+    if not s.video_id_map_path.exists():
+        return {}
+    try:
+        return json.loads(s.video_id_map_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_video_id_map(s: SessionDirs, mapping: dict):
+    s.video_id_map_path.write_text(
+        json.dumps(mapping, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 def make_session(session_id: str) -> SessionDirs:

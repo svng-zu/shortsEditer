@@ -21,9 +21,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY patch_ytdlp_oauth.py .
 RUN python patch_ytdlp_oauth.py
 
-# Whisper small 모델 빌드 타임에 미리 다운로드 (첫 실행 지연 방지)
+# faster-whisper small 모델 빌드 타임에 미리 다운로드 (첫 실행 지연 방지)
 ARG WHISPER_MODEL=small
-RUN python -c "import whisper; whisper.load_model('${WHISPER_MODEL}')"
+RUN python -c "from faster_whisper import WhisperModel; WhisperModel('${WHISPER_MODEL}', device='cpu', compute_type='int8')"
 
 # 애플리케이션 코드 복사
 COPY . .
