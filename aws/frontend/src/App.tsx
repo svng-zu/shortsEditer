@@ -158,7 +158,7 @@ function ShortsStudio() {
         {progressBar}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '16px 38px', maxWidth: 1440, margin: '0 auto', width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '16px 50px', maxWidth: 1440, margin: '0 auto', width: '100%' }}>
         <Pipeline
           status={status} isRunning={isRunning}
           onStartPolling={startPolling} onRefresh={handleRefresh} isMobile={false}
