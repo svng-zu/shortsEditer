@@ -2,6 +2,7 @@
 """수집/자막/분석 파이프라인 API"""
 
 import asyncio
+import glob
 import json
 import os
 import re
@@ -526,9 +527,9 @@ async def _run_analyze(session_id: str):
         for i, t in enumerate(transcripts):
             set_status(session_id, PipelineStep.ANALYZING, f"분석 중: {t.name}",
                        int((i / len(transcripts)) * 90))
-            before = set(s.analysis_dir.glob(f"{t.stem}*.json"))
+            before = set(s.analysis_dir.glob(f"{glob.escape(t.stem)}*.json"))
             await asyncio.to_thread(analyzer.analyze, str(t), category_map[str(t)], s.analysis_dir)
-            after = set(s.analysis_dir.glob(f"{t.stem}*.json"))
+            after = set(s.analysis_dir.glob(f"{glob.escape(t.stem)}*.json"))
             new_files = after - before
             if not new_files:
                 print(f"[{session_id[:8]}][WARN] 분석 결과 없음: {t.name}")
@@ -712,9 +713,9 @@ async def _run_process_selected(session_id: str, items: list[ProcessSelectedItem
             set_status(session_id, PipelineStep.ANALYZING,
                        f"[{i+1}/{total}] LLM 분석 중: {item.filename}",
                        30 + int((i / total) * 30))
-            before = set(s.analysis_dir.glob(f"{stem}*.json"))
+            before = set(s.analysis_dir.glob(f"{glob.escape(stem)}*.json"))
             await asyncio.to_thread(analyzer.analyze, str(transcript_path), item.category, s.analysis_dir)
-            after = set(s.analysis_dir.glob(f"{stem}*.json"))
+            after = set(s.analysis_dir.glob(f"{glob.escape(stem)}*.json"))
             for f in (after - before):
                 s3.upload(str(f), s.s3_key("analysis", f.name))
 
@@ -722,7 +723,7 @@ async def _run_process_selected(session_id: str, items: list[ProcessSelectedItem
         editor = Editor(template_id=template_id, session_dirs=s)
         for i, item in enumerate(items):
             stem = Path(item.filename).stem
-            analyses = list(s.analysis_dir.glob(f"{stem}*.json"))
+            analyses = list(s.analysis_dir.glob(f"{glob.escape(stem)}*.json"))
             for a in analyses:
                 set_status(session_id, PipelineStep.EDITING,
                            f"[{i+1}/{total}] 영상 편집 중: {a.name}",
