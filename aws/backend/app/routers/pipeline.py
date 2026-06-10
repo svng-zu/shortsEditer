@@ -241,13 +241,6 @@ async def upload_video(file: UploadFile = File(...), session: SessionDirs = Depe
 # URL 다운로드 상태 (세션별)
 _dl_states: dict[str, dict] = {}
 
-INVIDIOUS_INSTANCES = [
-    "https://inv.nadeko.net",
-    "https://invidious.privacydev.net",
-    "https://yt.cdaut.de",
-    "https://invidious.nerdvpn.de",
-]
-
 
 def _extract_video_id(url: str) -> str | None:
     for pat in [r'[?&]v=([^&]+)', r'youtu\.be/([^?]+)', r'shorts/([^?]+)']:
@@ -257,7 +250,7 @@ def _extract_video_id(url: str) -> str | None:
     return None
 
 
-def _run_url_download(session_id: str, url: str, category: str):
+async def _run_url_download(session_id: str, url: str, category: str):
     import yt_dlp
     from app.services.collector import _auth_opts, _has_oauth, _bgutil_alive, BGUTIL_URL
 
@@ -291,57 +284,47 @@ def _run_url_download(session_id: str, url: str, category: str):
     }
 
     video_id = _extract_video_id(url)
+    label = "YouTube (OAuth2)" if _has_oauth() else "YouTube 직접"
 
-    # OAuth2가 있으면 YouTube 직접만, 없으면 Invidious → YouTube 순
-    candidates: list[tuple[str, str]] = []
-    if _has_oauth():
-        candidates.append((url, "YouTube (OAuth2)"))
-    else:
-        if video_id:
-            for inst in INVIDIOUS_INSTANCES:
-                candidates.append((f"{inst}/watch?v={video_id}", f"Invidious ({inst.split('/')[2]})"))
-        candidates.append((url, "YouTube 직접"))
+    def _download() -> str:
+        """블로킹 yt-dlp 다운로드 + 후처리. 결과 파일명을 반환."""
+        with yt_dlp.YoutubeDL({**base_opts}) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+            if not filename.endswith(".mp4"):
+                filename = os.path.splitext(filename)[0] + ".mp4"
 
-    for dl_url, label in candidates:
-        _dl_states[session_id]["message"] = f"{label} 시도 중..."
-        print(f"[URL-DL] {label}: {dl_url}")
-        try:
-            with yt_dlp.YoutubeDL({**base_opts}) as ydl:
-                info = ydl.extract_info(dl_url, download=True)
-                filename = ydl.prepare_filename(info)
-                if not filename.endswith(".mp4"):
-                    filename = os.path.splitext(filename)[0] + ".mp4"
+            stem = os.path.splitext(os.path.basename(filename))[0]
+            cat_map = {}
+            if s.category_map_path.exists():
+                cat_map = json.loads(s.category_map_path.read_text())
+            cat_map[stem] = category
+            s.category_map_path.write_text(json.dumps(cat_map, ensure_ascii=False, indent=2))
 
-                stem = os.path.splitext(os.path.basename(filename))[0]
-                cat_map = {}
-                if s.category_map_path.exists():
-                    cat_map = json.loads(s.category_map_path.read_text())
-                cat_map[stem] = category
-                s.category_map_path.write_text(json.dumps(cat_map, ensure_ascii=False, indent=2))
+            if video_id:
+                id_map = load_video_id_map(s)
+                id_map[stem] = video_id
+                save_video_id_map(s, id_map)
 
-                if video_id:
-                    id_map = load_video_id_map(s)
-                    id_map[stem] = video_id
-                    save_video_id_map(s, id_map)
+            fname = os.path.basename(filename)
+            get_s3().upload(filename, s.s3_key("downloads", fname))
+            return fname
 
-                fname = os.path.basename(filename)
-                get_s3().upload(filename, s.s3_key("downloads", fname))
-                _dl_states[session_id] = {
-                    "status": "done",
-                    "message": f"✓ {label} 완료",
-                    "filename": fname,
-                    "error": None,
-                }
-                return
-        except Exception as e:
-            print(f"[URL-DL] {label} 실패: {e}")
-            continue
-
-    # 모두 실패 — OAuth2 미설정이면 안내
-    err_msg = "다운로드 실패."
-    if not _has_oauth():
-        err_msg += " OAuth2 인증이 필요합니다. 파이프라인 상단 'YouTube 인증' 버튼을 눌러 설정하세요."
-    _dl_states[session_id] = {"status": "error", "message": "", "filename": None, "error": err_msg}
+    print(f"[URL-DL] {label}: {url}")
+    try:
+        fname = await asyncio.to_thread(_download)
+        _dl_states[session_id] = {
+            "status": "done",
+            "message": f"✓ {label} 완료",
+            "filename": fname,
+            "error": None,
+        }
+    except Exception as e:
+        print(f"[URL-DL] {label} 실패: {e}")
+        err_msg = "다운로드 실패."
+        if not _has_oauth():
+            err_msg += " OAuth2 인증이 필요합니다. 파이프라인 상단 'YouTube 인증' 버튼을 눌러 설정하세요."
+        _dl_states[session_id] = {"status": "error", "message": "", "filename": None, "error": err_msg}
 
 
 class UrlDownloadRequest(BaseModel):

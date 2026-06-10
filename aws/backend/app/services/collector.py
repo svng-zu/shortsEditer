@@ -4,30 +4,16 @@
 우회 전략 우선순위:
   1. yt-dlp OAuth2 토큰 (~/.cache/yt-dlp/oauth2_token.json)
   2. 쿠키 파일 (data/cookies_master.txt)
-  3. Invidious API (인스턴스가 살아있을 때)
 """
 
 import os
 import shutil
 import json
-import random
-import xml.etree.ElementTree as ET
 import requests
 from pathlib import Path
 import yt_dlp
 
 from app.config import settings
-
-# ---------------------------------------------------------------------------
-# Invidious 인스턴스 (보조 수단 — 현재 대부분 불안정)
-# ---------------------------------------------------------------------------
-INVIDIOUS_INSTANCES = [
-    "https://inv.nadeko.net",
-    "https://invidious.nerdvpn.de",
-    "https://inv.thepixora.com",
-    "https://invidious.f5.si",
-    "https://invidious.tiekoetter.com",
-]
 
 _SESSION = requests.Session()
 _SESSION.headers.update({"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) Chrome/120.0"})
@@ -130,57 +116,40 @@ def _auth_opts() -> dict:
 # 채널 영상 목록 조회
 # ---------------------------------------------------------------------------
 
-def _channel_id_from_rss(channel_url: str) -> str | None:
-    """YouTube RSS에서 channelId 추출 (인증 불필요)"""
-    # handle → RSS URL: resolveurl을 거치지 않고 직접 RSS 시도
-    # 먼저 Invidious resolveurl로 channel ID 얻기
-    insts = INVIDIOUS_INSTANCES.copy()
-    random.shuffle(insts)
-    for inst in insts:
-        try:
-            r = _SESSION.get(
-                f"{inst}/api/v1/resolveurl",
-                params={"url": channel_url},
-                timeout=10,
-            )
-            if r.status_code == 200:
-                data = r.json()
-                cid = data.get("ucid") or data.get("id") or data.get("browseId")
-                if cid:
-                    return cid
-        except Exception:
-            continue
-    return None
+def _videos_from_channel(channel_url: str, fetch_count: int = 30) -> list[dict]:
+    """yt-dlp extract_flat으로 채널 최신 영상 목록 조회 (Invidious 불필요)
 
-
-def _videos_from_rss(channel_id: str) -> list[dict]:
-    """YouTube RSS 피드로 최신 영상 목록 조회 (duration 없음)"""
-    url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-    r = _SESSION.get(url, timeout=10)
-    r.raise_for_status()
-
-    ns = {
-        "atom": "http://www.w3.org/2005/Atom",
-        "yt": "http://www.youtube.com/xml/schemas/2015",
-        "media": "http://search.yahoo.com/mrss/",
+    기존 인증 인프라(OAuth2 + bgutil POT + 프록시)를 그대로 활용한다.
+    flat 추출은 duration도 함께 반환하므로 영상별 추가 조회가 필요 없다.
+    upload_date는 flat 모드에서 제공되지 않아 빈 문자열로 둔다.
+    """
+    videos_url = channel_url.rstrip("/") + "/videos"
+    opts = {
+        **_auth_opts(),
+        "quiet": True,
+        "skip_download": True,
+        "no_warnings": True,
+        "extract_flat": "in_playlist",
+        "playlistend": fetch_count,
     }
-    root = ET.fromstring(r.text)
-    channel_name = (root.find("atom:title", ns) or root).text or ""
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(videos_url, download=False)
 
+    channel_name = info.get("channel") or info.get("uploader") or ""
     videos = []
-    for entry in root.findall("atom:entry", ns):
-        vid = entry.find("yt:videoId", ns)
-        title = entry.find("atom:title", ns)
-        published = entry.find("atom:published", ns)
-        if vid is None:
+    for entry in info.get("entries") or []:
+        if not entry:
+            continue
+        vid = entry.get("id")
+        if not vid:
             continue
         videos.append({
-            "video_id":  vid.text,
-            "title":     title.text if title is not None else "",
-            "video_url": f"https://youtube.com/watch?v={vid.text}",
-            "duration":  None,  # RSS에 duration 없음
-            "channel":   channel_name,
-            "upload_date": (published.text or "")[:10] if published is not None else "",
+            "video_id":    vid,
+            "title":       entry.get("title") or "",
+            "video_url":   f"https://youtube.com/watch?v={vid}",
+            "duration":    entry.get("duration"),
+            "channel":     channel_name,
+            "upload_date": entry.get("upload_date") or "",
         })
     return videos
 
@@ -209,7 +178,7 @@ def _get_duration_via_yt_dlp(video_id: str) -> int | None:
 class YoutubeCollector:
     """YouTube 영상 수집기
 
-    영상 목록: Invidious resolveurl → YouTube RSS
+    영상 목록: yt-dlp extract_flat (채널 /videos 페이지)
     다운로드: yt-dlp (OAuth2 > 쿠키 인증)
     """
 
@@ -218,34 +187,29 @@ class YoutubeCollector:
 
     def get_latest_videos(self, channel_url: str) -> list[dict]:
         """채널 최신 영상 목록 조회"""
-        channel_id = _channel_id_from_rss(channel_url)
-        if not channel_id:
-            raise RuntimeError(f"채널 ID 조회 실패: {channel_url}")
+        try:
+            videos = _videos_from_channel(channel_url)
+        except Exception as e:
+            raise RuntimeError(f"채널 영상 목록 조회 실패: {channel_url} ({e})")
+        print(f"[Collector] 채널에서 {len(videos)}개 발견")
 
-        print(f"[Collector] 채널 ID: {channel_id}")
-        videos = _videos_from_rss(channel_id)
-        print(f"[Collector] RSS에서 {len(videos)}개 발견")
-
-        # duration 필터링: OAuth/쿠키가 있으면 메타데이터 조회, 없으면 생략
-        if _has_oauth() or _prepare_cookies():
-            filtered = []
-            for v in videos:
+        # duration 필터링
+        filtered = []
+        for v in videos:
+            dur = v.get("duration")
+            if dur is None:
                 dur = _get_duration_via_yt_dlp(v["video_id"])
-                if dur is None:
-                    continue
-                if dur < 180:  # 3분 미만 제외
-                    continue
-                if dur > 7200:  # 2시간 초과 제외 (라이브 재방송 등 — Whisper 처리 시 메모리 부족 유발)
-                    print(f"[Collector] 제외 (너무 긺, {dur}s): {v.get('title', v['video_id'])}")
-                    continue
-                v["duration"] = dur
-                filtered.append(v)
-            print(f"[Collector] duration 필터 후 {len(filtered)}개")
-            return filtered
-        else:
-            # 인증 없음 → duration 필터 없이 전체 반환 (다운로드에서 실패할 수 있음)
-            print("[Collector] 인증 없음 — duration 필터 건너뜀")
-            return videos
+            if dur is None:
+                continue
+            if dur < 180:  # 3분 미만 제외
+                continue
+            if dur > 7200:  # 2시간 초과 제외 (라이브 재방송 등 — Whisper 처리 시 메모리 부족 유발)
+                print(f"[Collector] 제외 (너무 긺, {dur}s): {v.get('title', v['video_id'])}")
+                continue
+            v["duration"] = dur
+            filtered.append(v)
+        print(f"[Collector] duration 필터 후 {len(filtered)}개")
+        return filtered
 
     def get_video_info(self, url: str) -> dict:
         """다운로드 없이 영상 메타데이터만 조회 (yt-dlp extract_info)"""

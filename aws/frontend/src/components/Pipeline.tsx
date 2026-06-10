@@ -262,21 +262,23 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
         <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text2)', letterSpacing: 0.4 }}>🔍 YouTube 영상으로 쇼츠 만들기</div>
 
         <div style={{
-          width: '100%', maxWidth: 720, display: 'flex', alignItems: 'center', gap: 8,
-          padding: '5px 6px 5px 22px', borderRadius: 999,
+          width: '100%', maxWidth: 720, display: 'flex', flexWrap: isMobile ? 'wrap' : 'nowrap', alignItems: 'center', gap: 8,
+          padding: isMobile ? '12px 14px' : '5px 6px 5px 22px', borderRadius: isMobile ? 20 : 999,
           border: '1px solid var(--border)', boxShadow: '0 2px 16px rgba(32,33,36,0.08)',
           background: 'white',
         }}>
-          <span style={{ fontSize: 17 }}>🔗</span>
-          <input
-            value={urlInput} onChange={e => setUrlInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !urlLoading) handleUrlDownload() }}
-            placeholder="YouTube 영상 URL을 붙여넣으세요"
-            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 17, padding: '13px 0', color: 'var(--text)' }}
-          />
+          <div style={{ flex: isMobile ? '1 1 100%' : 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 17 }}>🔗</span>
+            <input
+              value={urlInput} onChange={e => setUrlInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !urlLoading) handleUrlDownload() }}
+              placeholder="YouTube 영상 URL을 붙여넣으세요"
+              style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 17, padding: '13px 0', color: 'var(--text)' }}
+            />
+          </div>
           {!videoInfo && (
             <select value={urlCategory} onChange={e => setUrlCategory(e.target.value)}
-              style={{ border: 'none', background: 'var(--surface2)', borderRadius: 999, padding: '10px 14px', fontSize: 14, fontWeight: 600, color: 'var(--text2)', cursor: 'pointer', outline: 'none' }}>
+              style={{ flex: isMobile ? 1 : undefined, border: 'none', background: 'var(--surface2)', borderRadius: 999, padding: '10px 14px', fontSize: 14, fontWeight: 600, color: 'var(--text2)', cursor: 'pointer', outline: 'none' }}>
               {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           )}
@@ -284,7 +286,7 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
             onClick={videoInfo ? () => { setVideoInfo(null) } : handleUrlCheck}
             disabled={infoLoading || urlLoading || !urlInput.trim()}
             className={urlInput.trim() ? 'btn-primary' : 'btn-outlined'}
-            style={{ borderRadius: 999, padding: '12px 24px', fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap' }}>
+            style={{ flex: isMobile ? 1 : undefined, borderRadius: 999, padding: '12px 24px', fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap' }}>
             {infoLoading
               ? <div className="spinner spinner-sm" style={{ borderTopColor: 'white' }} />
               : videoInfo ? '↩ 다시 입력' : '확인'}
@@ -518,7 +520,7 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
                   <div key={d.filename} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
                     <input type="checkbox" checked={dlSelected.has(d.filename)} onChange={() => dlToggle(d.filename)}
                       style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer', marginTop: 3 }} />
-                    <div style={{ width: isMobile ? 'clamp(90px, 26vw, 144px)' : 'clamp(160px, 18vw, 240px)', aspectRatio: '16/9', borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
+                    <div style={{ width: isMobile ? 'clamp(130px, 37vw, 208px)' : 'clamp(299px, 34vw, 450px)', aspectRatio: '16/9', borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
                       <img src={d.thumbnail_url ?? `/api/media/downloads/default/${d.filename}/thumbnail`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>

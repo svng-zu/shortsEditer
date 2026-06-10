@@ -290,7 +290,7 @@ export default function ShortsPanel({
                       background: 'white',
                       WebkitTapHighlightColor: 'transparent',
                     }}>
-                      <div style={{ width: 56, height: 56, borderRadius: 10, overflow: 'hidden', background: '#202124', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
+                      <div style={{ width: 80, height: 80, borderRadius: 10, overflow: 'hidden', background: '#202124', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
                         <video src={`${s.url}#t=1`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -397,7 +397,7 @@ export default function ShortsPanel({
                       borderLeft: `3px solid ${selectedShort?.filename === s.filename ? 'var(--primary)' : 'transparent'}`,
                       background: selectedShort?.filename === s.filename ? 'var(--primary-bg)' : 'transparent',
                     }}>
-                      <div style={{ width: 44, height: 44, borderRadius: 6, overflow: 'hidden', background: '#202124', flexShrink: 0 }}>
+                      <div style={{ width: 83, height: 83, borderRadius: 6, overflow: 'hidden', background: '#202124', flexShrink: 0 }}>
                         <video src={`${s.url}#t=1`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
