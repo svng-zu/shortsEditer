@@ -743,6 +743,11 @@ async def _run_process_selected(session_id: str, items: list[ProcessSelectedItem
                     raw_path = await asyncio.to_thread(editor.edit_video, str(a))
                     if raw_path and os.path.exists(raw_path):
                         s3.upload(raw_path, s.s3_key("raw", os.path.basename(raw_path)))
+                        # raw가 S3에 안전하게 백업되면 원본 다운로드 mp4는 로컬에서 정리
+                        # (재편집 시 editor_base._find_video_path의 S3 폴백으로 재다운로드)
+                        download_path = s.download_dir / item.filename
+                        if download_path.exists() and s3.exists(s.s3_key("downloads", item.filename)):
+                            os.remove(download_path)
                 except Exception as e:
                     fail_count += 1
                     print(f"[process-selected][편집 오류] {a.name}: {e}")

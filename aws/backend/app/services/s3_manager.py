@@ -2,6 +2,7 @@
 """S3 파일 관리 유틸리티"""
 
 import os
+from pathlib import Path
 import boto3
 from botocore.exceptions import ClientError
 from functools import lru_cache
@@ -55,6 +56,23 @@ class S3Manager:
             self._client.delete_object(Bucket=self.bucket, Key=s3_key)
         except Exception:
             pass
+
+    def ensure_local(self, s3_key: str, local_path) -> bool:
+        """local_path가 없으면 S3에서 다운로드. 로컬/S3 어느 쪽에도 없으면 False"""
+        local_path = Path(local_path)
+        if local_path.exists():
+            return True
+        return self.download(s3_key, local_path)
+
+    def upload_and_cleanup(self, local_path, s3_key: str) -> str:
+        """업로드 성공 시 로컬 파일 삭제 — 로컬 디스크는 임시 캐시로만 사용"""
+        key = self.upload(local_path, s3_key)
+        if key:
+            try:
+                os.remove(local_path)
+            except OSError:
+                pass
+        return key
 
     def list_keys(self, prefix: str) -> list[str]:
         paginator = self._client.get_paginator("list_objects_v2")

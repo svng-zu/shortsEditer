@@ -22,6 +22,7 @@ async def _run_render(session_id: str, filename: str, title: str, subtitles: boo
     s = make_session(session_id)
     try:
         raw_path = s.raw_dir / filename
+        get_s3().ensure_local(s.s3_key("raw", filename), raw_path)
         if not raw_path.exists():
             set_status(session_id, PipelineStep.ERROR, f"raw 파일 없음: {filename}", 0)
             return
@@ -46,7 +47,7 @@ async def _run_render(session_id: str, filename: str, title: str, subtitles: boo
             narration_voice=narration_voice,
         )
         if shorts_path and os.path.exists(shorts_path):
-            get_s3().upload(shorts_path, s.s3_key("shorts", os.path.basename(shorts_path)))
+            get_s3().upload_and_cleanup(shorts_path, s.s3_key("shorts", os.path.basename(shorts_path)))
         set_status(session_id, PipelineStep.DONE, f"렌더링 완료: {stem}_shorts.mp4", 100)
     except Exception as e:
         set_status(session_id, PipelineStep.ERROR, f"렌더링 오류: {e}", 0)
@@ -114,7 +115,7 @@ async def _run_rerender(session_id: str, template_id: int):
                        int((i / len(analyses)) * 90))
             shorts_path = await asyncio.to_thread(editor.rerender, str(a))
             if shorts_path and os.path.exists(shorts_path):
-                s3.upload(shorts_path, s.s3_key("shorts", os.path.basename(shorts_path)))
+                s3.upload_and_cleanup(shorts_path, s.s3_key("shorts", os.path.basename(shorts_path)))
 
         shorts = list(s.shorts_dir.glob("*.mp4"))
         set_status(session_id, PipelineStep.DONE, f"재렌더링 완료 — 쇼츠 {len(shorts)}개", 100)

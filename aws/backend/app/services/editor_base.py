@@ -104,6 +104,16 @@ class EditorBase:
         for f in os.listdir(download_dir):
             if f.endswith(".mp4") and base in f:
                 return str(download_dir / f)
+        # 로컬에 없으면 S3에서 원본을 다시 받아온다 (재편집 등 — 로컬은 임시 캐시)
+        if self._sd:
+            from app.services.s3_manager import get_s3
+            s3 = get_s3()
+            for key in s3.list_keys(self._sd.s3_key("downloads", "")):
+                fname = key.rsplit("/", 1)[-1]
+                if fname.endswith(".mp4") and base in fname:
+                    local_path = download_dir / fname
+                    if s3.download(key, local_path):
+                        return str(local_path)
         return None
 
     def _get_video_duration(self, video_path):

@@ -11,6 +11,7 @@ import shutil
 import json
 import requests
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 import yt_dlp
 
 from app.config import settings
@@ -123,7 +124,12 @@ def _videos_from_channel(channel_url: str, fetch_count: int = 30) -> list[dict]:
     flat 추출은 duration도 함께 반환하므로 영상별 추가 조회가 필요 없다.
     upload_date는 flat 모드에서 제공되지 않아 빈 문자열로 둔다.
     """
-    videos_url = channel_url.rstrip("/") + "/videos"
+    # 채널 URL에 ?si=... 같은 공유 트래킹 쿼리스트링이 붙어 있으면 "/videos" 추가 시
+    # URL이 깨져 yt-dlp가 채널의 영상 목록 대신 Videos/Live/Shorts 플레이리스트
+    # 묶음을 반환하는 문제가 있어, 쿼리스트링/프래그먼트를 제거한 경로만 사용한다.
+    parts = urlsplit(channel_url)
+    base_url = urlunsplit((parts.scheme, parts.netloc, parts.path.rstrip("/"), "", ""))
+    videos_url = base_url + "/videos"
     opts = {
         **_auth_opts(),
         "quiet": True,

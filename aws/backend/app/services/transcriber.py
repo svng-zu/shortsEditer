@@ -71,32 +71,34 @@ class Transcriber:
         print(f"[Transcriber] 오디오 추출 중...")
         audio_path = self.extract_audio(video_path)
 
-        # 2. faster-whisper 변환
-        # vad_filter: 무음/비음성 구간을 건너뛰어 속도 향상 + 환각(없는 말 생성) 방지
-        # condition_on_previous_text=False: 이전 문장에 영향받아 같은 말을 반복하거나
-        #   타이밍이 밀리는(드리프트) 현상을 방지 — 자막-음성 불일치의 주요 원인
-        print(f"[Transcriber] faster-whisper 변환 중...")
-        seg_iter, info = self.model.transcribe(
-            audio_path,
-            language=self.language,
-            beam_size=5,
-            vad_filter=True,
-            vad_parameters={"min_silence_duration_ms": 500},
-            condition_on_previous_text=False,
-        )
+        try:
+            # 2. faster-whisper 변환
+            # vad_filter: 무음/비음성 구간을 건너뛰어 속도 향상 + 환각(없는 말 생성) 방지
+            # condition_on_previous_text=False: 이전 문장에 영향받아 같은 말을 반복하거나
+            #   타이밍이 밀리는(드리프트) 현상을 방지 — 자막-음성 불일치의 주요 원인
+            print(f"[Transcriber] faster-whisper 변환 중...")
+            seg_iter, info = self.model.transcribe(
+                audio_path,
+                language=self.language,
+                beam_size=5,
+                vad_filter=True,
+                vad_parameters={"min_silence_duration_ms": 500},
+                condition_on_previous_text=False,
+            )
 
-        # 3. 세그먼트 파싱 (segments는 제너레이터 — 순회하며 실제 디코딩 수행)
-        segments = [
-            {
-                "start": round(seg.start, 2),
-                "end": round(seg.end, 2),
-                "text": seg.text.strip()
-            }
-            for seg in seg_iter
-        ]
-
-        # 4. 임시 오디오 파일 정리
-        os.remove(audio_path)
+            # 3. 세그먼트 파싱 (segments는 제너레이터 — 순회하며 실제 디코딩 수행)
+            segments = [
+                {
+                    "start": round(seg.start, 2),
+                    "end": round(seg.end, 2),
+                    "text": seg.text.strip()
+                }
+                for seg in seg_iter
+            ]
+        finally:
+            # 4. 임시 오디오 파일 정리 — 예외 발생 시에도 누락되지 않도록 finally에서 처리
+            if os.path.exists(audio_path):
+                os.remove(audio_path)
 
         # 5. 로컬 저장
         save_path = self.transcript_dir / f"{base_name}.json"
