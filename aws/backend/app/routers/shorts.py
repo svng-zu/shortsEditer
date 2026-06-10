@@ -109,13 +109,18 @@ async def download_short(session_id: str, filename: str):
         obj = s3._client.get_object(Bucket=s3.bucket, Key=s3_key)
         return StreamingResponse(
             obj["Body"].iter_chunks(),
-            media_type="video/mp4",
-            headers={"Content-Disposition": _content_disposition(filename)},
+            # Safari는 video/mp4 응답을 Content-Disposition: attachment여도 인라인 재생으로 처리하는
+            # 경우가 있어, 파일로 인식되도록 octet-stream으로 내려준다.
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": _content_disposition(filename),
+                "Content-Length": str(obj["ContentLength"]),
+            },
         )
     path = s.shorts_dir / filename
     if not path.exists():
         raise HTTPException(404, "파일 없음")
-    return FileResponse(str(path), media_type="video/mp4", filename=filename)
+    return FileResponse(str(path), media_type="application/octet-stream", filename=filename)
 
 
 @router.get("/media/raw/{session_id}/{filename}")
