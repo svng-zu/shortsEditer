@@ -238,7 +238,6 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
           <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>고릴라AI 쇼츠 스튜디오</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 19, fontWeight: 700, color: 'var(--text2)', letterSpacing: 0.4 }}>
-          <img src="/static/gorila_ai.png" alt="" style={{ height: 22, width: 22, borderRadius: 5 }} />
           YouTube 영상으로 쇼츠 만들기
         </div>
 
