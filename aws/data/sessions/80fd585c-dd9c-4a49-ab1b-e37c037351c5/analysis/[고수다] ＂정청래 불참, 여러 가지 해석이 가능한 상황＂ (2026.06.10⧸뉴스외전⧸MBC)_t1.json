@@ -1,0 +1,45 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[고수다] ＂정청래 불참, 여러 가지 해석이 가능한 상황＂ (2026.06.10⧸뉴스외전⧸MBC).json",
+  "category": "politics",
+  "intro_text": "정청래 불참 논란\n대통령 일정에 무슨 일?",
+  "candidates": [
+    {
+      "start": 308.36,
+      "end": 312.34,
+      "title": "예상 못한 결과?",
+      "reason": "정청래 대표 불참이라는 예상치 못한 상황 발생으로 논의가 필요한 문제임을 제시하며 시청자의 궁금증을 유발합니다.",
+      "score": 8,
+      "edit_order": 1
+    },
+    {
+      "start": 318.92,
+      "end": 329.66,
+      "title": "대통령 옆엔 누가?",
+      "reason": "정청래 대표 대신 김민석 총리가 대통령과 함께 등장한 장면을 보여주며, 이 상황이 여러 해석을 낳고 있음을 강조하여 논쟁적인 요소를 부각합니다.",
+      "score": 9,
+      "edit_order": 2
+    },
+    {
+      "start": 308.36,
+      "end": 329.66,
+      "title": "정청래 불참, 해석은?",
+      "reason": "정청래 대표의 불참과 그로 인해 발생하는 다양한 해석 가능성을 제시하며, 정치적 논쟁의 핵심을 보여줍니다.",
+      "score": 10,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 14.74,
+      "orig_start": 316.92,
+      "orig_end": 331.66
+    },
+    {
+      "raw_start": 14.74,
+      "raw_end": 40.04,
+      "orig_start": 306.36,
+      "orig_end": 331.66
+    }
+  ]
+}

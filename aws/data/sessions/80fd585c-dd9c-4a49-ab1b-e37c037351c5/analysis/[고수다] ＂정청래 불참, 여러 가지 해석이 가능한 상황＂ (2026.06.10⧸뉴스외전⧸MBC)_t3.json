@@ -1,0 +1,65 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[고수다] ＂정청래 불참, 여러 가지 해석이 가능한 상황＂ (2026.06.10⧸뉴스외전⧸MBC).json",
+  "category": "politics",
+  "intro_text": "선거 투표 용지 부족\n국정조사·특검 요구",
+  "candidates": [
+    {
+      "start": 830.55,
+      "end": 846.03,
+      "title": "투표 용지 7천 장 부족",
+      "reason": "선거 과정에서 발생한 심각한 투표 용지 부족 사태와 명부 누락 문제를 구체적인 수치와 함께 제시하여 사건의 심각성을 알립니다.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 873.2,
+      "end": 902.63,
+      "title": "합리화 불가능한 사건",
+      "reason": "선거 과정의 문제점을 '합리화 불가능'하다고 단정하며 바로잡아야 한다고 주장하는 강한 발언을 담고 있습니다.",
+      "score": 10,
+      "edit_order": 2
+    },
+    {
+      "start": 935.43,
+      "end": 981.75,
+      "title": "일벌백계해야 한다",
+      "reason": "정치권의 개선 노력과 함께 의도성 여부와 관계없이 '일벌백계'해야 한다는 단호한 입장을 밝히며, 국정조사 및 특검 도입에 대한 긍정적 입장을 제시합니다.",
+      "score": 9,
+      "edit_order": 3
+    },
+    {
+      "start": 830.55,
+      "end": 981.75,
+      "title": "선거 부정 의혹 제기",
+      "reason": "투표 용지 부족 사태부터 일벌백계 주장까지, 선거 과정의 문제점을 집중적으로 다루며 국민적 의혹 해소를 위한 요구를 담고 있습니다.",
+      "score": 10,
+      "edit_order": 4
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 19.48,
+      "orig_start": 828.55,
+      "orig_end": 848.03
+    },
+    {
+      "raw_start": 19.48,
+      "raw_end": 52.91,
+      "orig_start": 871.2,
+      "orig_end": 904.63
+    },
+    {
+      "raw_start": 52.91,
+      "raw_end": 103.23,
+      "orig_start": 933.43,
+      "orig_end": 983.75
+    },
+    {
+      "raw_start": 103.23,
+      "raw_end": 120.0,
+      "orig_start": 828.55,
+      "orig_end": 845.32
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "transcript_path": "/app/data/sessions/dd1e1ef3-5420-444e-93b4-bf28631dd619/transcripts/민주당만 사전득표수 '소름 일치'...선관위 ＂단순 우연＂ [지금이뉴스] ⧸ YTN.json",
+  "category": "politics",
+  "intro_text": "사전투표 득표수 일치\n선관위 '단순 우연'",
+  "candidates": [
+    {
+      "start": 12.6,
+      "end": 30.42,
+      "title": "사전투표 득표수 '소름' 일치",
+      "reason": "부정 선거 의혹을 제기하는 핵심적인 수치와 함께 사건을 소개하여 시청자의 호기심을 자극합니다.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 43.34,
+      "end": 51.64,
+      "title": "조작 의혹? 상세 내역 보니",
+      "reason": "의혹이 제기된 상황과 선관위의 반박을 보여주며 논쟁의 핵심을 제시합니다.",
+      "score": 8,
+      "edit_order": 2
+    },
+    {
+      "start": 81.92,
+      "end": 93.54,
+      "title": "근거 없는 의혹 자제 당부",
+      "reason": "선관위의 공식 입장을 전달하며 사건을 마무리하고, 시청자들에게 경각심을 일깨웁니다.",
+      "score": 7,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 21.82,
+      "orig_start": 10.6,
+      "orig_end": 32.42
+    },
+    {
+      "raw_start": 21.82,
+      "raw_end": 34.12,
+      "orig_start": 41.34,
+      "orig_end": 53.64
+    },
+    {
+      "raw_start": 34.12,
+      "raw_end": 49.74,
+      "orig_start": 79.92,
+      "orig_end": 95.54
+    }
+  ]
+}

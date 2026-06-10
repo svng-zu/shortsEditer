@@ -1,0 +1,45 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[애프터마켓 브리핑] 급반등 하루 만에 다시 '8천피' 붕괴.json",
+  "category": "economy",
+  "intro_text": "일본 PPI 쇼크\n경기 둔화 우려",
+  "candidates": [
+    {
+      "start": 15.0,
+      "end": 21.82,
+      "title": "일본 PPI 예상치 상회",
+      "reason": "핵심 경제 수치(PPI)와 예상치 초과 달성이라는 임팩트 있는 정보를 담고 있어 시청자의 궁금증을 유발할 수 있습니다.",
+      "score": 8,
+      "edit_order": 1
+    },
+    {
+      "start": 21.82,
+      "end": 28.58,
+      "title": "국채 수요 부진, 증시 하락",
+      "reason": "경제 수치(국채 수요)의 부진이 증시 하락으로 이어진다는 점을 보여주며, 일반인이 체감할 수 있는 경제 이슈와 연결됩니다.",
+      "score": 7,
+      "edit_order": 2
+    },
+    {
+      "start": 28.58,
+      "end": 33.26,
+      "title": "중국 CPI/PPI 격차 확대",
+      "reason": "또 다른 핵심 경제 지표(CPI, PPI)의 격차 확대와 그로 인한 경기 둔화 우려를 언급하며, 시청자에게 경제 전망에 대한 경각심을 줄 수 있습니다.",
+      "score": 8,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 10.82,
+      "orig_start": 13.0,
+      "orig_end": 23.82
+    },
+    {
+      "raw_start": 10.82,
+      "raw_end": 21.58,
+      "orig_start": 19.82,
+      "orig_end": 30.58
+    }
+  ]
+}

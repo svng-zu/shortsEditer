@@ -1,0 +1,65 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[현장영상] ＂사라졌다!!＂ 잠실 투표상자…선관위는 ＂모른다＂ 충격 상황  JTBC News.json",
+  "category": "politics",
+  "intro_text": "투표함 사라졌다!\n선관위는 '모른다'",
+  "candidates": [
+    {
+      "start": 14,
+      "end": 27,
+      "title": "투표함이 사라졌다!",
+      "reason": "영상 초반에 등장하는 충격적인 상황을 직접적으로 보여주며 시청자의 호기심을 자극합니다. '사라졌다!!'라는 표현이 임팩트 있습니다.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 41,
+      "end": 58,
+      "title": "선관위 '버려진 듯'",
+      "reason": "사라진 투표함에 대한 선관위의 황당한 답변을 담고 있어 논란의 핵심을 보여줍니다. '모른다'는 반응과 대비되어 더욱 충격적입니다.",
+      "score": 8,
+      "edit_order": 2
+    },
+    {
+      "start": 141,
+      "end": 217,
+      "title": "선거법 위반 의혹 제기",
+      "reason": "투표 과정 전반에 걸쳐 제기된 다양한 공직선거법 위반 의혹들을 나열하며 문제의 심각성을 부각합니다. '평등권, 비밀 투표 공정성 침해'와 같은 키워드가 중요합니다.",
+      "score": 7,
+      "edit_order": 3
+    },
+    {
+      "start": 341,
+      "end": 384,
+      "title": "국민 의혹 해소 촉구",
+      "reason": "국민적 의혹 해소를 위해 신속한 사실 조사와 증거 확보를 요구하는 내용을 담고 있어, 사건의 해결 방향과 중요성을 강조합니다.",
+      "score": 7,
+      "edit_order": 4
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 17.0,
+      "orig_start": 12,
+      "orig_end": 29
+    },
+    {
+      "raw_start": 17.0,
+      "raw_end": 38.0,
+      "orig_start": 39,
+      "orig_end": 60
+    },
+    {
+      "raw_start": 38.0,
+      "raw_end": 118.0,
+      "orig_start": 139,
+      "orig_end": 219
+    },
+    {
+      "raw_start": 118.0,
+      "raw_end": 120.0,
+      "orig_start": 339,
+      "orig_end": 341.0
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[투자의 날 (刃)] 반도체 소부장, 태양광 호재 잡아먹는 시장 여파.json",
+  "category": "economy",
+  "intro_text": "태양광 산업\n232조 규모",
+  "candidates": [
+    {
+      "start": 263.07,
+      "end": 275.43,
+      "title": "태양광 '오버웨이트'",
+      "reason": "증권사 리포트의 긍정적인 의견과 대규모 발표 예정 금액을 언급하며 기대감을 높입니다.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 275.43,
+      "end": 295.83,
+      "title": "트럼프 발표 예고",
+      "reason": "미국 대통령의 발표와 '논차이나 프리미엄'을 연결하여 한국 태양광 산업의 저평가 가능성을 시사합니다.",
+      "score": 9,
+      "edit_order": 2
+    },
+    {
+      "start": 295.83,
+      "end": 304.87,
+      "title": "유망 종목은?",
+      "reason": "스페이스X 상장, 폴리실리콘 계약 임박 소식과 함께 구체적인 유망 종목을 제시합니다.",
+      "score": 8,
+      "edit_order": 3
+    },
+    {
+      "start": 311.71,
+      "end": 323.19,
+      "title": "태양광주 상한가",
+      "reason": "실제 주가 상승 사례(이턴이크 상한가)를 보여주며 시청자들의 투자 심리를 자극합니다.",
+      "score": 9,
+      "edit_order": 4
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 16.36,
+      "orig_start": 261.07,
+      "orig_end": 277.43
+    },
+    {
+      "raw_start": 16.36,
+      "raw_end": 40.76,
+      "orig_start": 273.43,
+      "orig_end": 297.83
+    },
+    {
+      "raw_start": 40.76,
+      "raw_end": 53.8,
+      "orig_start": 293.83,
+      "orig_end": 306.87
+    },
+    {
+      "raw_start": 53.8,
+      "raw_end": 69.28,
+      "orig_start": 309.71,
+      "orig_end": 325.19
+    }
+  ]
+}

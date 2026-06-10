@@ -1,0 +1,87 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/키움히어로즈 케스턴 히우라, 스리런 홈런 포함 3안타 맹활약으로 이끈 짜릿한 역전승! ｜ KBO 야구 하이라이트.json",
+  "category": "sports",
+  "intro_text": "키움 vs 상대팀\n짜릿한 역전승",
+  "candidates": [
+    {
+      "start": 11.18,
+      "end": 24.28,
+      "title": "1대1 동점! 히우라 적시타",
+      "reason": "경기 초반 동점을 만드는 한국 선수(키움)의 활약 장면으로 시청자의 흥미를 유발합니다.",
+      "score": 8,
+      "edit_order": 1,
+      "connection_note": "시작"
+    },
+    {
+      "start": 61.62,
+      "end": 69.52,
+      "title": "주자 있을 때 더 강해진다!",
+      "reason": "한국 선수(히우라)의 강점을 언급하며 앞으로의 활약을 기대하게 만듭니다.",
+      "score": 7,
+      "edit_order": 2,
+      "connection_note": "이전 동점 적시타 이후, 히우라 선수의 강점을 설명하며 다음 활약을 예고합니다."
+    },
+    {
+      "start": 92.07,
+      "end": 102.33,
+      "title": "상황에 맞는 타격!",
+      "reason": "한국 선수(히우라)의 뛰어난 타격 센스를 보여주는 장면으로, 결정적인 순간을 앞두고 기대감을 높입니다.",
+      "score": 8,
+      "edit_order": 3,
+      "connection_note": "히우라 선수의 강점을 설명한 후, 실제 경기에서 보여주는 상황 판단 능력을 보여줍니다."
+    },
+    {
+      "start": 102.33,
+      "end": 119.29,
+      "title": "결정적 스리런 홈런!",
+      "reason": "경기 흐름을 바꾸는 결정적인 장면인 스리런 홈런을 보여주며 극적인 순간을 연출합니다.",
+      "score": 10,
+      "edit_order": 4,
+      "connection_note": "상황에 맞는 타격 능력을 보여준 후, 그 결과로 나온 결정적인 홈런 장면으로 이어집니다."
+    },
+    {
+      "start": 119.29,
+      "end": 136.02,
+      "title": "히우라, 시즌 3호포!",
+      "reason": "한국 선수(히우라)의 홈런을 강조하며 기록 경신 및 짜릿한 순간을 부각합니다.",
+      "score": 9,
+      "edit_order": 5,
+      "connection_note": "결정적인 스리런 홈런 장면 이후, 해당 홈런이 시즌 몇 호인지 언급하며 기록적인 의미를 더합니다."
+    },
+    {
+      "start": 154.93,
+      "end": 173.34,
+      "title": "영웅 히우라의 완벽한 이해",
+      "reason": "한국 선수(히우라)의 활약을 종합하며 경기 결정적 순간에 대한 그의 능력을 다시 한번 강조합니다.",
+      "score": 9,
+      "edit_order": 6,
+      "connection_note": "홈런 장면 이후, 히우라 선수의 전체적인 활약과 경기 상황에 대한 완벽한 이해를 보여주며 마무리합니다."
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 17.1,
+      "orig_start": 9.18,
+      "orig_end": 26.28
+    },
+    {
+      "raw_start": 17.1,
+      "raw_end": 29.0,
+      "orig_start": 59.62,
+      "orig_end": 71.52
+    },
+    {
+      "raw_start": 29.0,
+      "raw_end": 43.26,
+      "orig_start": 90.07,
+      "orig_end": 104.33
+    },
+    {
+      "raw_start": 43.26,
+      "raw_end": 59.0,
+      "orig_start": 100.33,
+      "orig_end": 116.07
+    }
+  ]
+}

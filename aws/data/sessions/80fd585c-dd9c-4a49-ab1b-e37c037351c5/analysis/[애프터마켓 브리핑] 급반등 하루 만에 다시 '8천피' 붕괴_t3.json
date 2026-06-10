@@ -1,0 +1,65 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[애프터마켓 브리핑] 급반등 하루 만에 다시 '8천피' 붕괴.json",
+  "category": "economy",
+  "intro_text": "태양광株 급등\n신재생 에너지 빅딜",
+  "candidates": [
+    {
+      "start": 64.76,
+      "end": 73.1,
+      "title": "태양광株 강세 이유",
+      "reason": "구체적인 경제 수치(1조 8천억 원 규모 빅딜)를 언급하며, 일반인이 체감할 수 있는 투자 관련 이슈로 관심을 끌 수 있습니다.",
+      "score": 8,
+      "edit_order": 1
+    },
+    {
+      "start": 73.1,
+      "end": 82.36,
+      "title": "SK 관련주 상한가",
+      "reason": "실제 주가 상승(상한가, 19% 상승)을 보여주며 시청자의 직접적인 투자 관심사를 자극합니다.",
+      "score": 8,
+      "edit_order": 2
+    },
+    {
+      "start": 89.32,
+      "end": 108.44,
+      "title": "미국 공급망 탈중국 기조",
+      "reason": "글로벌 경제 흐름과 맞물린 중요한 이슈(공급망 재편)를 언급하며, 국내 관련주에 미치는 영향까지 설명하여 시청자의 이해를 돕습니다.",
+      "score": 7,
+      "edit_order": 3
+    },
+    {
+      "start": 151.52,
+      "end": 166.68,
+      "title": "하나솔루션, 4% 급등",
+      "reason": "구체적인 주가 상승률과 함께 미국 생산기지 완공 및 양산 소식을 전달하며, 투자자들의 관심을 끌 만한 내용을 담고 있습니다.",
+      "score": 7,
+      "edit_order": 4
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 12.34,
+      "orig_start": 62.76,
+      "orig_end": 75.1
+    },
+    {
+      "raw_start": 12.34,
+      "raw_end": 25.6,
+      "orig_start": 71.1,
+      "orig_end": 84.36
+    },
+    {
+      "raw_start": 25.6,
+      "raw_end": 48.72,
+      "orig_start": 87.32,
+      "orig_end": 110.44
+    },
+    {
+      "raw_start": 48.72,
+      "raw_end": 67.88,
+      "orig_start": 149.52,
+      "orig_end": 168.68
+    }
+  ]
+}

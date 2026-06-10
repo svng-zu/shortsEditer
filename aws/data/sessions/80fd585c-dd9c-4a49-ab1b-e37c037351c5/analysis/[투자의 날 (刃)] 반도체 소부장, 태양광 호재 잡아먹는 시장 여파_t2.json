@@ -1,0 +1,51 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[투자의 날 (刃)] 반도체 소부장, 태양광 호재 잡아먹는 시장 여파.json",
+  "category": "economy",
+  "intro_text": "반도체 소부장\n증설 호재",
+  "candidates": [
+    {
+      "start": 142.44,
+      "end": 168.16,
+      "title": "반도체 소부장 주목",
+      "reason": "반도체 투톱 증설 소식을 언급하며 투자자들의 관심을 끄는 핵심 키워드를 제시합니다.",
+      "score": 8,
+      "edit_order": 1
+    },
+    {
+      "start": 177.6,
+      "end": 204.04,
+      "title": "전공정/후공정 투자",
+      "reason": "반도체 공정별 투자 포인트를 명확히 제시하며 일반 투자자들이 이해하기 쉽게 설명합니다.",
+      "score": 8,
+      "edit_order": 2
+    },
+    {
+      "start": 236.29,
+      "end": 249.91,
+      "title": "증착/식각 장비 강세",
+      "reason": "구체적인 기업명과 상승률을 언급하며 투자 유망 종목에 대한 정보를 제공합니다.",
+      "score": 9,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 29.72,
+      "orig_start": 140.44,
+      "orig_end": 170.16
+    },
+    {
+      "raw_start": 29.72,
+      "raw_end": 60.16,
+      "orig_start": 175.6,
+      "orig_end": 206.04
+    },
+    {
+      "raw_start": 60.16,
+      "raw_end": 77.78,
+      "orig_start": 234.29,
+      "orig_end": 251.91
+    }
+  ]
+}

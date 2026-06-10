@@ -1,0 +1,65 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/'한국팀 분석 끝' 체코 자신감 폭발..＂손흥민 막을 방법은＂ 깜짝 #뉴스다 ⧸ JTBC News.json",
+  "category": "politics",
+  "intro_text": "체코 감독 자신감",
+  "candidates": [
+    {
+      "start": 47.87,
+      "end": 56.11,
+      "title": "체코 감독, 한국전 자신감",
+      "reason": "체코 감독이 한국 선수들을 연구했다며 자신감을 내비치는 구간으로, 한국팀과의 경기 결과에 대한 기대감을 높입니다.",
+      "score": 8,
+      "edit_order": 1
+    },
+    {
+      "start": 63.31,
+      "end": 80.57,
+      "title": "한국 선수 연구 완료",
+      "reason": "체코 감독이 한국 선수들을 한 명 한 명 연구했다는 구체적인 발언으로, 한국팀에 대한 분석과 자신감을 보여줍니다.",
+      "score": 9,
+      "edit_order": 2
+    },
+    {
+      "start": 197.53,
+      "end": 203.93,
+      "title": "황희찬 역할 중요",
+      "reason": "체코 수비진의 약점을 공략할 황희찬의 역할이 중요하다고 언급하며, 경기 전략의 핵심을 보여줍니다.",
+      "score": 7,
+      "edit_order": 3
+    },
+    {
+      "start": 210.13,
+      "end": 221.84,
+      "title": "동료 수비수 경계",
+      "reason": "체코 수비수 크레이치와의 친분을 언급하며 경계해야 할 선수로 지목하는 부분은 흥미로운 관전 포인트를 제공합니다.",
+      "score": 7,
+      "edit_order": 4
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 12.24,
+      "orig_start": 45.87,
+      "orig_end": 58.11
+    },
+    {
+      "raw_start": 12.24,
+      "raw_end": 33.5,
+      "orig_start": 61.31,
+      "orig_end": 82.57
+    },
+    {
+      "raw_start": 33.5,
+      "raw_end": 43.9,
+      "orig_start": 195.53,
+      "orig_end": 205.93
+    },
+    {
+      "raw_start": 43.9,
+      "raw_end": 59.61,
+      "orig_start": 208.13,
+      "orig_end": 223.84
+    }
+  ]
+}

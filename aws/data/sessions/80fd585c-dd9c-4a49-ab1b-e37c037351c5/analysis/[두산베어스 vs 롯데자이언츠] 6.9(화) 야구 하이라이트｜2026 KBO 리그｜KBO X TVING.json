@@ -1,0 +1,60 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[두산베어스 vs 롯데자이언츠] 6.9(화) 야구 하이라이트｜2026 KBO 리그｜KBO X TVING.json",
+  "category": "sports",
+  "intro_text": "두산베어스 vs 롯데자이언츠\n6.9 KBO 하이라이트",
+  "candidates": [
+    {
+      "start": 0.0,
+      "end": 124.65,
+      "title": "개막! 곽빈 vs 나균안",
+      "reason": "경기 시작 장면으로, 어떤 팀 간의 경기인지 명확히 보여주며 시청자의 흥미를 유발합니다.",
+      "score": 10,
+      "edit_order": 1,
+      "connection_note": "시작"
+    },
+    {
+      "start": 148.93,
+      "end": 165.68,
+      "title": "롯데, 황성빈 득점!",
+      "reason": "한국 선수(황성빈)의 활약으로 득점하는 장면을 보여주며 국내 팬들의 관심을 끌 수 있습니다.",
+      "score": 8,
+      "edit_order": 2,
+      "connection_note": "경기 초반 득점 장면 이후, 롯데의 추격 흐름을 보여줍니다."
+    },
+    {
+      "start": 334.91,
+      "end": 362.7,
+      "title": "손성민 홈런! 1점차 추격",
+      "reason": "경기 흐름을 바꾸는 중요한 홈런으로, 롯데의 맹활약을 보여줍니다. 한국 선수(손성민)의 활약이 돋보입니다.",
+      "score": 9,
+      "edit_order": 3,
+      "connection_note": "롯데의 득점 장면이 이어지며 경기 긴장감을 고조시킵니다."
+    },
+    {
+      "start": 939.62,
+      "end": 945.62,
+      "title": "동점 홈런! 롯데 역전?",
+      "reason": "경기 동점을 만드는 극적인 순간으로, 시청자의 몰입도를 높입니다. 롯데의 중요한 득점 장면입니다.",
+      "score": 10,
+      "edit_order": 4,
+      "connection_note": "경기 막바지, 승부를 원점으로 돌리는 결정적인 장면입니다."
+    },
+    {
+      "start": 966.84,
+      "end": 977.04,
+      "title": "두산, 극적인 끝내기 승리!",
+      "reason": "경기 결과가 결정되는 마지막 순간으로, 승패가 갈리는 극적인 장면을 보여줍니다.",
+      "score": 10,
+      "edit_order": 5,
+      "connection_note": "동점 이후, 승부를 결정짓는 마지막 순간을 보여주며 경기의 대미를 장식합니다."
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 59.0,
+      "orig_start": 0,
+      "orig_end": 59.0
+    }
+  ]
+}
