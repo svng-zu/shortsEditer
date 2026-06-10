@@ -195,7 +195,7 @@ export default function ShortsPanel({
                 {selectedShort.title || selectedShort.filename}
               </span>
               <div style={{ display: 'flex', gap: 6 }}>
-                <a href={selectedShort.url} download={selectedShort.filename}
+                <a href={`${selectedShort.url}/download`} download={selectedShort.filename}
                   style={{ fontSize: 13, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', textDecoration: 'none' }}>⬇</a>
                 <button onClick={() => setUploadTarget(selectedShort)}
                   style={{ fontSize: 13, padding: '6px 10px', borderRadius: 8, background: '#ea4335', color: 'white', border: 'none', cursor: 'pointer' }}>YT</button>
@@ -408,7 +408,7 @@ export default function ShortsPanel({
                           {s.title || s.filename}
                         </div>
                         <div style={{ display: 'flex', gap: 4 }}>
-                          <a href={s.url} download={s.filename} onClick={e => e.stopPropagation()}
+                          <a href={`${s.url}/download`} download={s.filename} onClick={e => e.stopPropagation()}
                             className="btn-outlined" style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4 }}>다운</a>
                           <button onClick={e => { e.stopPropagation(); setUploadTarget(s) }}
                             style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4, background: '#fce8e6', color: 'var(--error)', border: '1px solid #f28b82', cursor: 'pointer' }}>YT</button>

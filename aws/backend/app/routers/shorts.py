@@ -5,8 +5,9 @@ import json
 import subprocess
 import requests
 from pathlib import Path
+from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 
 from app.config import settings
 from app.session import get_session, SessionDirs, load_video_id_map
@@ -88,6 +89,33 @@ async def serve_short(session_id: str, filename: str):
     if not path.exists():
         raise HTTPException(404, "파일 없음")
     return FileResponse(str(path), media_type="video/mp4")
+
+
+def _content_disposition(filename: str) -> str:
+    """비ASCII(한글, 대괄호 등) 파일명도 안전하게 다운로드되도록 RFC 5987 인코딩 적용"""
+    quoted = quote(filename)
+    return f"attachment; filename=\"{quoted}\"; filename*=utf-8''{quoted}"
+
+
+@router.get("/media/shorts/{session_id}/{filename}/download")
+async def download_short(session_id: str, filename: str):
+    """Safari 등에서 cross-origin S3 redirect 시 download 속성이 무시되는 문제를 피하기 위해
+    백엔드가 같은 origin으로 Content-Disposition: attachment 응답을 직접 스트리밍한다"""
+    from app.session import make_session
+    s = make_session(session_id)
+    s3_key = s.s3_key("shorts", filename)
+    s3 = get_s3()
+    if s3.exists(s3_key):
+        obj = s3._client.get_object(Bucket=s3.bucket, Key=s3_key)
+        return StreamingResponse(
+            obj["Body"].iter_chunks(),
+            media_type="video/mp4",
+            headers={"Content-Disposition": _content_disposition(filename)},
+        )
+    path = s.shorts_dir / filename
+    if not path.exists():
+        raise HTTPException(404, "파일 없음")
+    return FileResponse(str(path), media_type="video/mp4", filename=filename)
 
 
 @router.get("/media/raw/{session_id}/{filename}")
