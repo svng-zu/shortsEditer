@@ -42,22 +42,22 @@ class Editor:
 
     def apply_overlay(self, raw_path: str, analysis_path: str,
                       title_override=None, subtitles=False, style=None, bg_image=None,
-                      narration=False, narration_voice="female"):
+                      bg_solid_color=None, narration=False, narration_voice="female"):
         return self._get_editor(analysis_path).apply_overlay(
             raw_path, analysis_path,
             title_override=title_override, subtitles=subtitles, style=style, bg_image=bg_image,
-            narration=narration, narration_voice=narration_voice,
+            bg_solid_color=bg_solid_color, narration=narration, narration_voice=narration_voice,
         )
 
-    def rerender(self, analysis_path: str, title_override=None, subtitles=False, style=None, bg_image=None):
+    def rerender(self, analysis_path: str, title_override=None, subtitles=False, style=None, bg_image=None, bg_solid_color=None):
         return self._get_editor(analysis_path).rerender(
             analysis_path, title_override=title_override, subtitles=subtitles,
-            style=style, bg_image=bg_image
+            style=style, bg_image=bg_image, bg_solid_color=bg_solid_color
         )
 
-    def preview_frame(self, raw_path: str, analysis_path: str, title=None, style=None, seek=2.0, bg_image=None):
+    def preview_frame(self, raw_path: str, analysis_path: str, title=None, style=None, seek=2.0, bg_image=None, bg_solid_color=None):
         return self._get_editor(analysis_path).preview_frame(
-            raw_path, analysis_path, title=title, style=style, seek=seek, bg_image=bg_image
+            raw_path, analysis_path, title=title, style=style, seek=seek, bg_image=bg_image, bg_solid_color=bg_solid_color
         )
 
     def run(self, analysis_paths: list):

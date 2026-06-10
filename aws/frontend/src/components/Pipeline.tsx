@@ -499,7 +499,7 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
                     <div style={{ width: isMobile ? 'clamp(130px, 37vw, 208px)' : 'clamp(299px, 34vw, 450px)', aspectRatio: '16/9', borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
                       <img src={d.thumbnail_url ?? `/api/media/downloads/default/${d.filename}/thumbnail`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ flex: '0 1 45%', minWidth: 0 }}>
                       <div style={{ fontSize: isMobile ? 13 : 16, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 6, wordBreak: 'break-word' }}>
                         {d.stem}
                       </div>
