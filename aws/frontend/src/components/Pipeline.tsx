@@ -259,7 +259,10 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
 
       {/* ── 검색창(구글 스타일) — URL로 영상 가져오기 ── */}
       <div style={{ padding: '40px 24px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, borderBottom: '1px solid var(--border)' }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text2)', letterSpacing: 0.4 }}>🔍 YouTube 영상으로 쇼츠 만들기</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 19, fontWeight: 700, color: 'var(--text2)', letterSpacing: 0.4 }}>
+          <img src="/static/gorila_ai.png" alt="" style={{ height: 22, width: 22, borderRadius: 5 }} />
+          YouTube 영상으로 쇼츠 만들기
+        </div>
 
         <div style={{
           width: '100%', maxWidth: 720, display: 'flex', flexWrap: isMobile ? 'wrap' : 'nowrap', alignItems: 'center', gap: 8,
@@ -524,9 +527,14 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
                       <img src={d.thumbnail_url ?? `/api/media/downloads/default/${d.filename}/thumbnail`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 6, wordBreak: 'break-word' }}>
+                      <div style={{ fontSize: isMobile ? 13 : 16, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 6, wordBreak: 'break-word' }}>
                         {d.stem}
                       </div>
+                      {d.duration != null && (
+                        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
+                          {fmtDuration(Math.round(d.duration))}
+                        </div>
+                      )}
                       <select value={dlCategories[d.filename] || d.category}
                         onChange={e => setDlCategories(prev => ({ ...prev, [d.filename]: e.target.value }))}
                         onClick={e => e.stopPropagation()}

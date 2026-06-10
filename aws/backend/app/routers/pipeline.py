@@ -611,20 +611,39 @@ async def get_video_info(url: str, session: SessionDirs = Depends(get_session)):
 
 # ── 다운로드 목록 조회 ─────────────────────────────────────────────
 
+def _ffprobe_duration(video_path: str) -> float | None:
+    """ffprobe로 영상 길이(초) 조회 (실패 시 None)"""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", video_path],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=10,
+        )
+        return float(result.stdout.strip())
+    except (ValueError, subprocess.TimeoutExpired):
+        return None
+
+
 @router.get("/downloads")
 async def list_downloads(session: SessionDirs = Depends(get_session)):
-    """다운로드된 영상 목록 + 카테고리 + 썸네일 반환"""
+    """다운로드된 영상 목록 + 카테고리 + 썸네일 + 길이 반환"""
     cat_map = load_category_map(session)
     id_map = load_video_id_map(session)
-    result = []
-    for f in sorted(session.download_dir.glob("*.mp4")):
-        thumbnail_url = f"/api/media/downloads/{session.session_id}/{f.name}/thumbnail"
-        result.append(DownloadInfo(
-            filename=f.name,
-            stem=f.stem,
-            category=cat_map.get(f.stem, "economy"),
-            thumbnail_url=thumbnail_url,
-        ))
+
+    def _build():
+        result = []
+        for f in sorted(session.download_dir.glob("*.mp4")):
+            thumbnail_url = f"/api/media/downloads/{session.session_id}/{f.name}/thumbnail"
+            result.append(DownloadInfo(
+                filename=f.name,
+                stem=f.stem,
+                category=cat_map.get(f.stem, "economy"),
+                thumbnail_url=thumbnail_url,
+                duration=_ffprobe_duration(str(f)),
+            ))
+        return result
+
+    result = await asyncio.to_thread(_build)
     return {"downloads": [d.model_dump() for d in result]}
 
 

@@ -104,6 +104,7 @@ class DownloadInfo(BaseModel):
     stem: str
     category: str
     thumbnail_url: Optional[str] = None
+    duration: Optional[float] = None
 
 
 class ProcessSelectedItem(BaseModel):

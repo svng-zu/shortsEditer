@@ -150,6 +150,7 @@ export interface DownloadInfo {
   stem: string
   category: string
   thumbnail_url: string | null
+  duration: number | null
 }
 
 export interface StyleParams {
