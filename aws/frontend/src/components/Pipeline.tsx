@@ -88,6 +88,7 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
   const [dlSelected, setDlSelected]   = useState<Set<string>>(new Set())
   const [dlCategories, setDlCategories] = useState<Record<string, string>>({})
   const [dlProcessing, setDlProcessing] = useState(false)
+  const [playingDownload, setPlayingDownload] = useState<DownloadInfo | null>(null)
 
   useEffect(() => {
     const init: Record<string, string> = {}
@@ -232,6 +233,10 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
 
       {/* ── 검색창(구글 스타일) — URL로 영상 가져오기 ── */}
       <div style={{ padding: '40px 24px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <img src="/static/gorila_ai.png" alt="" style={{ height: 44, width: 44, borderRadius: 9 }} />
+          <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>고릴라AI 쇼츠 스튜디오</span>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 19, fontWeight: 700, color: 'var(--text2)', letterSpacing: 0.4 }}>
           <img src="/static/gorila_ai.png" alt="" style={{ height: 22, width: 22, borderRadius: 5 }} />
           YouTube 영상으로 쇼츠 만들기
@@ -493,8 +498,10 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
               </div>
             : downloads.map(d => {
                 return (
-                  <div key={d.filename} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                  <div key={d.filename} onClick={() => setPlayingDownload(d)}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
                     <input type="checkbox" checked={dlSelected.has(d.filename)} onChange={() => dlToggle(d.filename)}
+                      onClick={e => e.stopPropagation()}
                       style={{ accentColor: 'var(--primary)', width: 18, height: 18, flexShrink: 0, cursor: 'pointer', marginTop: 3 }} />
                     <div style={{ width: isMobile ? 'clamp(130px, 37vw, 208px)' : 'clamp(299px, 34vw, 450px)', aspectRatio: '16/9', borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#e8eaed' }}>
                       <img src={d.thumbnail_url ?? `/api/media/downloads/default/${d.filename}/thumbnail`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -525,6 +532,24 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
           }
         </div>
       </div>
+
+      {playingDownload && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#111', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px' }}>
+            <button onClick={() => setPlayingDownload(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: 'white', lineHeight: 1, padding: '0 4px 0 0' }}>
+              ←
+            </button>
+            <span style={{ fontWeight: 700, fontSize: 16, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'white' }}>
+              {playingDownload.stem}
+            </span>
+          </div>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, minHeight: 0 }}>
+            <video key={playingDownload.filename} src={playingDownload.thumbnail_url?.replace(/\/thumbnail$/, '')} controls autoPlay
+              style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 12, boxShadow: '0 4px 32px rgba(0,0,0,0.5)' }} />
+          </div>
+        </div>
+      )}
     </aside>
   )
 }

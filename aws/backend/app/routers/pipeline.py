@@ -679,47 +679,56 @@ async def _run_process_selected(session_id: str, items: list[ProcessSelectedItem
         cat_map[stem] = item.category
     s.category_map_path.write_text(json.dumps(cat_map, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    fail_count = 0
     try:
         # ── Step 1: 자막 생성 ──────────────────────────────────────
         for i, item in enumerate(items):
-            video_path = s.download_dir / item.filename
-            if not video_path.exists():
-                print(f"[process-selected] 파일 없음: {item.filename}")
-                continue
-            stem = video_path.stem
-            transcript_path = s.transcript_dir / f"{stem}.json"
-            if transcript_path.exists():
-                print(f"[process-selected] 자막 이미 존재, 건너뜀: {stem}")
-                continue
-            set_status(session_id, PipelineStep.TRANSCRIBING,
-                       f"[{i+1}/{total}] 자막 생성 중: {item.filename}",
-                       int((i / total) * 30))
-            proc = await asyncio.create_subprocess_exec(
-                sys.executable, "-m", "app.services.transcribe_worker",
-                str(video_path), str(s.transcript_dir),
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
-            )
-            out, _ = await proc.communicate()
-            for line in out.decode("utf-8", "replace").splitlines():
-                print(f"[{session_id[:8]}][TRANSCRIBING] {line}")
-            if transcript_path.exists():
-                s3.upload(str(transcript_path), s.s3_key("transcripts", transcript_path.name))
+            try:
+                video_path = s.download_dir / item.filename
+                if not video_path.exists():
+                    print(f"[process-selected] 파일 없음: {item.filename}")
+                    continue
+                stem = video_path.stem
+                transcript_path = s.transcript_dir / f"{stem}.json"
+                if transcript_path.exists():
+                    print(f"[process-selected] 자막 이미 존재, 건너뜀: {stem}")
+                    continue
+                set_status(session_id, PipelineStep.TRANSCRIBING,
+                           f"[{i+1}/{total}] 자막 생성 중: {item.filename}",
+                           int((i / total) * 30))
+                proc = await asyncio.create_subprocess_exec(
+                    sys.executable, "-m", "app.services.transcribe_worker",
+                    str(video_path), str(s.transcript_dir),
+                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+                )
+                out, _ = await proc.communicate()
+                for line in out.decode("utf-8", "replace").splitlines():
+                    print(f"[{session_id[:8]}][TRANSCRIBING] {line}")
+                if transcript_path.exists():
+                    s3.upload(str(transcript_path), s.s3_key("transcripts", transcript_path.name))
+            except Exception as e:
+                fail_count += 1
+                print(f"[process-selected][자막 오류] {item.filename}: {e}")
 
         # ── Step 2: LLM 분석 ──────────────────────────────────────
         analyzer = Analyzer()
         for i, item in enumerate(items):
-            stem = Path(item.filename).stem
-            transcript_path = s.transcript_dir / f"{stem}.json"
-            if not transcript_path.exists():
-                continue
-            set_status(session_id, PipelineStep.ANALYZING,
-                       f"[{i+1}/{total}] LLM 분석 중: {item.filename}",
-                       30 + int((i / total) * 30))
-            before = set(s.analysis_dir.glob(f"{glob.escape(stem)}*.json"))
-            await asyncio.to_thread(analyzer.analyze, str(transcript_path), item.category, s.analysis_dir)
-            after = set(s.analysis_dir.glob(f"{glob.escape(stem)}*.json"))
-            for f in (after - before):
-                s3.upload(str(f), s.s3_key("analysis", f.name))
+            try:
+                stem = Path(item.filename).stem
+                transcript_path = s.transcript_dir / f"{stem}.json"
+                if not transcript_path.exists():
+                    continue
+                set_status(session_id, PipelineStep.ANALYZING,
+                           f"[{i+1}/{total}] LLM 분석 중: {item.filename}",
+                           30 + int((i / total) * 30))
+                before = set(s.analysis_dir.glob(f"{glob.escape(stem)}*.json"))
+                await asyncio.to_thread(analyzer.analyze, str(transcript_path), item.category, s.analysis_dir)
+                after = set(s.analysis_dir.glob(f"{glob.escape(stem)}*.json"))
+                for f in (after - before):
+                    s3.upload(str(f), s.s3_key("analysis", f.name))
+            except Exception as e:
+                fail_count += 1
+                print(f"[process-selected][분석 오류] {item.filename}: {e}")
 
         # ── Step 3: 영상 편집 ──────────────────────────────────────
         editor = Editor(template_id=template_id, session_dirs=s)
@@ -727,14 +736,21 @@ async def _run_process_selected(session_id: str, items: list[ProcessSelectedItem
             stem = Path(item.filename).stem
             analyses = list(s.analysis_dir.glob(f"{glob.escape(stem)}*.json"))
             for a in analyses:
-                set_status(session_id, PipelineStep.EDITING,
-                           f"[{i+1}/{total}] 영상 편집 중: {a.name}",
-                           60 + int((i / total) * 35))
-                raw_path = await asyncio.to_thread(editor.edit_video, str(a))
-                if raw_path and os.path.exists(raw_path):
-                    s3.upload(raw_path, s.s3_key("raw", os.path.basename(raw_path)))
+                try:
+                    set_status(session_id, PipelineStep.EDITING,
+                               f"[{i+1}/{total}] 영상 편집 중: {a.name}",
+                               60 + int((i / total) * 35))
+                    raw_path = await asyncio.to_thread(editor.edit_video, str(a))
+                    if raw_path and os.path.exists(raw_path):
+                        s3.upload(raw_path, s.s3_key("raw", os.path.basename(raw_path)))
+                except Exception as e:
+                    fail_count += 1
+                    print(f"[process-selected][편집 오류] {a.name}: {e}")
 
-        set_status(session_id, PipelineStep.DONE, f"선택 편집 완료 — {total}개 처리", 100)
+        msg = f"선택 편집 완료 — {total}개 처리"
+        if fail_count:
+            msg += f" (실패 {fail_count}개)"
+        set_status(session_id, PipelineStep.DONE, msg, 100)
     except Exception as e:
         set_status(session_id, PipelineStep.ERROR, f"선택 편집 오류: {e}", 0)
 

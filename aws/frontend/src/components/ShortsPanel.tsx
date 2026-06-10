@@ -255,8 +255,8 @@ export default function ShortsPanel({
                       WebkitTapHighlightColor: 'transparent',
                     }}>
                       <input type="checkbox" checked={rawSelected.has(r.filename)} onClick={e => e.stopPropagation()} onChange={() => rawToggle(r.filename)} style={{ cursor: 'pointer', accentColor: 'var(--primary)', width: 16, height: 16, flexShrink: 0 }} />
-                      <div style={{ width: 48, height: 48, borderRadius: 12, background: '#e8eaed', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
-                        ✂️
+                      <div style={{ width: 48, height: 48, borderRadius: 12, overflow: 'hidden', background: '#202124', flexShrink: 0 }}>
+                        <video src={`${r.url}#t=1`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', marginBottom: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -359,6 +359,9 @@ export default function ShortsPanel({
                       transition: 'background .15s',
                     }}>
                       <input type="checkbox" checked={rawSelected.has(r.filename)} onClick={e => e.stopPropagation()} onChange={() => rawToggle(r.filename)} style={{ cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }} />
+                      <div style={{ width: 64, height: 64, borderRadius: 6, overflow: 'hidden', background: '#202124', flexShrink: 0 }}>
+                        <video src={`${r.url}#t=1`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
+                      </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {r.title || r.filename}
