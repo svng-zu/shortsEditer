@@ -1,5 +1,5 @@
 # backend/app/services/analyzer.py
-"""Gemini 기반 LLM 분석 서비스 (메인: 2.5-flash / 청크요약: 2.0-flash-lite)"""
+"""Gemini 기반 LLM 분석 서비스 (메인/청크요약 모두 2.5-flash-lite)"""
 
 import os
 import json
@@ -8,9 +8,12 @@ import google.generativeai as genai
 
 from app.config import settings
 
-# 메인 분석: 고성능, 청크 요약: 저비용
-MAIN_MODEL_NAME = "gemini-2.5-flash"
-CHEAP_MODEL_NAME = "gemini-2.5-flash"
+# gemini-2.5-flash는 기본적으로 "thinking" 토큰을 max_output_tokens 예산에서
+# 소비하는데, 현재 SDK(0.8.6, deprecated google-generativeai)는 thinking_config로
+# 이를 끌 수 없어 응답이 중간에 잘려 JSON 파싱이 실패하는 문제가 있었다.
+# flash-lite는 thinking 오버헤드 없이 동일 작업을 안정적으로 완료한다.
+MAIN_MODEL_NAME = "gemini-2.5-flash-lite"
+CHEAP_MODEL_NAME = "gemini-2.5-flash-lite"
 
 # ────────────────────────────────────────────────
 # 카테고리별 기준 프롬프트
@@ -146,6 +149,8 @@ SINGLE_TOPIC_PROMPT = """
 - 최대 6개 선택, 각 구간은 반드시 5초 이상
 - edit_order는 시청자가 자연스럽게 이해할 수 있는 흐름 순서로 지정 (시간순이 아니어도 됨)
 - connection_note로 구간 간 연결이 왜 자연스러운지 설명
+- ⚠️ candidates의 시간 구간은 서로 겹치면 안 됩니다. 같은 영상 구간을 두 번 이상 선택하면
+  편집본에서 같은 장면이 중복 재생되므로 절대 금지합니다.
 - ⚠️ 매우 중요: start와 end는 반드시 위 세그먼트 목록에 있는 어떤 세그먼트의 시작/종료 시각과 정확히 일치해야 합니다.
   세그먼트 중간 지점을 잘라서 사용하면 말이 끊긴 채로 영상이 시작되거나 끝나므로 절대 금지합니다.
   말이 자연스럽게 끝나는 세그먼트(문장이 마무리되는 지점)의 종료 시각을 end로 선택하세요.
@@ -191,6 +196,8 @@ MULTI_TOPIC_PROMPT = """
 - edit_order는 각 topic 내에서 1부터 시작
 - 가능하면 각 topic의 candidates를 서두(상황 소개) → 본론(전개) → 핵심(가장 임팩트 있는 장면/발언) → 결말(파장·반응·마무리)
   순서의 4단계 구성으로 배치하세요 (candidates가 4개 미만이면 핵심 위주로 구성하되 흐름은 유지).
+- ⚠️ 같은 topic 내 candidates의 시간 구간은 서로 겹치면 안 됩니다. 같은 영상 구간을 두 번 이상
+  선택하면 편집본에서 같은 장면이 중복 재생되므로 절대 금지합니다.
 - ⚠️ 매우 중요: 모든 candidate의 start와 end는 반드시 위 세그먼트 목록에 있는 어떤 세그먼트의 시작/종료 시각과 정확히 일치해야 합니다.
   세그먼트 중간 지점을 잘라서 사용하면 말이 끊긴 채로 시작·종료되므로 절대 금지합니다.
   말이 자연스럽게 끝나는 세그먼트(문장이 마무리되는 지점)의 종료 시각을 end로 선택하세요.
@@ -368,7 +375,7 @@ class Analyzer:
         result = self._parse_response(response)
 
         if not result:
-            return {}
+            raise RuntimeError(f"Gemini 분석 응답 파싱 실패: {video_title}")
 
         base_name = os.path.splitext(os.path.basename(transcript_path))[0]
         if multi:
