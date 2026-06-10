@@ -65,8 +65,6 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
   useEffect(() => { checkOauth() }, [checkOauth])
   useEffect(() => () => { if (oauthPollRef.current) clearInterval(oauthPollRef.current) }, [])
 
-  const oauthDone = oauthState?.status === 'done'
-
   const loadChannels = useCallback(async () => {
     const { channels } = await api.getChannels()
     setChannels(channels)
@@ -218,7 +216,7 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
           title="새로고침">↻</button>
       </div>
 
-      {oauthState?.status === 'expired' ? (
+      {oauthState?.status === 'expired' && (
         <div style={{ padding: '10px 14px', background: '#fce8e6', borderBottom: '1px solid #f28b82', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
@@ -230,32 +228,7 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
             </button>
           </div>
         </div>
-      ) : !oauthDone ? (
-        <div style={{ padding: '10px 14px', background: '#fff8e1', borderBottom: '1px solid #ffe082', flexShrink: 0 }}>
-          {oauthState?.status === 'waiting' && oauthState.url ? (
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: '#e65100' }}>🔐 YouTube 인증 진행 중</div>
-              <div style={{ fontSize: 13, color: '#5f6368', marginBottom: 6, lineHeight: 1.5 }}>
-                아래 URL에서 코드 <b style={{ color: '#1a73e8' }}>{oauthState.code}</b> 를 입력하세요
-              </div>
-              <a href={oauthState.url} target="_blank" rel="noreferrer"
-                className="btn-primary" style={{ display: 'inline-block', fontSize: 13, padding: '5px 10px' }}>
-                인증 페이지 열기 →
-              </a>
-            </div>
-          ) : oauthState?.status === 'done' ? null : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14, color: '#e65100' }}>⚠ YouTube 인증 필요</div>
-                <div style={{ fontSize: 12, color: '#5f6368', marginTop: 1 }}>인증 없이는 다운로드가 차단될 수 있어요</div>
-              </div>
-              <button onClick={startOauth} className="btn-primary" style={{ fontSize: 13, padding: '5px 10px', background: '#f57c00', whiteSpace: 'nowrap' }}>
-                🔑 인증 시작
-              </button>
-            </div>
-          )}
-        </div>
-      ) : null}
+      )}
 
       {/* ── 검색창(구글 스타일) — URL로 영상 가져오기 ── */}
       <div style={{ padding: '40px 24px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, borderBottom: '1px solid var(--border)' }}>
