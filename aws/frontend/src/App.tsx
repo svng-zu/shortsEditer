@@ -55,7 +55,11 @@ function ShortsStudio() {
   const onQuotaError = useCallback(() => { setQuotaNotice(true); fetchQuota() }, [fetchQuota])
 
   useEffect(() => {
-    fetchStatus(); fetchFiles(); fetchShorts(); fetchRaws(); fetchQuota(); fetchDownloads()
+    fetchFiles(); fetchShorts(); fetchRaws(); fetchQuota(); fetchDownloads()
+    fetchStatus().then(d => {
+      // 페이지 진입/새로고침 시점에 이미 작업이 진행 중이면 폴링을 이어서 시작한다
+      if (d && !['idle', 'done', 'error'].includes(d.step)) setIsPolling(true)
+    })
   }, [fetchStatus, fetchFiles, fetchShorts, fetchRaws, fetchQuota, fetchDownloads])
 
   useEffect(() => {

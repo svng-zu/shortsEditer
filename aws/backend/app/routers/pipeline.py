@@ -175,6 +175,15 @@ def clear_pipeline_files(s: SessionDirs):
     if s.category_map_path.exists():
         s.category_map_path.unlink()
 
+    # 로컬 정리 후에도 S3에 남아있는 이전 결과물(특히 process-selected 후
+    # 로컬에서 정리된 downloads/raw/shorts)을 함께 삭제해, 재수집 후
+    # 목록에 옛 영상이 다시 노출되지 않도록 한다.
+    s3 = get_s3()
+    for subdir in ("downloads", "transcripts", "analysis", "raw", "shorts"):
+        prefix = s.s3_key(subdir, "")
+        for key in s3.list_keys(prefix):
+            s3.delete(key)
+
 
 @router.post("/upload-video")
 async def upload_video(file: UploadFile = File(...), session: SessionDirs = Depends(get_session),
