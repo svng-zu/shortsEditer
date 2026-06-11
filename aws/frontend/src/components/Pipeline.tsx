@@ -39,6 +39,7 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
   const [collectLimit, setCollectLimit]     = useState(3)
   const [oauthState, setOauthState]         = useState<{status:string; url?:string; code?:string} | null>(null)
   const [channels, setChannels]             = useState<{url:string; category:string; thumbnail_url?:string}[]>([])
+  const [selectedChannels, setSelectedChannels] = useState<Set<string>>(new Set())
   const [showChannels, setShowChannels]     = useState(false)
   const [newChUrl, setNewChUrl]             = useState('')
   const [newChCategory, setNewChCategory]   = useState('sports')
@@ -68,8 +69,22 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
   const loadChannels = useCallback(async () => {
     const { channels } = await api.getChannels()
     setChannels(channels)
+    // 새로 등록된 채널은 기본적으로 선택 상태로, 삭제된 채널은 선택 목록에서도 제거
+    setSelectedChannels(prev => {
+      const urls = new Set(channels.map(c => c.url))
+      const next = new Set([...prev].filter(u => urls.has(u)))
+      channels.forEach(c => { if (!prev.has(c.url)) next.add(c.url) })
+      return next
+    })
   }, [])
   useEffect(() => { loadChannels() }, [loadChannels])
+
+  const toggleChannelSelected = (url: string) => {
+    setSelectedChannels(prev => { const next = new Set(prev); next.has(url) ? next.delete(url) : next.add(url); return next })
+  }
+  const toggleAllChannelsSelected = () => {
+    setSelectedChannels(prev => prev.size === channels.length ? new Set() : new Set(channels.map(c => c.url)))
+  }
 
   const handleAddChannel = async () => {
     if (!newChUrl.trim()) return
@@ -206,7 +221,11 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
     catch (e: any) { if (isQuotaError(e)) { onQuotaError() } else throw e }
   }
   const isCollecting = status.step === 'collecting'
-  const handleCollect = runAction(() => api.collect(clearExisting, collectLimit))
+  // 일부 채널만 선택된 경우에만 channel_urls를 전달 (전체 선택/채널 없음이면 기본 동작 그대로)
+  const handleCollect = runAction(() => api.collect(
+    clearExisting, collectLimit,
+    channels.length > 0 && selectedChannels.size < channels.length ? [...selectedChannels] : undefined
+  ))
 
   // ── 공통 레이아웃 (모바일/데스크톱 동일) ──
   return (
@@ -389,8 +408,18 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
                     채널 없음 → 기본 채널(SBSBiz, MBC, SPOTV 등) 사용
                   </div>
                 )}
+                {channels.length > 0 && (
+                  <button onClick={toggleAllChannelsSelected} style={{
+                    alignSelf: 'flex-start', background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 12, fontWeight: 600, color: 'var(--primary)', padding: '0 2px',
+                  }}>
+                    {selectedChannels.size === channels.length ? '전체 해제' : '전체 선택'} ({selectedChannels.size}/{channels.length})
+                  </button>
+                )}
                 {channels.map(ch => (
                   <div key={ch.url} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                    <input type="checkbox" checked={selectedChannels.has(ch.url)} onChange={() => toggleChannelSelected(ch.url)}
+                      style={{ cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }} />
                     {ch.thumbnail_url && (
                       <img src={ch.thumbnail_url} alt="" style={{ width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                     )}
@@ -439,10 +468,10 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
                 </label>
               </div>
 
-              <button onClick={() => { if (collectLimit === 0) { alert('1개 이상의 값을 설정해주세요'); return } handleCollect() }} disabled={isRunning} className="btn-primary" style={{ padding: '10px 0', fontSize: 15, fontWeight: 700, borderRadius: 999 }}>
+              <button onClick={() => { if (collectLimit === 0) { alert('1개 이상의 값을 설정해주세요'); return } if (channels.length > 0 && selectedChannels.size === 0) { alert('수집할 채널을 1개 이상 선택해주세요'); return } handleCollect() }} disabled={isRunning} className="btn-primary" style={{ padding: '10px 0', fontSize: 15, fontWeight: 700, borderRadius: 999 }}>
                 {isCollecting
                   ? <><div className="spinner spinner-sm" style={{ borderTopColor: 'white', marginRight: 6 }} />수집 중...</>
-                  : '⬇ 채널 수집'}
+                  : channels.length > 0 && selectedChannels.size < channels.length ? `⬇ 선택한 채널 수집 (${selectedChannels.size}개)` : '⬇ 채널 수집'}
               </button>
             </div>
           )}

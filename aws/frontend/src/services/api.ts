@@ -285,8 +285,12 @@ export const api = {
   },
 
   // Pipeline
-  async collect(clearExisting: boolean = true, limitPerChannel: number = 3): Promise<void> {
-    await client.post('/api/collect', { clear_existing: clearExisting, limit_per_channel: limitPerChannel })
+  async collect(clearExisting: boolean = true, limitPerChannel: number = 3, channelUrls?: string[]): Promise<void> {
+    await client.post('/api/collect', {
+      clear_existing: clearExisting,
+      limit_per_channel: limitPerChannel,
+      channel_urls: channelUrls && channelUrls.length > 0 ? channelUrls : null,
+    })
   },
 
   async transcribe(): Promise<void> {
