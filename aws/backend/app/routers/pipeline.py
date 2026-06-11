@@ -8,8 +8,8 @@ import os
 import re
 import subprocess
 import sys
-import threading
 from pathlib import Path
+from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
@@ -22,8 +22,9 @@ from app.models.user import User
 from app.models.schemas import (
     CollectRequest, EditRequest, PipelineStatus, PipelineStep,
     VideoInfoResponse, DownloadInfo, ProcessSelectedRequest, ProcessSelectedItem,
+    GenerateScriptRequest, GenerateScriptResponse,
 )
-from app.services.collector import YoutubeCollector
+from app.services.collector import YoutubeCollector, CATEGORY_CHANNELS
 from app.services.analyzer import Analyzer
 from app.services.editor import Editor
 from app.services.s3_manager import get_s3
@@ -66,10 +67,25 @@ class ChannelItem(BaseModel):
 class ChannelDeleteRequest(BaseModel):
     url: str
 
+def _default_channels() -> list[dict]:
+    """코드에 하드코딩된 기본 채널 목록을 세션용 채널 항목 형식으로 변환."""
+    return [
+        {"url": url, "category": category, "thumbnail_url": ""}
+        for category, urls in CATEGORY_CHANNELS.items()
+        for url in urls
+    ]
+
 def _load_channels(s: SessionDirs) -> list[dict]:
     if not s.channels_path.exists():
-        return []
-    return json.loads(s.channels_path.read_text(encoding="utf-8"))
+        defaults = _default_channels()
+        _save_channels(s, defaults)
+        return defaults
+    channels = json.loads(s.channels_path.read_text(encoding="utf-8"))
+    if not channels:
+        defaults = _default_channels()
+        _save_channels(s, defaults)
+        return defaults
+    return channels
 
 def _save_channels(s: SessionDirs, channels: list[dict]):
     s.channels_path.write_text(json.dumps(channels, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -158,72 +174,6 @@ def clear_pipeline_files(s: SessionDirs):
             f.unlink()
     if s.category_map_path.exists():
         s.category_map_path.unlink()
-
-
-COOKIES_PATH = settings.BASE_DIR / "data" / "cookies.txt"
-OAUTH_TOKEN_DIR = Path.home() / ".cache" / "yt-dlp" / "youtube-oauth2"
-
-_oauth_state: dict = {"status": "idle", "url": None, "code": None, "error": None}
-_oauth_proc: subprocess.Popen | None = None
-
-
-def _run_oauth_background():
-    global _oauth_state, _oauth_proc
-    try:
-        _oauth_proc = subprocess.Popen(
-            ["yt-dlp", "--username", "oauth2", "--password", "",
-             "https://www.youtube.com/watch?v=dQw4w9WgXcQ"],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, bufsize=1
-        )
-        for line in _oauth_proc.stdout:
-            line = line.strip()
-            print("[OAuth2]", line)
-            if "google.com/device" in line:
-                url_m = re.search(r'(https://[^\s]+)', line)
-                code_m = re.search(r'([A-Z0-9]{3,4}(?:-[A-Z0-9]{3,4}){1,3})', line)
-                if url_m:
-                    _oauth_state["url"] = url_m.group(1)
-                if code_m:
-                    _oauth_state["code"] = code_m.group(1)
-                _oauth_state["status"] = "waiting"
-        _oauth_proc.wait()
-        if _oauth_proc.returncode == 0:
-            _oauth_state["status"] = "done"
-        else:
-            if _oauth_state["status"] == "waiting":
-                _oauth_state["status"] = "done"
-            else:
-                _oauth_state["status"] = "error"
-                _oauth_state["error"] = "인증 실패 또는 취소됨"
-    except Exception as e:
-        _oauth_state["status"] = "error"
-        _oauth_state["error"] = str(e)
-
-
-@router.post("/oauth-init")
-async def oauth_init():
-    global _oauth_state
-    _oauth_state = {"status": "starting", "url": None, "code": None, "error": None}
-    t = threading.Thread(target=_run_oauth_background, daemon=True)
-    t.start()
-    return {"ok": True}
-
-
-@router.get("/oauth-status")
-async def oauth_status():
-    import time
-    token_file = OAUTH_TOKEN_DIR / "token_data.json"
-    is_saved = token_file.exists()
-    is_expired = False
-    if is_saved:
-        try:
-            data = json.loads(token_file.read_text())
-            expires = data.get("data", {}).get("expires", 0)
-            is_expired = time.time() > expires
-        except Exception:
-            is_expired = True
-    return {**_oauth_state, "token_saved": is_saved, "token_expired": is_expired}
 
 
 @router.post("/upload-video")
@@ -365,7 +315,8 @@ async def list_files(session: SessionDirs = Depends(get_session)):
 
 # ── 1. 수집 ─────────────────────────────────────────────────────
 
-async def _run_collect(session_id: str, clear_existing: bool, limit_per_channel: int = 3):
+async def _run_collect(session_id: str, clear_existing: bool, limit_per_channel: int = 3,
+                       channel_urls: list[str] | None = None):
     s = make_session(session_id)
     try:
         if clear_existing:
@@ -375,6 +326,8 @@ async def _run_collect(session_id: str, clear_existing: bool, limit_per_channel:
         set_status(session_id, PipelineStep.COLLECTING, "유튜브 채널 수집 중...", 5)
         collector = YoutubeCollector(download_dir=str(s.download_dir))
         custom_channels = _load_channels(s)
+        if channel_urls:
+            custom_channels = [c for c in custom_channels if c["url"] in channel_urls]
 
         def progress_cb(msg: str, pct: int):
             set_status(session_id, PipelineStep.COLLECTING, msg, pct)
@@ -435,7 +388,7 @@ async def collect(req: CollectRequest,
     status = get_session_status(session.session_id)
     if status.step not in (PipelineStep.IDLE, PipelineStep.DONE, PipelineStep.ERROR):
         raise HTTPException(400, "파이프라인이 실행 중입니다.")
-    _spawn(session.session_id, _run_collect(session.session_id, req.clear_existing, req.limit_per_channel))
+    _spawn(session.session_id, _run_collect(session.session_id, req.clear_existing, req.limit_per_channel, req.channel_urls))
     return {"ok": True}
 
 
@@ -574,6 +527,36 @@ async def edit(req: EditRequest,
     return {"ok": True}
 
 
+# ── GPT(Gemini) 나레이션 대본 리라이팅 + 효과음 위치 선정 ──────────────
+
+@router.post("/generate-script", response_model=GenerateScriptResponse)
+async def generate_script(req: GenerateScriptRequest,
+                          session: SessionDirs = Depends(get_session)):
+    """edit 완료(raw_segments 존재) 후 호출. narration_script/sfx_placements를
+    analysis json에 추가하고 S3에 재업로드한다."""
+    stem = req.filename.replace("_shorts.mp4", "").replace("_raw.mp4", "")
+    analysis_path = session.analysis_dir / f"{stem}.json"
+    if not analysis_path.exists():
+        raise HTTPException(404, f"분석 파일 없음: {stem}.json")
+
+    data = json.loads(analysis_path.read_text(encoding="utf-8"))
+    if not data.get("raw_segments"):
+        raise HTTPException(400, "편집(raw_segments)이 완료된 후에 사용할 수 있습니다.")
+
+    try:
+        result = await asyncio.to_thread(
+            Analyzer().generate_script_and_sfx, str(analysis_path), data.get("transcript_path"), req.mode
+        )
+    except Exception as e:
+        raise HTTPException(500, f"대본 생성 실패: {e}")
+
+    if not result:
+        raise HTTPException(422, "대본 생성에 필요한 데이터가 부족합니다.")
+
+    get_s3().upload(str(analysis_path), session.s3_key("analysis", analysis_path.name))
+    return GenerateScriptResponse(**result)
+
+
 # ── 통합: 자막 생성 + AI 분석 + 영상 편집 (한 번에 실행) ──────────
 
 async def _run_full_edit(session_id: str, template_id: int):
@@ -628,18 +611,35 @@ def _ffprobe_duration(video_path: str) -> float | None:
 async def list_downloads(session: SessionDirs = Depends(get_session)):
     """다운로드된 영상 목록 + 카테고리 + 썸네일 + 길이 반환"""
     cat_map = load_category_map(session)
-    id_map = load_video_id_map(session)
 
     def _build():
         result = []
+        seen = set()
         for f in sorted(session.download_dir.glob("*.mp4")):
-            thumbnail_url = f"/api/media/downloads/{session.session_id}/{f.name}/thumbnail"
+            thumbnail_url = f"/api/media/downloads/{session.session_id}/{quote(f.name)}/thumbnail"
             result.append(DownloadInfo(
                 filename=f.name,
                 stem=f.stem,
                 category=cat_map.get(f.stem, "economy"),
                 thumbnail_url=thumbnail_url,
                 duration=_ffprobe_duration(str(f)),
+            ))
+            seen.add(f.name)
+
+        # process-selected 처리 후 로컬에서 정리되어 S3에만 남은 다운로드도 목록에 포함
+        prefix = session.s3_key("downloads", "")
+        for key in get_s3().list_keys(prefix):
+            filename = key[len(prefix):]
+            if not filename.endswith(".mp4") or "/" in filename or filename in seen:
+                continue
+            stem = Path(filename).stem
+            thumbnail_url = f"/api/media/downloads/{session.session_id}/{quote(filename)}/thumbnail"
+            result.append(DownloadInfo(
+                filename=filename,
+                stem=stem,
+                category=cat_map.get(stem, "economy"),
+                thumbnail_url=thumbnail_url,
+                duration=None,
             ))
         return result
 
@@ -649,19 +649,23 @@ async def list_downloads(session: SessionDirs = Depends(get_session)):
 
 @router.delete("/downloads/{filename}")
 async def delete_download(filename: str, session: SessionDirs = Depends(get_session)):
-    """수집된 영상 파일 삭제"""
+    """수집된 영상 파일 삭제 (로컬 + S3)"""
     filepath = session.download_dir / filename
-    if not filepath.exists():
-        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
-    filepath.unlink()
-    # S3에서도 삭제
     s3 = get_s3()
-    if s3:
-        s3_key = session.s3_key("downloads", filename)
+    s3_key = session.s3_key("downloads", filename)
+    local_exists = filepath.exists()
+    s3_exists = s3.exists(s3_key)
+    if not local_exists and not s3_exists:
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    if local_exists:
+        filepath.unlink()
+    if s3_exists:
         try:
             s3.delete(s3_key)
         except Exception:
             pass
+    thumb_path = session.download_dir / ".thumbs" / f"{Path(filename).stem}.jpg"
+    thumb_path.unlink(missing_ok=True)
     return {"ok": True}
 
 

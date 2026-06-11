@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 
 from app.config import settings
 from app.session import get_session, SessionDirs, load_video_id_map
-from app.models.schemas import ShortInfo, RawInfo, UpdateTitleRequest, SrtSaveRequest
+from app.models.schemas import ShortInfo, RawInfo, UpdateTitleRequest, UpdateNarrationScriptRequest, SrtSaveRequest
 from app.services.s3_manager import get_s3
 
 router = APIRouter()
@@ -41,19 +41,35 @@ def _write_srt(entries: list, srt_path):
 @router.get("/shorts")
 async def list_shorts(session: SessionDirs = Depends(get_session)):
     shorts = []
-    for mp4 in sorted(session.shorts_dir.glob("*.mp4")):
-        stem = mp4.stem.replace("_shorts", "")
+    seen = set()
+
+    def _add(filename: str):
+        stem = Path(filename).stem.replace("_shorts", "")
         analysis_file = session.analysis_dir / f"{stem}.json"
         meta = {}
         if analysis_file.exists():
             meta = json.loads(analysis_file.read_text(encoding="utf-8"))
         shorts.append(ShortInfo(
-            filename=mp4.name,
-            url=f"/api/media/shorts/{session.session_id}/{mp4.name}",
-            title=meta.get("intro_text", mp4.stem).replace("\\n", " "),
+            filename=filename,
+            url=f"/api/media/shorts/{session.session_id}/{quote(filename)}",
+            title=meta.get("intro_text", stem).replace("\\n", " "),
             category=meta.get("category", ""),
             candidates=meta.get("candidates", []),
         ))
+        seen.add(filename)
+
+    for mp4 in sorted(session.shorts_dir.glob("*.mp4")):
+        _add(mp4.name)
+
+    # 렌더링 결과는 업로드 후 로컬에서 정리되므로(upload_and_cleanup), S3에만
+    # 남아있는 쇼츠도 목록에 포함시킨다.
+    prefix = session.s3_key("shorts", "")
+    for key in get_s3().list_keys(prefix):
+        filename = key[len(prefix):]
+        if not filename.endswith(".mp4") or filename in seen:
+            continue
+        _add(filename)
+
     return {"shorts": shorts}
 
 
@@ -68,7 +84,7 @@ async def list_raws(session: SessionDirs = Depends(get_session)):
             meta = json.loads(analysis_file.read_text(encoding="utf-8"))
         raws.append(RawInfo(
             filename=mp4.name,
-            url=f"/api/media/raw/{session.session_id}/{mp4.name}",
+            url=f"/api/media/raw/{session.session_id}/{quote(mp4.name)}",
             title=meta.get("intro_text", stem).replace("\\n", " / "),
             category=meta.get("category", ""),
         ))
@@ -200,10 +216,16 @@ async def serve_download_thumbnail(session_id: str, filename: str):
 @router.delete("/shorts/{filename}")
 async def delete_short(filename: str, session: SessionDirs = Depends(get_session)):
     path = session.shorts_dir / filename
-    if not path.exists():
+    s3 = get_s3()
+    s3_key = session.s3_key("shorts", filename)
+    local_exists = path.exists()
+    s3_exists = s3.exists(s3_key)
+    if not local_exists and not s3_exists:
         raise HTTPException(404, "파일 없음")
-    path.unlink()
-    get_s3().delete(session.s3_key("shorts", filename))
+    if local_exists:
+        path.unlink()
+    if s3_exists:
+        s3.delete(s3_key)
     return {"ok": True}
 
 
@@ -217,17 +239,6 @@ async def delete_raw(filename: str, session: SessionDirs = Depends(get_session))
     return {"ok": True}
 
 
-@router.delete("/downloads/{filename}")
-async def delete_download(filename: str, session: SessionDirs = Depends(get_session)):
-    path = session.download_dir / filename
-    if not path.exists():
-        raise HTTPException(404, "파일 없음")
-    path.unlink()
-    get_s3().delete(session.s3_key("downloads", filename))
-    _thumb_path(session, filename).unlink(missing_ok=True)
-    return {"ok": True}
-
-
 @router.post("/update-title")
 async def update_title(req: UpdateTitleRequest, session: SessionDirs = Depends(get_session)):
     stem = req.filename.replace("_shorts.mp4", "")
@@ -237,6 +248,19 @@ async def update_title(req: UpdateTitleRequest, session: SessionDirs = Depends(g
     data = json.loads(analysis_path.read_text(encoding="utf-8"))
     data["intro_text"] = req.intro_text.strip()
     analysis_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True}
+
+
+@router.post("/update-narration-script")
+async def update_narration_script(req: UpdateNarrationScriptRequest, session: SessionDirs = Depends(get_session)):
+    stem = req.filename.replace("_shorts.mp4", "").replace("_raw.mp4", "")
+    analysis_path = session.analysis_dir / f"{stem}.json"
+    if not analysis_path.exists():
+        raise HTTPException(404, f"분석 파일 없음: {stem}.json")
+    data = json.loads(analysis_path.read_text(encoding="utf-8"))
+    data["narration_script"] = req.narration_script.strip()
+    analysis_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    get_s3().upload(str(analysis_path), session.s3_key("analysis", analysis_path.name))
     return {"ok": True}
 
 

@@ -13,8 +13,6 @@ TEMPLATES = {
         "title_color": "0xFFFFFF",
         "title_border": "0xFF3D3D",
         "title_fontsize": 115,
-        "divider": True,
-        "divider_color": "0xFF3D3D",
     },
     2: {
         "name": "정치 미니멀 (흰배경+검정글)",
@@ -23,8 +21,6 @@ TEMPLATES = {
         "title_color": "0x111111",
         "title_border": "0xCC0000",
         "title_fontsize": 115,
-        "divider": True,
-        "divider_color": "0xCC0000",
     },
     3: {
         "name": "정치 그레이 (진회색+흰글+빨강 포인트)",
@@ -33,8 +29,6 @@ TEMPLATES = {
         "title_color": "0xFFFFFF",
         "title_border": "0xFF3D3D",
         "title_fontsize": 115,
-        "divider": True,
-        "divider_color": "0xFF3D3D",
     },
 }
 

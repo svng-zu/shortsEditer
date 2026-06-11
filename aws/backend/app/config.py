@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     SHORTS_DIR: Path = BASE_DIR / "data" / "shorts"
     RAW_DIR: Path = BASE_DIR / "data" / "raw"
     STATIC_DIR: Path = BASE_DIR / "static"
+    SFX_DIR: Path = BASE_DIR / "static" / "sfx"
 
     # CORS
     CORS_ORIGINS: list = [
@@ -78,5 +79,5 @@ def get_settings() -> Settings:
 settings = get_settings()
 for d in [settings.DOWNLOAD_DIR, settings.TRANSCRIPT_DIR,
           settings.ANALYSIS_DIR, settings.SHORTS_DIR, settings.RAW_DIR,
-          settings.STATIC_DIR]:
+          settings.STATIC_DIR, settings.SFX_DIR]:
     d.mkdir(parents=True, exist_ok=True)

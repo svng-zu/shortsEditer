@@ -70,3 +70,52 @@ def mix_narration(video_path: str, narration_path: str, output_path: str,
         print(f"[TTS] 믹싱 실패: {result.stderr[-300:]}")
         return False
     return True
+
+
+def mix_narration_and_sfx(video_path: str, narration_path: str, output_path: str,
+                          sfx_events: list[dict] = None,
+                          narration_delay: float = 0.5, narration_volume: float = 1.2,
+                          video_volume: float = 0.3, sfx_volume: float = 0.8) -> bool:
+    """나레이션 음성 + 효과음(들)을 영상에 믹싱.
+
+    sfx_events: [{"time": float, "file": "/path/to/sfx.mp3"}, ...]
+    sfx_events가 비어있으면 mix_narration과 동일하게 동작한다.
+    """
+    sfx_events = [e for e in (sfx_events or []) if Path(e.get("file", "")).exists()]
+
+    inputs = ["-i", video_path, "-i", narration_path]
+    for e in sfx_events:
+        inputs += ["-i", e["file"]]
+
+    va = f"[0:a]volume={video_volume}[va]"
+    na = (
+        f"[1:a]volume={narration_volume},"
+        f"adelay={int(narration_delay*1000)}|{int(narration_delay*1000)}[na]"
+    )
+    filters = [va, na]
+    mix_labels = ["[va]", "[na]"]
+    for i, e in enumerate(sfx_events):
+        delay_ms = max(0, int(e["time"] * 1000))
+        label = f"[sfx{i}]"
+        filters.append(f"[{i+2}:a]volume={sfx_volume},adelay={delay_ms}|{delay_ms}{label}")
+        mix_labels.append(label)
+
+    filters.append(
+        f"{''.join(mix_labels)}amix=inputs={len(mix_labels)}:duration=first:dropout_transition=2[aout]"
+    )
+
+    cmd = [
+        "ffmpeg", "-y",
+        *inputs,
+        "-filter_complex", ";".join(filters),
+        "-map", "0:v",
+        "-map", "[aout]",
+        "-c:v", "copy",
+        "-c:a", "aac", "-b:a", "128k",
+        output_path,
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        print(f"[TTS] 믹싱(SFX 포함) 실패: {result.stderr[-300:]}")
+        return False
+    return True

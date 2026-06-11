@@ -32,17 +32,18 @@ body {
 
 #root { height: 100vh; display: flex; flex-direction: column; }
 
-/* 모바일: body/root overflow 해제 → 자연 스크롤 허용, 폰트 확대 */
+/* 모바일: 뷰포트에 고정, 내부 콘텐츠 영역만 스크롤 (하단 탭바 고정용 앱쉘 레이아웃) */
 @media (max-width: 767px) {
   html, body {
-    height: auto !important;
-    overflow: auto !important;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
     font-size: 15px;
   }
   #root {
-    height: auto !important;
-    min-height: 100dvh;
-    overflow: visible !important;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
   }
 
   /* 입력창·버튼 기본 크기 업 */

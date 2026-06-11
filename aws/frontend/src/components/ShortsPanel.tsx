@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, RefObject } from 'react'
+import { createPortal } from 'react-dom'
 import { api, ShortInfo, RawInfo, StyleParams } from '../services/api'
 import YouTubeUploadModal from './YouTubeUploadModal'
 
@@ -22,10 +23,10 @@ const SCALE = CV_W / 1080
 const VID_Y_PX = Math.round(555 * SCALE)   // ≈139
 const VID_H_PX = Math.round(810 * SCALE)   // ≈203
 
-const TMPL_COLORS: Record<string, Record<number, { bg: string; div: string }>> = {
-  sports:   { 1: { bg: '#0d0d0d', div: '#FFD700' }, 2: { bg: '#f5f5f5', div: '#DAA520' }, 3: { bg: '#1a1a0d', div: '#FFD700' } },
-  economy:  { 1: { bg: '#0a0f0a', div: '#00E676' }, 2: { bg: '#f5f5f5', div: '#00897B' }, 3: { bg: '#0d1b2a', div: '#00E676' } },
-  politics: { 1: { bg: '#0d0505', div: '#FF3D3D' }, 2: { bg: '#f5f5f5', div: '#CC0000' }, 3: { bg: '#111111', div: '#FF3D3D' } },
+const TMPL_COLORS: Record<string, Record<number, { bg: string }>> = {
+  sports:   { 1: { bg: '#0d0d0d' }, 2: { bg: '#f5f5f5' }, 3: { bg: '#1a1a0d' } },
+  economy:  { 1: { bg: '#0a0f0a' }, 2: { bg: '#f5f5f5' }, 3: { bg: '#0d1b2a' } },
+  politics: { 1: { bg: '#0d0505' }, 2: { bg: '#f5f5f5' }, 3: { bg: '#111111' } },
 }
 
 function _hexToRgba(hex: string, alpha: number): string {
@@ -134,10 +135,38 @@ export default function ShortsPanel({
 }: Props) {
   const [uploadTarget, setUploadTarget] = useState<ShortInfo | null>(null)
   const [rawSelected, setRawSelected] = useState<Set<string>>(new Set())
+  const [shortSelected, setShortSelected] = useState<Set<string>>(new Set())
 
   const deleteShort = async (fn: string, e: React.MouseEvent) => {
     e.stopPropagation(); if (!confirm('삭제?')) return
-    await api.deleteShort(fn); onRefresh()
+    await api.deleteShort(fn)
+    if (selectedShort?.filename === fn) onSelectShort(null)
+    setShortSelected(prev => { const s = new Set(prev); s.delete(fn); return s })
+    onRefresh()
+  }
+
+  const shortToggle = (fn: string) => setShortSelected(prev => { const s = new Set(prev); s.has(fn) ? s.delete(fn) : s.add(fn); return s })
+  const shortToggleAll = () => setShortSelected(prev => prev.size === shorts.length ? new Set() : new Set(shorts.map(s => s.filename)))
+  const handleShortDeleteSelected = async () => {
+    if (shortSelected.size === 0) return
+    if (!confirm(`선택된 ${shortSelected.size}개 쇼츠를 삭제하시겠습니까?`)) return
+    await Promise.all([...shortSelected].map(fn => api.deleteShort(fn)))
+    if (selectedShort && shortSelected.has(selectedShort.filename)) onSelectShort(null)
+    setShortSelected(new Set())
+    onRefresh()
+  }
+  const handleShortDownloadSelected = () => {
+    const selected = shorts.filter(s => shortSelected.has(s.filename))
+    selected.forEach((s, i) => {
+      setTimeout(() => {
+        const a = document.createElement('a')
+        a.href = `${s.url}/download`
+        a.download = s.filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+      }, i * 400)
+    })
   }
 
   const deleteRaw = async (fn: string, e: React.MouseEvent) => {
@@ -169,10 +198,10 @@ export default function ShortsPanel({
       <>
         {uploadTarget && <YouTubeUploadModal filename={uploadTarget.filename} defaultTitle={uploadTarget.title} onClose={() => setUploadTarget(null)} />}
 
-        {/* 편집/플레이어 — fixed 전체화면 오버레이 */}
-        {mobileShowEdit && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 150, background: 'var(--bg)', overflowY: 'auto' }}>
-            <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'white', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', boxShadow: '0 1px 6px rgba(0,0,0,0.08)' }}>
+        {/* 편집/플레이어 — fixed 전체화면 오버레이 (앱 레이아웃 영향을 받지 않도록 body에 직접 렌더링) */}
+        {mobileShowEdit && createPortal(
+          <div style={{ position: 'fixed', inset: 0, zIndex: 150, background: 'var(--bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ flexShrink: 0, zIndex: 10, background: 'white', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', boxShadow: '0 1px 6px rgba(0,0,0,0.08)' }}>
               <button onClick={() => onSelectRaw(null)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: 'var(--primary)', lineHeight: 1, padding: '0 4px 0 0' }}>
                 ←
@@ -181,10 +210,11 @@ export default function ShortsPanel({
               <CategoryBadge cat={selectedRaw?.category || ''} />
             </div>
             <RawEditArea raw={selectedRaw} onStartPolling={onStartPolling} isMobile />
-          </div>
+          </div>,
+          document.body
         )}
 
-        {mobileShowPlayer && selectedShort && (
+        {mobileShowPlayer && selectedShort && createPortal(
           <div style={{ position: 'fixed', inset: 0, zIndex: 150, background: '#111', display: 'flex', flexDirection: 'column' }}>
             <div style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px' }}>
               <button onClick={() => onSelectShort(null)}
@@ -208,13 +238,14 @@ export default function ShortsPanel({
                 <video key={selectedShort.url} src={selectedShort.url} controls autoPlay style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* 리스트 — 자연 스크롤 */}
         <div style={{ background: 'var(--bg)' }}>
           {/* 탭 */}
-          <div style={{ display: 'flex', background: 'white', borderBottom: '1px solid var(--border)', position: 'sticky', top: 52, zIndex: 50 }}>
+          <div style={{ display: 'flex', background: 'white', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 50 }}>
             {(['raws', 'shorts'] as const).map(tab => (
               <button key={tab} onClick={() => onTabChange(tab)} style={{
                 flex: 1, padding: '13px 0', border: 'none', background: 'none', cursor: 'pointer',
@@ -276,6 +307,18 @@ export default function ShortsPanel({
           {/* SHORTS 목록 */}
           {activeTab === 'shorts' && (
             <div style={{ background: 'white' }}>
+              {shorts.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }}>
+                  <input type="checkbox" checked={shortSelected.size === shorts.length && shorts.length > 0} onChange={shortToggleAll} style={{ cursor: 'pointer', accentColor: 'var(--primary)', width: 16, height: 16 }} />
+                  <span style={{ fontSize: 13, color: 'var(--text2)', flex: 1 }}>{shortSelected.size > 0 ? `${shortSelected.size}개 선택됨` : '전체 선택'}</span>
+                  {shortSelected.size > 0 && (
+                    <>
+                      <button onClick={handleShortDownloadSelected} style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, background: 'var(--primary)', color: 'white', border: 'none', cursor: 'pointer' }}>선택 다운로드</button>
+                      <button onClick={handleShortDeleteSelected} style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, background: 'var(--error, #d93025)', color: 'white', border: 'none', cursor: 'pointer' }}>선택 삭제</button>
+                    </>
+                  )}
+                </div>
+              )}
               {shorts.length === 0
                 ? <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--muted)' }}>
                     <div style={{ fontSize: 40, marginBottom: 10, opacity: 0.3 }}>🎬</div>
@@ -290,6 +333,7 @@ export default function ShortsPanel({
                       background: 'white',
                       WebkitTapHighlightColor: 'transparent',
                     }}>
+                      <input type="checkbox" checked={shortSelected.has(s.filename)} onClick={e => e.stopPropagation()} onChange={() => shortToggle(s.filename)} style={{ cursor: 'pointer', accentColor: 'var(--primary)', width: 16, height: 16, flexShrink: 0 }} />
                       <div style={{ width: 80, height: 80, borderRadius: 10, overflow: 'hidden', background: '#202124', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
                         <video src={`${s.url}#t=1`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
                       </div>
@@ -384,9 +428,18 @@ export default function ShortsPanel({
         {activeTab === 'shorts' && (
           <>
             <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface2)' }}>
-              <div style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: 'var(--text2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                완성 쇼츠
-                <span style={{ background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>{shorts.length}</span>
+              <div style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: 'var(--text2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                {shorts.length > 0 && (
+                  <input type="checkbox" checked={shortSelected.size === shorts.length && shorts.length > 0} onChange={shortToggleAll} style={{ cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }} />
+                )}
+                <span style={{ flex: 1 }}>완성 쇼츠</span>
+                {shortSelected.size > 0
+                  ? <>
+                      <button onClick={handleShortDownloadSelected} style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: 'var(--primary)', color: 'white', border: 'none', cursor: 'pointer' }}>다운({shortSelected.size})</button>
+                      <button onClick={handleShortDeleteSelected} style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: 'var(--error, #d93025)', color: 'white', border: 'none', cursor: 'pointer' }}>삭제({shortSelected.size})</button>
+                    </>
+                  : <span style={{ background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>{shorts.length}</span>
+                }
               </div>
               {shorts.length === 0
                 ? <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)' }}>
@@ -395,11 +448,12 @@ export default function ShortsPanel({
                   </div>
                 : shorts.map(s => (
                     <div key={s.filename} onClick={() => onSelectShort(s)} style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer',
                       borderBottom: '1px solid var(--border)',
                       borderLeft: `3px solid ${selectedShort?.filename === s.filename ? 'var(--primary)' : 'transparent'}`,
                       background: selectedShort?.filename === s.filename ? 'var(--primary-bg)' : 'transparent',
                     }}>
+                      <input type="checkbox" checked={shortSelected.has(s.filename)} onClick={e => e.stopPropagation()} onChange={() => shortToggle(s.filename)} style={{ cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }} />
                       <div style={{ width: 83, height: 83, borderRadius: 6, overflow: 'hidden', background: '#202124', flexShrink: 0 }}>
                         <video src={`${s.url}#t=1`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
                       </div>
@@ -479,6 +533,11 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [volume,     setVolume]     = useState(1)
   const [narration, setNarration]   = useState(false)
   const [narrVoice, setNarrVoice]   = useState('female')
+  const [narrMode, setNarrMode]     = useState<'title' | 'script'>('title')
+  const [narrationScript, setNarrationScript] = useState('')
+  const [scriptMode, setScriptMode] = useState<'summary' | 'style_convert'>('summary')
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false)
+  const [genScriptMsg, setGenScriptMsg] = useState('')
   const [isRendering, setIsRendering] = useState(false)
   const [renderMsg, setRenderMsg]   = useState('')
   const [showSrt, setShowSrt]       = useState(false)
@@ -507,6 +566,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     const parts = raw.title.split(' / ')
     setTitle1(parts[0] || ''); setTitle2(parts[1] || ''); setChannelName(''); setRenderMsg('')
     setChannelX(0); setChannelY(0); setChannelFontsize(36); setChannelImageUrl('')
+    setNarrMode('title'); setNarrationScript(''); setGenScriptMsg(''); setScriptMode('summary')
     if (bgOptions.includes(raw.category)) {
       setBgType('image'); setBgImageName(raw.category); loadBg(raw.category)
     } else {
@@ -563,7 +623,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     const draw = () => {
       ctx.clearRect(0, 0, CV_W, CV_H)
       const cat = raw.category || 'economy'
-      const colors = (TMPL_COLORS[cat] || TMPL_COLORS.economy)[templateId] || { bg: '#0a0f0a', div: '#00E676' }
+      const colors = (TMPL_COLORS[cat] || TMPL_COLORS.economy)[templateId] || { bg: '#0a0f0a' }
       if (bgType === 'solid') {
         ctx.fillStyle = bgSolidColor; ctx.fillRect(0, 0, CV_W, CV_H)
       } else if (bgType === 'image') {
@@ -580,10 +640,6 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         ctx.drawImage(vid, 0, VID_Y_PX, CV_W, VID_H_PX)
         ctx.filter = 'none'
       }
-      ctx.fillStyle = colors.div
-      ctx.fillRect(0, VID_Y_PX, CV_W, Math.max(1, Math.round(4*SCALE)))
-      ctx.fillRect(0, VID_Y_PX+VID_H_PX-Math.max(1, Math.round(4*SCALE)), CV_W, Math.max(1, Math.round(4*SCALE)))
-
       const lines = [{ t: title1, c: t1Color }, { t: title2, c: t2Color }].filter(l => l.t.trim())
       if (lines.length) {
         const maxLen = Math.max(...lines.map(l => l.t.length))
@@ -686,25 +742,44 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     setIsRendering(true); setRenderMsg('')
     try {
       const { bgImage, bgSolidColor: bgSC } = getBgParams()
-      await api.render(raw.filename, getTitle(), subtitles, templateId, getStyle(), bgImage, bgSC, narration, narrVoice)
+      await api.render(raw.filename, getTitle(), subtitles, templateId, getStyle(), bgImage, bgSC, narration, narrVoice, narrMode)
       setRenderMsg(narration ? '✓ 나레이션 버전 렌더링 시작' : '✓ 렌더링 시작 — 완성 쇼츠 탭에서 확인')
       onStartPolling()
     } catch { setRenderMsg('오류가 발생했습니다') }
     finally { setIsRendering(false) }
   }
 
+  const handleGenerateScript = async () => {
+    if (!raw || isGeneratingScript) return
+    setIsGeneratingScript(true); setGenScriptMsg('')
+    try {
+      const res = await api.generateScript(raw.filename, scriptMode)
+      setNarrationScript(res.narration_script)
+      setGenScriptMsg(`✓ 대본 생성 완료 (효과음 ${res.sfx_placements.length}개)`)
+    } catch (e: any) {
+      setGenScriptMsg(e?.response?.data?.detail || '대본 생성 실패')
+    } finally {
+      setIsGeneratingScript(false)
+    }
+  }
+
+  const handleScriptBlur = async () => {
+    if (!raw) return
+    try { await api.updateNarrationScript(raw.filename, narrationScript) } catch {}
+  }
+
   // 모바일: 세로 스택 (캔버스 → 컨트롤)
   // 데스크톱: 가로 분할 (280px 미리보기 | flex 컨트롤)
   if (isMobile) {
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface)' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface)' }}>
         <video ref={hidVidRef} style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }} playsInline />
         {!raw
           ? <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: 8 }}>
               <div style={{ fontSize: 40, opacity: 0.15 }}>🎬</div>
               <p style={{ fontSize: 15, color: 'var(--text2)' }}>목록에서 영상을 선택하세요</p>
             </div>
-          : <div style={{ flex: 1, overflowY: 'auto' }}>
+          : <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
               {/* 캔버스 미리보기 — 전체 너비 */}
               <div style={{ background: 'var(--surface2)', padding: 14, display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ position: 'relative', width: '60%', maxWidth: 200, borderRadius: 10, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
@@ -833,6 +908,38 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                         <option value="female">여성 (SunHi)</option>
                         <option value="male">남성 (InJoon)</option>
                       </select>
+                      <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}>
+                          <input type="radio" name="narrMode" checked={narrMode === 'title'} onChange={() => setNarrMode('title')} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+                          제목만
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}>
+                          <input type="radio" name="narrMode" checked={narrMode === 'script'} onChange={() => setNarrMode('script')} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+                          전체 대본
+                        </label>
+                      </div>
+                      {narrMode === 'script' && (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ display: 'flex', gap: 12, marginBottom: 6 }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}>
+                              <input type="radio" name="scriptMode" checked={scriptMode === 'summary'} onChange={() => setScriptMode('summary')} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+                              전체 요약
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}>
+                              <input type="radio" name="scriptMode" checked={scriptMode === 'style_convert'} onChange={() => setScriptMode('style_convert')} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+                              화법 변환 (전체 유지)
+                            </label>
+                          </div>
+                          <button onClick={handleGenerateScript} disabled={isGeneratingScript} className="btn-outlined"
+                            style={{ fontSize: 13, padding: '5px 10px', cursor: 'pointer' }}>
+                            {isGeneratingScript ? '생성 중...' : '✨ AI 나레이션 대본 생성'}
+                          </button>
+                          {genScriptMsg && <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>{genScriptMsg}</p>}
+                          <textarea value={narrationScript} onChange={e => setNarrationScript(e.target.value)} onBlur={handleScriptBlur}
+                            placeholder="대본을 생성하거나 직접 입력하세요"
+                            className="input-field" style={{ width: '100%', marginTop: 6, minHeight: 80, resize: 'vertical', fontSize: 13, boxSizing: 'border-box' }} />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1029,6 +1136,38 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                       <option value="female">여성 목소리 (SunHi)</option>
                       <option value="male">남성 목소리 (InJoon)</option>
                     </select>
+                    <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}>
+                        <input type="radio" name="narrModeDesktop" checked={narrMode === 'title'} onChange={() => setNarrMode('title')} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+                        제목만
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}>
+                        <input type="radio" name="narrModeDesktop" checked={narrMode === 'script'} onChange={() => setNarrMode('script')} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+                        전체 대본
+                      </label>
+                    </div>
+                    {narrMode === 'script' && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ display: 'flex', gap: 12, marginBottom: 6 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}>
+                            <input type="radio" name="scriptModeDesktop" checked={scriptMode === 'summary'} onChange={() => setScriptMode('summary')} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+                            전체 요약
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}>
+                            <input type="radio" name="scriptModeDesktop" checked={scriptMode === 'style_convert'} onChange={() => setScriptMode('style_convert')} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+                            화법 변환 (전체 유지)
+                          </label>
+                        </div>
+                        <button onClick={handleGenerateScript} disabled={isGeneratingScript} className="btn-outlined"
+                          style={{ fontSize: 13, padding: '5px 10px', cursor: 'pointer' }}>
+                          {isGeneratingScript ? '생성 중...' : '✨ AI 나레이션 대본 생성'}
+                        </button>
+                        {genScriptMsg && <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>{genScriptMsg}</p>}
+                        <textarea value={narrationScript} onChange={e => setNarrationScript(e.target.value)} onBlur={handleScriptBlur}
+                          placeholder="대본을 생성하거나 직접 입력하세요"
+                          className="input-field" style={{ width: '100%', marginTop: 6, minHeight: 80, resize: 'vertical', fontSize: 13, boxSizing: 'border-box' }} />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

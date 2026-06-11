@@ -25,6 +25,7 @@ class PipelineStatus(BaseModel):
 class CollectRequest(BaseModel):
     clear_existing: bool = True
     limit_per_channel: int = 3
+    channel_urls: Optional[list[str]] = None
 
 
 class EditRequest(BaseModel):
@@ -64,6 +65,7 @@ class RenderRequest(BaseModel):
     bg_solid_color: Optional[str] = None
     narration: bool = False
     narration_voice: str = "female"
+    narration_mode: str = "title"  # "title" | "script"
 
 
 class PreviewRequest(BaseModel):
@@ -78,6 +80,21 @@ class PreviewRequest(BaseModel):
 class UpdateTitleRequest(BaseModel):
     filename: str
     intro_text: str
+
+
+class GenerateScriptRequest(BaseModel):
+    filename: str
+    mode: str = "summary"  # "summary" | "style_convert"
+
+
+class GenerateScriptResponse(BaseModel):
+    narration_script: str
+    sfx_placements: List[dict] = []
+
+
+class UpdateNarrationScriptRequest(BaseModel):
+    filename: str
+    narration_script: str
 
 
 class SrtEntry(BaseModel):

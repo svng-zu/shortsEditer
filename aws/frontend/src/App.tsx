@@ -92,9 +92,9 @@ function ShortsStudio() {
 
   if (isMobile) {
     return (
-      <div style={{ minHeight: '100dvh', background: 'var(--bg)' }}>
-        {/* 헤더 — sticky */}
-        <div style={{ position: 'sticky', top: 0, zIndex: 100, background: 'white', boxShadow: '0 1px 6px rgba(0,0,0,0.08)' }}>
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
+        {/* 헤더 */}
+        <div style={{ flexShrink: 0, zIndex: 100, background: 'white', boxShadow: '0 1px 6px rgba(0,0,0,0.08)' }}>
           <Header
             status={status} isRunning={isRunning} isPaused={isPaused}
             onPause={async () => { await api.pause(); setIsPaused(true) }}
@@ -106,8 +106,8 @@ function ShortsStudio() {
           {progressBar}
         </div>
 
-        {/* 콘텐츠 — 자연 스크롤, 하단 탭만큼 패딩 */}
-        <div style={{ paddingBottom: 70 }}>
+        {/* 콘텐츠 — 이 영역만 스크롤 */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {mobileView === 'pipeline' && (
             <Pipeline
               status={status} isRunning={isRunning}
@@ -121,9 +121,9 @@ function ShortsStudio() {
           </div>
         </div>
 
-        {/* 하단 탭 — fixed */}
+        {/* 하단 탭 — 항상 화면 하단에 고정 */}
         <nav style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+          flexShrink: 0, zIndex: 100,
           height: 58, display: 'flex',
           background: 'white', borderTop: '1px solid var(--border)',
           boxShadow: '0 -2px 10px rgba(0,0,0,0.07)',

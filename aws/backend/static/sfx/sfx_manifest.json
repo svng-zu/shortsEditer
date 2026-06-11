@@ -1,0 +1,9 @@
+{
+  "sfx": [
+    {"id": "whoosh", "file": "whoosh.mp3", "description": "장면 전환, 빠른 컷 전환에 사용"},
+    {"id": "impact", "file": "impact.mp3", "description": "충격적/강한 발언 강조"},
+    {"id": "ding", "file": "ding.mp3", "description": "수치·통계 등장 알림"},
+    {"id": "drumroll", "file": "drumroll.mp3", "description": "클라이맥스 직전 긴장감 조성"},
+    {"id": "news_alert", "file": "news_alert.mp3", "description": "뉴스 속보풍 알림음"}
+  ]
+}

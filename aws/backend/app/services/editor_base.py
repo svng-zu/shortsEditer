@@ -20,7 +20,7 @@ TOP_H = int(REMAINING_H * 0.50)
 BOTTOM_H = REMAINING_H - TOP_H
 VIDEO_Y = TOP_H
 
-BUFFER_SEC = 2
+BUFFER_SEC = 0
 MIN_SEGMENT_SEC = 5
 MAX_TOTAL_SEC = 90
 FACE_SAMPLE_FRAMES = 10
@@ -240,10 +240,6 @@ class EditorBase:
         filters = [f"pad={CANVAS_W}:{CANVAS_H}:0:{VIDEO_Y}:color={bg_color}"]
         if t.get("top_bg_color"):
             filters.append(f"drawbox=x=0:y=0:w={CANVAS_W}:h={TOP_H}:color={t['top_bg_color']}:t=fill")
-        if t.get("divider"):
-            dc = t["divider_color"]
-            filters.append(f"drawbox=x=0:y={VIDEO_Y}:w={CANVAS_W}:h=4:color={dc}:t=fill")
-            filters.append(f"drawbox=x=0:y={VIDEO_Y+VIDEO_H-4}:w={CANVAS_W}:h=4:color={dc}:t=fill")
         if title_text:
             filters += self._build_drawtext(
                 title_text, TOP_H // 2 + 140,
@@ -271,10 +267,6 @@ class EditorBase:
         t = self.template
         s = style or {}
         filters = []
-        if t.get("divider"):
-            dc = t["divider_color"]
-            filters.append(f"drawbox=x=0:y={VIDEO_Y}:w={CANVAS_W}:h=4:color={dc}:t=fill")
-            filters.append(f"drawbox=x=0:y={VIDEO_Y+VIDEO_H-4}:w={CANVAS_W}:h=4:color={dc}:t=fill")
         if title_text:
             filters += self._build_drawtext(
                 title_text, TOP_H // 2 + 140,
@@ -380,7 +372,7 @@ class EditorBase:
         cmd = [
             "ffmpeg", "-y", "-ss", str(seek), "-i", video_path,
             "-t", str(duration), "-vf", vf,
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "128k",
             output_path
         ]
@@ -423,7 +415,7 @@ class EditorBase:
             ["ffmpeg", "-y"] + inputs +
             ["-filter_complex", ";".join(fc_parts),
              "-map", "[vout]", "-map", "[aout]",
-             "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+             "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p",
              "-c:a", "aac", "-b:a", "128k",
              output_path]
         )
@@ -549,7 +541,8 @@ class EditorBase:
                       bg_image: str = None,
                       bg_solid_color: str = None,
                       narration: bool = False,
-                      narration_voice: str = "female") -> str:
+                      narration_voice: str = "female",
+                      narration_mode: str = "title") -> str:
         # style의 font_name으로 폰트 갱신
         if style and style.get("font_name"):
             self.font = self._resolve_font(style["font_name"])
@@ -610,7 +603,7 @@ class EditorBase:
                 ["ffmpeg", "-y"] + inputs +
                 ["-filter_complex", fc,
                  "-map", "[out]", "-map", "0:a?",
-                 "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                 "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p",
                  "-c:a", "aac", "-b:a", "128k"] + af_opts +
                 [output_path]
             )
@@ -640,7 +633,7 @@ class EditorBase:
                 ["ffmpeg", "-y"] + inputs +
                 ["-filter_complex", fc,
                  "-map", "[out]", "-map", "0:a?",
-                 "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                 "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p",
                  "-c:a", "aac", "-b:a", "128k"] + af_opts +
                 [output_path]
             )
@@ -673,7 +666,7 @@ class EditorBase:
                 ["ffmpeg", "-y"] + inputs +
                 ["-filter_complex", fc,
                  "-map", "[out]", "-map", "0:a?",
-                 "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                 "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p",
                  "-c:a", "aac", "-b:a", "128k"] + af_opts +
                 [output_path]
             )
@@ -715,13 +708,22 @@ class EditorBase:
         print(f"  [Stage 2] 완료 → {os.path.basename(output_path)}")
 
         # 나레이션 믹싱
-        if narration and title:
-            print(f"  [TTS] 나레이션 생성 중: '{title[:30]}'")
-            from app.services.tts import generate_narration, mix_narration
+        narration_text = title
+        if narration_mode == "script":
+            narration_text = analysis.get("narration_script") or title
+
+        if narration and narration_text:
+            print(f"  [TTS] 나레이션 생성 중: '{narration_text[:30]}'")
+            from app.services.tts import generate_narration, mix_narration, mix_narration_and_sfx
             narr_path = output_path.replace("_shorts.mp4", "_narr.mp3")
             mixed_path = output_path.replace("_shorts.mp4", "_shorts_narr.mp4")
-            if generate_narration(title, narr_path, narration_voice):
-                if mix_narration(output_path, narr_path, mixed_path):
+            if generate_narration(narration_text, narr_path, narration_voice):
+                if narration_mode == "script":
+                    sfx_events = self._resolve_sfx_events(analysis.get("sfx_placements", []))
+                    mixed_ok = mix_narration_and_sfx(output_path, narr_path, mixed_path, sfx_events=sfx_events)
+                else:
+                    mixed_ok = mix_narration(output_path, narr_path, mixed_path)
+                if mixed_ok:
                     import shutil
                     shutil.move(mixed_path, output_path)
                     print(f"  [TTS] 믹싱 완료 → {os.path.basename(output_path)}")
@@ -733,6 +735,29 @@ class EditorBase:
                 print(f"  [TTS] 나레이션 생성 실패, 원본 유지")
 
         return output_path
+
+    def _resolve_sfx_events(self, sfx_placements: list[dict]) -> list[dict]:
+        """sfx_placements의 sfx_id를 sfx_manifest.json을 통해 실제 파일 경로로 변환."""
+        if not sfx_placements:
+            return []
+        manifest_path = settings.SFX_DIR / "sfx_manifest.json"
+        if not manifest_path.exists():
+            return []
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                catalog = {s["id"]: s["file"] for s in json.load(f).get("sfx", [])}
+        except Exception as e:
+            print(f"  [SFX] manifest 로드 실패: {e}")
+            return []
+
+        events = []
+        for p in sfx_placements:
+            file_name = catalog.get(p.get("sfx_id"))
+            if not file_name:
+                continue
+            file_path = settings.SFX_DIR / file_name
+            events.append({"time": p.get("raw_time", 0), "file": str(file_path)})
+        return events
 
     def preview_frame(self, raw_path, analysis_path, title=None, style=None, seek=2.0, bg_image=None, bg_solid_color=None):
         if style and style.get("font_name"):

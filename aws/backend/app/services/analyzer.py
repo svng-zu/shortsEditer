@@ -3,6 +3,7 @@
 
 import os
 import json
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import google.generativeai as genai
 
@@ -154,6 +155,9 @@ SINGLE_TOPIC_PROMPT = """
 - ⚠️ 매우 중요: start와 end는 반드시 위 세그먼트 목록에 있는 어떤 세그먼트의 시작/종료 시각과 정확히 일치해야 합니다.
   세그먼트 중간 지점을 잘라서 사용하면 말이 끊긴 채로 영상이 시작되거나 끝나므로 절대 금지합니다.
   말이 자연스럽게 끝나는 세그먼트(문장이 마무리되는 지점)의 종료 시각을 end로 선택하세요.
+- ⚠️ 기자/앵커의 마무리 멘트(예: "OOO 기자입니다", "지금까지 MBC뉴스 OOO였습니다", "OOO뉴스 OOO입니다" 등
+  방송사명이나 기자 이름이 들어간 클로징 멘트)는 candidates에 포함하지 마세요. 해당 구간이 포함된 세그먼트는
+  start/end로 선택하지 말고, 그 직전 세그먼트에서 구간을 끝내세요.
 """
 
 MULTI_TOPIC_PROMPT = """
@@ -201,6 +205,9 @@ MULTI_TOPIC_PROMPT = """
 - ⚠️ 매우 중요: 모든 candidate의 start와 end는 반드시 위 세그먼트 목록에 있는 어떤 세그먼트의 시작/종료 시각과 정확히 일치해야 합니다.
   세그먼트 중간 지점을 잘라서 사용하면 말이 끊긴 채로 시작·종료되므로 절대 금지합니다.
   말이 자연스럽게 끝나는 세그먼트(문장이 마무리되는 지점)의 종료 시각을 end로 선택하세요.
+- ⚠️ 기자/앵커의 마무리 멘트(예: "OOO 기자입니다", "지금까지 MBC뉴스 OOO였습니다", "OOO뉴스 OOO입니다" 등
+  방송사명이나 기자 이름이 들어간 클로징 멘트)는 candidates에 포함하지 마세요. 해당 구간이 포함된 세그먼트는
+  start/end로 선택하지 말고, 그 직전 세그먼트에서 구간을 끝내세요.
 """
 
 MULTI_TOPIC_CATEGORIES = {"economy", "politics"}
@@ -213,6 +220,65 @@ CHUNK_SUMMARY_PROMPT = """
 {segments_text}
 
 형식: [시작s ~ 끝s] 핵심 요약
+"""
+
+# ────────────────────────────────────────────────
+# 나레이션 대본 리라이팅 + 효과음 위치 선정 프롬프트
+# ────────────────────────────────────────────────
+SCRIPT_REWRITE_PROMPT = """
+당신은 유튜브 쇼츠 나레이션 작가입니다.
+아래는 영상에서 선택된 구간들의 원본 발언 내용입니다:
+
+{combined_text}
+
+이 내용을 바탕으로 쇼츠 영상에 입힐 나레이션 대본을 새로 작성하세요.
+조건:
+- 구어체로, 시청자에게 말하듯 자연스럽게 작성
+- 두괄식 — 가장 임팩트 있는 내용을 먼저 전달
+- 원본 발언을 그대로 베끼지 말고 핵심만 간결하게 재구성
+- 전체 분량은 한국어 기준 약 {target_chars}자 내외 (TTS로 읽었을 때 영상 길이와 비슷하게)
+- 문장이 자연스럽게 끝나도록 마침표로 종결
+
+나레이션 대본만 출력하세요. 다른 설명, 따옴표, 마크다운은 포함하지 마세요.
+"""
+
+# 화법 변환 모드: 요약하지 않고 원본 발언 전체를 "한 사람이 옆에서 설명해주는" 구어체로만 바꿔서 재작성
+SCRIPT_STYLE_CONVERT_PROMPT = """
+당신은 유튜브 쇼츠 나레이션 작가입니다.
+아래는 영상에서 선택된 구간들의 원본 발언(뉴스 앵커/기자 말투) 내용입니다:
+
+{combined_text}
+
+이 내용을 한 사람이 시청자 옆에서 친근하게 설명해주는 말투로 바꿔서 다시 작성하세요.
+조건:
+- 절대 요약하지 말고, 원본에 담긴 정보·수치·순서를 빠짐없이 전부 유지하세요
+- "~입니다/~했습니다" 같은 뉴스 앵커식 격식체를 "~하더라고요/~한대요/~거든요/~인데요" 같은
+  친근한 구어체로 바꾸세요
+- 새로운 정보를 추가하거나 내용을 생략하지 말고, 표현과 어조만 바꾸세요
+- 문장이 자연스럽게 끝나도록 마침표로 종결
+
+나레이션 대본만 출력하세요. 다른 설명, 따옴표, 마크다운은 포함하지 마세요.
+"""
+
+SFX_SELECTION_PROMPT = """
+당신은 쇼츠 영상의 효과음 디자이너입니다.
+
+나레이션 대본:
+{narration_script}
+
+영상은 아래와 같은 구간들로 편집되어 있습니다 (raw_start/raw_end = 편집본 기준 시각, 초):
+{segments_text}
+
+사용 가능한 효과음 목록:
+{sfx_catalog}
+
+각 구간이 시작되는 시점(raw_start)마다 어울리는 효과음을 위 목록에서 골라 배치하세요.
+어울리는 효과음이 없으면 "none"으로 표시하세요.
+
+아래 JSON 배열 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요:
+[
+  {{"raw_time": 구간의 raw_start 값(숫자), "sfx_id": "효과음 id 또는 none"}}
+]
 """
 
 
@@ -341,7 +407,6 @@ class Analyzer:
 
     def analyze(self, transcript_path: str, category: str, analysis_dir=None) -> dict:
         """자막 분석 실행"""
-        from pathlib import Path
         if analysis_dir is None:
             analysis_dir = settings.ANALYSIS_DIR
         analysis_dir = Path(analysis_dir)
@@ -397,3 +462,97 @@ class Analyzer:
             except Exception as e:
                 print(f"[Analyzer] ERROR {path}: {e}")
         return all_results
+
+    def _load_sfx_catalog(self) -> list[dict]:
+        manifest_path = settings.SFX_DIR / "sfx_manifest.json"
+        if not manifest_path.exists():
+            return []
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                return json.load(f).get("sfx", [])
+        except Exception as e:
+            print(f"[Analyzer] sfx_manifest 로드 실패: {e}")
+            return []
+
+    def generate_script_and_sfx(self, analysis_path: str, transcript_path: str = None, mode: str = "summary") -> dict:
+        """편집된 구간(raw_segments)을 바탕으로 나레이션 대본을 재작성하고 효과음 위치를 선정한다.
+        edit_video() 실행 후(raw_segments가 존재할 때) 호출해야 한다."""
+        analysis_path = Path(analysis_path)
+        with open(analysis_path, "r", encoding="utf-8") as f:
+            analysis = json.load(f)
+
+        candidates = analysis.get("candidates", [])
+        raw_segments = analysis.get("raw_segments", [])
+        if not candidates or not raw_segments:
+            print(f"[Analyzer] generate_script_and_sfx: candidates/raw_segments 없음 — {analysis_path.name}")
+            return {}
+
+        transcript_path = transcript_path or analysis.get("transcript_path", "")
+        with open(transcript_path, "r", encoding="utf-8") as f:
+            transcript = json.load(f)
+        segments = transcript.get("segments", [])
+
+        # 1) 선택된 구간들의 발언 텍스트 결합 (edit_order 순서대로)
+        combined_parts = []
+        for cand in sorted(candidates, key=lambda c: c.get("edit_order", 99)):
+            start, end = cand["start"], cand["end"]
+            text = " ".join(
+                seg["text"].strip() for seg in segments
+                if seg["start"] >= start - 0.5 and seg["end"] <= end + 0.5
+            )
+            if text:
+                combined_parts.append(text)
+        combined_text = "\n".join(combined_parts)
+
+        if not combined_text.strip():
+            print(f"[Analyzer] generate_script_and_sfx: 결합 텍스트 없음 — {analysis_path.name}")
+            return {}
+
+        # 2) 나레이션 대본 재작성 (Gemini)
+        if mode == "style_convert":
+            # 화법 변환: 요약 없이 원본 발언 전체를 친근한 구어체로만 재작성
+            script_prompt = SCRIPT_STYLE_CONVERT_PROMPT.format(combined_text=combined_text)
+        else:
+            total_duration = sum(seg["raw_end"] - seg["raw_start"] for seg in raw_segments)
+            target_chars = max(int(total_duration * 4.5), 30)
+            script_prompt = SCRIPT_REWRITE_PROMPT.format(
+                combined_text=combined_text,
+                target_chars=target_chars,
+            )
+        narration_script = self._call_main(script_prompt, max_tokens=1024).strip()
+        narration_script = narration_script.strip('"').strip()
+
+        # 3) 효과음 위치 선정 (Gemini)
+        sfx_catalog = self._load_sfx_catalog()
+        sfx_placements = []
+        if sfx_catalog:
+            catalog_text = "\n".join(f"- {s['id']}: {s['description']}" for s in sfx_catalog)
+            segments_text = "\n".join(
+                f"[구간 {i+1}] raw_start={seg['raw_start']}s, raw_end={seg['raw_end']}s"
+                for i, seg in enumerate(raw_segments)
+            )
+            sfx_prompt = SFX_SELECTION_PROMPT.format(
+                narration_script=narration_script,
+                segments_text=segments_text,
+                sfx_catalog=catalog_text,
+            )
+            sfx_response = self._call_main(sfx_prompt, max_tokens=1024)
+            parsed = self._parse_response(sfx_response)
+            if isinstance(parsed, list):
+                valid_ids = {s["id"] for s in sfx_catalog}
+                for item in parsed:
+                    sfx_id = item.get("sfx_id")
+                    if sfx_id and sfx_id != "none" and sfx_id in valid_ids:
+                        sfx_placements.append({
+                            "raw_time": float(item.get("raw_time", 0)),
+                            "sfx_id": sfx_id,
+                        })
+
+        analysis["narration_script"] = narration_script
+        analysis["sfx_placements"] = sfx_placements
+        with open(analysis_path, "w", encoding="utf-8") as f:
+            json.dump(analysis, f, ensure_ascii=False, indent=2)
+
+        print(f"[Analyzer] 대본/효과음 생성 완료 → {analysis_path.name} "
+              f"(대본 {len(narration_script)}자, 효과음 {len(sfx_placements)}개)")
+        return {"narration_script": narration_script, "sfx_placements": sfx_placements}

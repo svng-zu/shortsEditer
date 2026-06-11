@@ -42,11 +42,13 @@ class Editor:
 
     def apply_overlay(self, raw_path: str, analysis_path: str,
                       title_override=None, subtitles=False, style=None, bg_image=None,
-                      bg_solid_color=None, narration=False, narration_voice="female"):
+                      bg_solid_color=None, narration=False, narration_voice="female",
+                      narration_mode="title"):
         return self._get_editor(analysis_path).apply_overlay(
             raw_path, analysis_path,
             title_override=title_override, subtitles=subtitles, style=style, bg_image=bg_image,
             bg_solid_color=bg_solid_color, narration=narration, narration_voice=narration_voice,
+            narration_mode=narration_mode,
         )
 
     def rerender(self, analysis_path: str, title_override=None, subtitles=False, style=None, bg_image=None, bg_solid_color=None):
