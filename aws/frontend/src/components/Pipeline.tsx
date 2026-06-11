@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { api, apiClient, PipelineStatus, VideoInfo, DownloadInfo } from '../services/api'
 
 const CATEGORIES_DL = [
@@ -561,7 +562,7 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
         </div>
       </div>
 
-      {playingDownload && (
+      {playingDownload && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#111', display: 'flex', flexDirection: 'column' }}>
           <div style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px' }}>
             <button onClick={() => setPlayingDownload(null)}
@@ -576,7 +577,8 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
             <video key={playingDownload.filename} src={playingDownload.thumbnail_url?.replace(/\/thumbnail$/, '')} controls autoPlay
               style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 12, boxShadow: '0 4px 32px rgba(0,0,0,0.5)' }} />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </aside>
   )
