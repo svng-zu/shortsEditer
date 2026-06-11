@@ -9,13 +9,18 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     fonts-nanum \
     curl \
+    unzip \
     nodejs \
     npm \
     && rm -rf /var/lib/apt/lists/*
 
+# yt-dlp EJS(JS Challenge) 솔버용 deno 런타임 설치 (node는 unsupported로 표시됨)
+RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh -s -- -y
+
 # Python 패키지 설치 (레이어 캐시 활용)
+# PyPI 인덱스가 일시적으로 503을 반환하는 경우가 있어 재시도 추가
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN sh -c 'for i in 1 2 3 4 5; do pip install --no-cache-dir -r requirements.txt && exit 0; sleep 10; done; exit 1'
 
 # yt-dlp-youtube-oauth2 플러그인 버그 패치 (device_code 파라미터 + 초기 데이터 API OAuth 제외)
 COPY patch_ytdlp_oauth.py .

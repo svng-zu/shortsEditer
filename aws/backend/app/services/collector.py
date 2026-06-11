@@ -86,7 +86,7 @@ def _auth_opts() -> dict:
         opts: dict = {
             "username": "oauth2",
             "password": "",
-            "js_runtimes": {"node": {}},  # n-challenge 해결용
+            # js_runtimes 미지정 시 yt-dlp가 기본 활성화된 deno를 사용 (Dockerfile에 설치됨)
         }
         # bgutil POT 서버가 살아있으면 extractor_args에 추가
         ea: dict = {"youtube": {"lang": ["ko"]}}
