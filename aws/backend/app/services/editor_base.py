@@ -316,7 +316,7 @@ class EditorBase:
         return entries
 
     @staticmethod
-    def _split_subtitle_line(text, max_chars=20):
+    def _split_subtitle_line(text, max_chars=14):
         if len(text) <= max_chars:
             return [text]
         mid = len(text) // 2
@@ -348,7 +348,7 @@ class EditorBase:
             raw_lines = [l for l in text.replace("\\n", "\n").split("\n") if l.strip()]
             lines = []
             for l in raw_lines:
-                lines.extend(self._split_subtitle_line(l, max_chars=20))
+                lines.extend(self._split_subtitle_line(l, max_chars=14))
             if not lines:
                 continue
             n = min(len(lines), 2)
