@@ -117,6 +117,13 @@ function SrtModal({ stem, onClose }: { stem: string; onClose: () => void }) {
   )
 }
 
+function fmtDuration(sec?: number | null): string {
+  if (sec == null) return ''
+  const total = Math.round(sec)
+  const m = Math.floor(total / 60), s = total % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 function CategoryBadge({ cat }: { cat: string }) {
   const map: Record<string, { bg: string; color: string; label: string }> = {
     sports:   { bg: '#e8f0fe', color: '#1a73e8', label: '스포츠' },
@@ -293,7 +300,10 @@ export default function ShortsPanel({
                         <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', marginBottom: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {r.title || r.filename}
                         </div>
-                        <CategoryBadge cat={r.category} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <CategoryBadge cat={r.category} />
+                          {r.duration != null && <span style={{ fontSize: 13, color: 'var(--muted)' }}>{fmtDuration(r.duration)}</span>}
+                        </div>
                       </div>
                       <button onClick={e => deleteRaw(r.filename, e)}
                         style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }}>삭제</button>
@@ -412,6 +422,7 @@ export default function ShortsPanel({
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <CategoryBadge cat={r.category} />
+                          {r.duration != null && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDuration(r.duration)}</span>}
                           <button onClick={e => deleteRaw(r.filename, e)}
                             style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', marginLeft: 'auto' }}>삭제</button>
                         </div>

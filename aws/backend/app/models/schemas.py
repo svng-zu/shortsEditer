@@ -157,6 +157,7 @@ class RawInfo(BaseModel):
     url: str
     title: str
     category: str
+    duration: Optional[float] = None
 
 
 # ── 사용자 계정 / 인증 ──────────────────────────────────────

@@ -135,6 +135,7 @@ export interface RawInfo {
   url: string
   title: string
   category: string
+  duration?: number | null
 }
 
 export interface VideoInfo {

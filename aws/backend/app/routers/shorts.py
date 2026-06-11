@@ -38,6 +38,15 @@ def _write_srt(entries: list, srt_path):
     srt_path.write_text(content, encoding="utf-8")
 
 
+def _get_video_duration(video_path) -> float | None:
+    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", str(video_path)]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True).stdout
+        return round(float(json.loads(out)["format"]["duration"]), 1)
+    except Exception:
+        return None
+
+
 @router.get("/shorts")
 async def list_shorts(session: SessionDirs = Depends(get_session)):
     shorts = []
@@ -87,6 +96,7 @@ async def list_raws(session: SessionDirs = Depends(get_session)):
             url=f"/api/media/raw/{session.session_id}/{quote(mp4.name)}",
             title=meta.get("intro_text", stem).replace("\\n", " / "),
             category=meta.get("category", ""),
+            duration=_get_video_duration(mp4),
         ))
     return {"raws": raws}
 
