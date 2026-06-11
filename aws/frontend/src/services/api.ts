@@ -260,6 +260,18 @@ export const api = {
     })
   },
 
+  async generateScript(filename: string, mode: string = 'summary'): Promise<{ narration_script: string; sfx_placements: any[] }> {
+    const { data } = await client.post('/api/generate-script', { filename, mode })
+    return data
+  },
+
+  async updateNarrationScript(filename: string, narrationScript: string): Promise<void> {
+    await client.post('/api/update-narration-script', {
+      filename,
+      narration_script: narrationScript,
+    })
+  },
+
   // Channels
   async getChannels(): Promise<{ channels: { url: string; category: string; thumbnail_url?: string }[] }> {
     const { data } = await client.get('/api/channels')
@@ -304,6 +316,7 @@ export const api = {
     bgSolidColor?: string,
     narration?: boolean,
     narrationVoice?: string,
+    narrationMode?: string,
   ): Promise<void> {
     await client.post('/api/render', {
       filename,
@@ -315,6 +328,7 @@ export const api = {
       bg_solid_color: bgSolidColor ?? null,
       narration: narration ?? false,
       narration_voice: narrationVoice ?? 'female',
+      narration_mode: narrationMode ?? 'title',
     })
   },
 
