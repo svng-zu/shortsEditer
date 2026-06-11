@@ -1,0 +1,51 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[NEWS 11 다시보기] 쿠팡에 6천억 '폭탄'…정보유출 역대 최고 과징금.json",
+  "category": "economy",
+  "intro_text": "우편 요금 인상\n생활 물가↑",
+  "candidates": [
+    {
+      "start": 1109.75,
+      "end": 1128.55,
+      "title": "우편 요금 오른다!",
+      "reason": "일반 우편 요금 인상이라는 생활 밀착형 경제 이슈를 직접적으로 언급하며 시청자의 관심을 유도합니다.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 1136.03,
+      "end": 1146.47,
+      "title": "얼마나 오를까?",
+      "reason": "구체적인 우편물 규격별 인상 금액을 제시하여 시청자가 자신의 우편물 요금 인상 폭을 가늠할 수 있도록 합니다.",
+      "score": 8,
+      "edit_order": 2
+    },
+    {
+      "start": 1158.83,
+      "end": 1165.88,
+      "title": "5년 만에 '껑충'",
+      "reason": "마지막 인상 시점과 비교하며 인상 폭이 커졌음을 강조하여 시청자에게 체감되는 변화를 전달합니다.",
+      "score": 8,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 22.8,
+      "orig_start": 1107.75,
+      "orig_end": 1130.55
+    },
+    {
+      "raw_start": 22.8,
+      "raw_end": 37.24,
+      "orig_start": 1134.03,
+      "orig_end": 1148.47
+    },
+    {
+      "raw_start": 37.24,
+      "raw_end": 48.29,
+      "orig_start": 1156.83,
+      "orig_end": 1167.88
+    }
+  ]
+}

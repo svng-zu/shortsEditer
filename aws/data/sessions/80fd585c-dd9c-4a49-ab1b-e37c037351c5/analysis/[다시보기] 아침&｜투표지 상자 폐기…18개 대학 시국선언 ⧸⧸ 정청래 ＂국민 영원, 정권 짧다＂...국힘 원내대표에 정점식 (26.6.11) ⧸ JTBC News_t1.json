@@ -1,0 +1,37 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/[다시보기] 아침&｜투표지 상자 폐기…18개 대학 시국선언 ⧸⧸ 정청래 ＂국민 영원, 정권 짧다＂...국힘 원내대표에 정점식 (26.6.11) ⧸ JTBC News.json",
+  "category": "politics",
+  "intro_text": "투표 용지 폐기 논란\n참정권 훼손 규탄",
+  "candidates": [
+    {
+      "start": 217.24,
+      "end": 290.78,
+      "title": "투표함 폐기, 충격의 진실",
+      "reason": "투표 용지 보관 상자 폐기라는 구체적인 사건과 학생회 시국 선언이라는 파장을 담고 있어 쇼츠의 서두로 적합합니다.",
+      "score": 8,
+      "edit_order": 1
+    },
+    {
+      "start": 302.5,
+      "end": 335.99,
+      "title": "학생회, 진상 조사 요구",
+      "reason": "학생회 요구 사항을 구체적으로 제시하며 사건의 쟁점을 명확히 보여줍니다. '진상 조사, 책임자 처벌' 등의 키워드가 중요합니다.",
+      "score": 7,
+      "edit_order": 2
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 73.54,
+      "orig_start": 217.24,
+      "orig_end": 290.78
+    },
+    {
+      "raw_start": 73.54,
+      "raw_end": 107.03,
+      "orig_start": 302.5,
+      "orig_end": 335.99
+    }
+  ]
+}
