@@ -12,6 +12,9 @@ __pycache__/
 hf_token
 ollama_private_key
 
+# GCP 서비스 계정 키 (민감정보)
+**/credentials/*.json
+
 # 데이터 파일 (용량 큼)
 downloads/
 outputs/

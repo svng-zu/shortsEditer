@@ -24,7 +24,7 @@ from app.models.schemas import (
     VideoInfoResponse, DownloadInfo, ProcessSelectedRequest, ProcessSelectedItem,
     GenerateScriptRequest, GenerateScriptResponse,
 )
-from app.services.collector import YoutubeCollector, CATEGORY_CHANNELS
+from app.services.collector import YoutubeCollector
 from app.services.analyzer import Analyzer
 from app.services.editor import Editor
 from app.services.s3_manager import get_s3
@@ -67,25 +67,10 @@ class ChannelItem(BaseModel):
 class ChannelDeleteRequest(BaseModel):
     url: str
 
-def _default_channels() -> list[dict]:
-    """코드에 하드코딩된 기본 채널 목록을 세션용 채널 항목 형식으로 변환."""
-    return [
-        {"url": url, "category": category, "thumbnail_url": ""}
-        for category, urls in CATEGORY_CHANNELS.items()
-        for url in urls
-    ]
-
 def _load_channels(s: SessionDirs) -> list[dict]:
     if not s.channels_path.exists():
-        defaults = _default_channels()
-        _save_channels(s, defaults)
-        return defaults
-    channels = json.loads(s.channels_path.read_text(encoding="utf-8"))
-    if not channels:
-        defaults = _default_channels()
-        _save_channels(s, defaults)
-        return defaults
-    return channels
+        return []
+    return json.loads(s.channels_path.read_text(encoding="utf-8"))
 
 def _save_channels(s: SessionDirs, channels: list[dict]):
     s.channels_path.write_text(json.dumps(channels, ensure_ascii=False, indent=2), encoding="utf-8")

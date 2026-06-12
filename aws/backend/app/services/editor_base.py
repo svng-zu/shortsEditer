@@ -558,9 +558,16 @@ class EditorBase:
         shorts_dir = self._sd.shorts_dir if self._sd else settings.SHORTS_DIR
         output_path = str(shorts_dir / f"{base_name}_shorts.mp4")
 
+        narration_text = title
+        if narration_mode == "script":
+            narration_text = analysis.get("narration_script") or title
+
         sub_entries = []
         if subtitles:
-            narration_subs = analysis.get("narration_subtitles") if narration else None
+            narration_subs = None
+            if narration and narration_text:
+                from app.services.tts import get_narration_subtitles
+                narration_subs = get_narration_subtitles(narration_text, narration_voice)
             if narration_subs:
                 from app.services.tts import NARRATION_DELAY
                 sub_entries = [
@@ -724,21 +731,21 @@ class EditorBase:
         print(f"  [Stage 2] 완료 → {os.path.basename(output_path)}")
 
         # 나레이션 믹싱
-        narration_text = title
-        if narration_mode == "script":
-            narration_text = analysis.get("narration_script") or title
-
         if narration and narration_text:
             print(f"  [TTS] 나레이션 생성 중: '{narration_text[:30]}'")
             from app.services.tts import generate_narration, mix_narration, mix_narration_and_sfx
             narr_path = output_path.replace("_shorts.mp4", "_narr.mp3")
             mixed_path = output_path.replace("_shorts.mp4", "_shorts_narr.mp4")
+            narration_volume = (style or {}).get("narration_volume", 1.2)
+            narration_video_volume = (style or {}).get("narration_video_volume", 0.3)
             if generate_narration(narration_text, narr_path, narration_voice):
                 if narration_mode == "script":
                     sfx_events = self._resolve_sfx_events(analysis.get("sfx_placements", []))
-                    mixed_ok = mix_narration_and_sfx(output_path, narr_path, mixed_path, sfx_events=sfx_events)
+                    mixed_ok = mix_narration_and_sfx(output_path, narr_path, mixed_path, sfx_events=sfx_events,
+                                                      narration_volume=narration_volume, video_volume=narration_video_volume)
                 else:
-                    mixed_ok = mix_narration(output_path, narr_path, mixed_path)
+                    mixed_ok = mix_narration(output_path, narr_path, mixed_path,
+                                              narration_volume=narration_volume, video_volume=narration_video_volume)
                 if mixed_ok:
                     import shutil
                     shutil.move(mixed_path, output_path)

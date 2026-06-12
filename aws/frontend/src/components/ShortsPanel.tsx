@@ -48,6 +48,37 @@ const SUB_FONT_OPTIONS: { value: string; label: string }[] = [
   { value: 'NanumMyeongjoBold',    label: '나눔명조 Bold' },
 ]
 
+// Google Cloud TTS 한국어(ko-KR) 음성 — SSML <mark> 타임포인트를 지원하는 타입만 포함
+// (Chirp3 HD는 <mark>를 지원하지 않아 나레이션 자막 생성이 동작하지 않음)
+const NARRATION_VOICE_GROUPS: { group: string; options: { value: string; label: string }[] }[] = [
+  {
+    group: 'Neural2 (고품질)',
+    options: [
+      { value: 'ko-KR-Neural2-A', label: '여성 A' },
+      { value: 'ko-KR-Neural2-B', label: '여성 B' },
+      { value: 'ko-KR-Neural2-C', label: '남성' },
+    ],
+  },
+  {
+    group: 'WaveNet',
+    options: [
+      { value: 'ko-KR-Wavenet-A', label: '여성 A' },
+      { value: 'ko-KR-Wavenet-B', label: '여성 B' },
+      { value: 'ko-KR-Wavenet-C', label: '남성 A' },
+      { value: 'ko-KR-Wavenet-D', label: '남성 B' },
+    ],
+  },
+  {
+    group: 'Standard',
+    options: [
+      { value: 'ko-KR-Standard-A', label: '여성 A' },
+      { value: 'ko-KR-Standard-B', label: '여성 B' },
+      { value: 'ko-KR-Standard-C', label: '남성 A' },
+      { value: 'ko-KR-Standard-D', label: '남성 B' },
+    ],
+  },
+]
+
 const bgCache: Record<string, HTMLImageElement | null> = {}
 function loadBg(name: string) {
   if (name in bgCache) return
@@ -544,7 +575,9 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [saturation, setSaturation] = useState(1)
   const [volume,     setVolume]     = useState(1)
   const [narration, setNarration]   = useState(false)
-  const [narrVoice, setNarrVoice]   = useState('female')
+  const [narrVolume, setNarrVolume] = useState(1.2)
+  const [narrVideoVolume, setNarrVideoVolume] = useState(0.3)
+  const [narrVoice, setNarrVoice]   = useState('ko-KR-Neural2-A')
   const [narrMode, setNarrMode]     = useState<'title' | 'script'>('title')
   const [narrationScript, setNarrationScript] = useState('')
   const [scriptMode, setScriptMode] = useState<'summary' | 'style_convert'>('summary')
@@ -728,6 +761,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     channel_image_url: channelImageUrl,
     font_name: subFont,
     brightness, contrast, saturation, volume,
+    narration_volume: narrVolume, narration_video_volume: narrVideoVolume,
   })
   const getTitle = () => { const t1=title1.trim(),t2=title2.trim(); return t1&&t2?`${t1}\n${t2}`:(t1||t2||'') }
 
@@ -936,8 +970,11 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                     <div style={{ marginTop: 10 }}>
                       <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>AI 분석 요약을 TTS로 변환해 도입부에 삽입합니다.</p>
                       <select value={narrVoice} onChange={e => setNarrVoice(e.target.value)} className="input-field" style={{ cursor: 'pointer', fontSize: 14 }}>
-                        <option value="female">여성 (SunHi)</option>
-                        <option value="male">남성 (InJoon)</option>
+                        {NARRATION_VOICE_GROUPS.map(g => (
+                          <optgroup key={g.group} label={g.group}>
+                            {g.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </optgroup>
+                        ))}
                       </select>
                       <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}>
@@ -978,6 +1015,12 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                         </button>
                         <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>나레이션 음성에 맞춰 자막을 생성합니다. '자막' 옵션을 켜면 렌더링 영상에 함께 표시됩니다.</p>
                         {genNarrSubsMsg && <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>{genNarrSubsMsg}</p>}
+                      </div>
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <Slider label="나레이션 음량" value={narrVolume} display={`${Math.round(narrVolume * 100)}%`}
+                          min={0} max={2} step={0.05} onChange={setNarrVolume} />
+                        <Slider label="원본 영상 음량" value={narrVideoVolume} display={`${Math.round(narrVideoVolume * 100)}%`}
+                          min={0} max={2} step={0.05} onChange={setNarrVideoVolume} />
                       </div>
                     </div>
                   )}
@@ -1176,8 +1219,11 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   <div>
                     <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>AI 분석의 요약문을 TTS로 변환해 영상 도입부에 삽입합니다.</p>
                     <select value={narrVoice} onChange={e => setNarrVoice(e.target.value)} className="input-field" style={{ cursor: 'pointer', fontSize: 14 }}>
-                      <option value="female">여성 목소리 (SunHi)</option>
-                      <option value="male">남성 목소리 (InJoon)</option>
+                      {NARRATION_VOICE_GROUPS.map(g => (
+                        <optgroup key={g.group} label={g.group}>
+                          {g.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </optgroup>
+                      ))}
                     </select>
                     <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}>
@@ -1218,6 +1264,12 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                       </button>
                       <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>나레이션 음성에 맞춰 자막을 생성합니다. '자막' 옵션을 켜면 렌더링 영상에 함께 표시됩니다.</p>
                       {genNarrSubsMsg && <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>{genNarrSubsMsg}</p>}
+                    </div>
+                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <Slider label="나레이션 음량" value={narrVolume} display={`${Math.round(narrVolume * 100)}%`}
+                        min={0} max={2} step={0.05} onChange={setNarrVolume} />
+                      <Slider label="원본 영상 음량" value={narrVideoVolume} display={`${Math.round(narrVideoVolume * 100)}%`}
+                        min={0} max={2} step={0.05} onChange={setNarrVideoVolume} />
                     </div>
                   </div>
                 )}

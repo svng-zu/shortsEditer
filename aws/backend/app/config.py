@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # Gemini
     GEMINI_API_KEY: str = ""
 
+    # TTS: Google Cloud Text-to-Speech (서비스 계정 키 파일 경로)
+    GCP_TTS_CREDENTIALS: str = ""
+
     # YouTube OAuth2 (Google Cloud Console에서 발급)
     YOUTUBE_CLIENT_ID: str = ""
     YOUTUBE_CLIENT_SECRET: str = ""

@@ -208,6 +208,8 @@ export interface StyleParams {
   contrast?: number
   saturation?: number
   volume?: number
+  narration_volume?: number
+  narration_video_volume?: number
 }
 
 export const api = {

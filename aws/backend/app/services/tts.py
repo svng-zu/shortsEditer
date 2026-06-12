@@ -1,50 +1,105 @@
 # backend/app/services/tts.py
-"""Amazon Polly Neural 기반 한국어 TTS 나레이션 생성"""
+"""Google Cloud Text-to-Speech (Neural2) 기반 한국어 TTS 나레이션 생성"""
 
-import json
+import re
 import subprocess
 import tempfile
 from functools import lru_cache
 from pathlib import Path
 
-import boto3
+from google.cloud import texttospeech_v1beta1 as texttospeech
 
 from app.config import settings
 
-# Polly 한국어(ko-KR) 음성은 Seoyeon/Jihye 둘 다 여성 음성뿐이라
-# (남성 한국어 Neural 음성 없음) 톤 차이를 두는 용도로만 구분한다.
+# ko-KR 음성 — SSML <mark> 타임포인트를 지원하는 Neural2/WaveNet/Standard만 포함
+# (Chirp3 HD는 <mark>를 지원하지 않아 나레이션 자막 생성(get_narration_subtitles)이 동작하지 않음)
 VOICES = {
-    "female": "Seoyeon",
-    "male":   "Jihye",
+    # 기존 값(하위 호환용)
+    "female": "ko-KR-Neural2-A",
+    "male":   "ko-KR-Neural2-C",
+    # Neural2
+    "ko-KR-Neural2-A": "ko-KR-Neural2-A",
+    "ko-KR-Neural2-B": "ko-KR-Neural2-B",
+    "ko-KR-Neural2-C": "ko-KR-Neural2-C",
+    # WaveNet
+    "ko-KR-Wavenet-A": "ko-KR-Wavenet-A",
+    "ko-KR-Wavenet-B": "ko-KR-Wavenet-B",
+    "ko-KR-Wavenet-C": "ko-KR-Wavenet-C",
+    "ko-KR-Wavenet-D": "ko-KR-Wavenet-D",
+    # Standard
+    "ko-KR-Standard-A": "ko-KR-Standard-A",
+    "ko-KR-Standard-B": "ko-KR-Standard-B",
+    "ko-KR-Standard-C": "ko-KR-Standard-C",
+    "ko-KR-Standard-D": "ko-KR-Standard-D",
 }
 
 # mix_narration*에서 나레이션 음성을 영상 시작 후 지연시키는 시간(초).
 # 나레이션 자막 타이밍을 영상 타임라인에 맞출 때도 동일한 오프셋을 더한다.
 NARRATION_DELAY = 0.5
 
+_DEFAULT_CREDENTIALS_PATH = Path(__file__).resolve().parent.parent / "credentials" / "gcp_tts_key.json"
+
 
 @lru_cache(maxsize=1)
-def _polly_client():
-    return boto3.client("polly", region_name=settings.AWS_REGION)
+def _tts_client():
+    creds_path = settings.GCP_TTS_CREDENTIALS or str(_DEFAULT_CREDENTIALS_PATH)
+    return texttospeech.TextToSpeechClient.from_service_account_file(creds_path)
+
+
+def _clean_text(text: str) -> str:
+    return text.replace("\\n", " ").replace("\n", " ").strip()
+
+
+def _split_sentences(text: str) -> list[str]:
+    """문장 단위로 분리 (마침표/물음표/느낌표 기준)."""
+    parts = re.split(r"(?<=[.!?])\s+", text)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _escape_ssml(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _wrap_lines(text: str, max_chars: int = 14) -> list[str]:
+    """단어 단위 그리디 줄바꿈. 모든 줄을 max_chars 이하로 유지한다."""
+    words = text.split()
+    lines, current, current_len = [], [], 0
+    for w in words:
+        added = len(w) + (1 if current else 0)
+        if current and current_len + added > max_chars:
+            lines.append(" ".join(current))
+            current, current_len = [w], len(w)
+        else:
+            current.append(w)
+            current_len += added
+    if current:
+        lines.append(" ".join(current))
+    return lines
+
+
+def _chunk_sentence_frames(sentence: str, max_chars: int = 14) -> list[str]:
+    """문장을 max_chars 이하 줄들로 줄바꿈한 뒤, 2줄씩 묶어 자막 프레임 문자열로 반환.
+
+    각 프레임은 '\\n'으로 구분된 최대 2줄."""
+    lines = _wrap_lines(sentence, max_chars)
+    return ["\n".join(lines[i:i + 2]) for i in range(0, len(lines), 2)]
 
 
 def generate_narration(text: str, output_path: str, voice: str = "female") -> bool:
     """TTS 음성 파일 생성. 성공하면 True 반환."""
     voice_name = VOICES.get(voice, VOICES["female"])
-    text = text.replace("\\n", " ").replace("\n", " ").strip()
+    text = _clean_text(text)
     if not text:
         return False
 
     try:
-        response = _polly_client().synthesize_speech(
-            Text=text,
-            OutputFormat="mp3",
-            VoiceId=voice_name,
-            Engine="neural",
-            LanguageCode="ko-KR",
+        response = _tts_client().synthesize_speech(
+            input=texttospeech.SynthesisInput(text=text),
+            voice=texttospeech.VoiceSelectionParams(language_code="ko-KR", name=voice_name),
+            audio_config=texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3),
         )
         with open(output_path, "wb") as f:
-            f.write(response["AudioStream"].read())
+            f.write(response.audio_content)
         return Path(output_path).exists() and Path(output_path).stat().st_size > 0
     except Exception as e:
         print(f"[TTS] 생성 실패: {e}")
@@ -141,47 +196,61 @@ def _audio_duration(audio_path: str) -> float:
 
 
 def get_narration_subtitles(text: str, voice: str = "female") -> list[dict]:
-    """나레이션 텍스트에 대해 Polly speech marks로 문장별 타이밍을 구해 자막 세그먼트를 반환한다.
+    """나레이션 텍스트에 대해 SSML mark 타임포인트로 문장별 타이밍을 구해 자막 세그먼트를 반환한다.
 
     반환값은 나레이션 음성(mp3) 시작 시점(0초) 기준 [{start, end, text}] 리스트.
     실제 영상 타임라인에 적용할 때는 NARRATION_DELAY를 더해 오프셋을 맞춘다.
     """
     voice_name = VOICES.get(voice, VOICES["female"])
-    text = text.replace("\\n", " ").replace("\n", " ").strip()
+    text = _clean_text(text)
     if not text:
         return []
 
+    sentences = _split_sentences(text)
+    if not sentences:
+        return []
+
+    ssml = "<speak>" + "".join(
+        f'<mark name="s{i}"/>{_escape_ssml(sent)}' for i, sent in enumerate(sentences)
+    ) + "</speak>"
+
     try:
-        marks_response = _polly_client().synthesize_speech(
-            Text=text,
-            OutputFormat="json",
-            VoiceId=voice_name,
-            Engine="neural",
-            LanguageCode="ko-KR",
-            SpeechMarkTypes=["sentence"],
+        request = texttospeech.SynthesizeSpeechRequest(
+            input=texttospeech.SynthesisInput(ssml=ssml),
+            voice=texttospeech.VoiceSelectionParams(language_code="ko-KR", name=voice_name),
+            audio_config=texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3),
+            enable_time_pointing=[texttospeech.SynthesizeSpeechRequest.TimepointType.SSML_MARK],
         )
-        raw = marks_response["AudioStream"].read().decode("utf-8")
-        marks = [json.loads(line) for line in raw.splitlines() if line.strip()]
+        response = _tts_client().synthesize_speech(request=request)
     except Exception as e:
         print(f"[TTS] speech marks 조회 실패: {e}")
         return []
 
-    if not marks:
+    timepoints = {tp.mark_name: tp.time_seconds for tp in response.timepoints}
+    if not timepoints:
         return []
 
-    # 마지막 문장의 종료 시각은 speech marks에 없으므로 실제 오디오 길이로 보정한다
+    # 마지막 문장의 종료 시각은 마크에 없으므로 실제 오디오 길이로 보정한다
     audio_duration = 0.0
     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
         tmp_path = tmp.name
     try:
-        if generate_narration(text, tmp_path, voice):
-            audio_duration = _audio_duration(tmp_path)
+        with open(tmp_path, "wb") as f:
+            f.write(response.audio_content)
+        audio_duration = _audio_duration(tmp_path)
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 
     subtitles = []
-    for i, mark in enumerate(marks):
-        start = mark["time"] / 1000.0
-        end = marks[i + 1]["time"] / 1000.0 if i + 1 < len(marks) else max(audio_duration, start)
-        subtitles.append({"start": round(start, 3), "end": round(end, 3), "text": mark["value"].strip()})
+    for i, sent in enumerate(sentences):
+        start = timepoints.get(f"s{i}", 0.0)
+        end = timepoints.get(f"s{i+1}", start) if i + 1 < len(sentences) else max(audio_duration, start)
+        frames = _chunk_sentence_frames(sent)
+        total_chars = sum(len(f.replace("\n", "")) for f in frames) or 1
+        t = start
+        for f in frames:
+            dur = (end - start) * (len(f.replace("\n", "")) / total_chars)
+            f_end = t + dur
+            subtitles.append({"start": round(t, 3), "end": round(f_end, 3), "text": f})
+            t = f_end
     return subtitles

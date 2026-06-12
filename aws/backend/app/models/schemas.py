@@ -54,6 +54,8 @@ class StyleParams(BaseModel):
     contrast: float = 1.0
     saturation: float = 1.0
     volume: float = 1.0
+    narration_volume: float = 1.2
+    narration_video_volume: float = 0.3
 
 
 class RenderRequest(BaseModel):

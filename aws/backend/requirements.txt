@@ -38,7 +38,8 @@ google-api-python-client>=2.100.0
 google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.1.0
 
-# TTS: Amazon Polly Neural (boto3로 호출, 위 boto3>=1.34.0 사용)
+# TTS: Google Cloud Text-to-Speech (Neural2)
+google-cloud-texttospeech>=2.16.0
 
 # Utilities
 httpx>=0.26.0
