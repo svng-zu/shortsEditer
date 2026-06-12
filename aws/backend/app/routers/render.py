@@ -19,7 +19,7 @@ async def _run_render(session_id: str, filename: str, title: str, subtitles: boo
                       template_id: int, style: dict = None, bg_image: str = None,
                       bg_solid_color: str = None,
                       narration: bool = False, narration_voice: str = "female",
-                      narration_mode: str = "title"):
+                      narration_mode: str = "title", narration_speed: float = 1.0):
     s = make_session(session_id)
     try:
         raw_path = s.raw_dir / filename
@@ -47,6 +47,7 @@ async def _run_render(session_id: str, filename: str, title: str, subtitles: boo
             narration=narration,
             narration_voice=narration_voice,
             narration_mode=narration_mode,
+            narration_speed=narration_speed,
         )
         if shorts_path and os.path.exists(shorts_path):
             get_s3().upload_and_cleanup(shorts_path, s.s3_key("shorts", os.path.basename(shorts_path)))
@@ -65,6 +66,7 @@ async def render(req: RenderRequest, background_tasks: BackgroundTasks,
         _run_render, session.session_id, req.filename, req.title,
         req.subtitles, req.template_id, req.style.model_dump(), req.bg_image,
         req.bg_solid_color, req.narration, req.narration_voice, req.narration_mode,
+        req.narration_speed,
     )
     return {"ok": True}
 

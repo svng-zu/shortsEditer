@@ -544,7 +544,8 @@ class EditorBase:
                       bg_solid_color: str = None,
                       narration: bool = False,
                       narration_voice: str = "female",
-                      narration_mode: str = "title") -> str:
+                      narration_mode: str = "title",
+                      narration_speed: float = 1.0) -> str:
         # style의 font_name으로 폰트 갱신
         if style and style.get("font_name"):
             self.font = self._resolve_font(style["font_name"])
@@ -567,7 +568,7 @@ class EditorBase:
             narration_subs = None
             if narration and narration_text:
                 from app.services.tts import get_narration_subtitles
-                narration_subs = get_narration_subtitles(narration_text, narration_voice)
+                narration_subs = get_narration_subtitles(narration_text, narration_voice, narration_speed)
             if narration_subs:
                 from app.services.tts import NARRATION_DELAY
                 sub_entries = [
@@ -738,7 +739,7 @@ class EditorBase:
             mixed_path = output_path.replace("_shorts.mp4", "_shorts_narr.mp4")
             narration_volume = (style or {}).get("narration_volume", 1.2)
             narration_video_volume = (style or {}).get("narration_video_volume", 0.3)
-            if generate_narration(narration_text, narr_path, narration_voice):
+            if generate_narration(narration_text, narr_path, narration_voice, narration_speed):
                 if narration_mode == "script":
                     sfx_events = self._resolve_sfx_events(analysis.get("sfx_placements", []))
                     mixed_ok = mix_narration_and_sfx(output_path, narr_path, mixed_path, sfx_events=sfx_events,

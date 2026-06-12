@@ -297,7 +297,7 @@ async def generate_narration_subtitles(req: GenerateNarrationSubtitlesRequest, s
         raise HTTPException(422, "나레이션 텍스트가 없습니다.")
 
     from app.services.tts import get_narration_subtitles
-    subtitles = await asyncio.to_thread(get_narration_subtitles, narration_text, req.narration_voice)
+    subtitles = await asyncio.to_thread(get_narration_subtitles, narration_text, req.narration_voice, req.narration_speed)
     if not subtitles:
         raise HTTPException(500, "나레이션 자막 생성 실패")
 

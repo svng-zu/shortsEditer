@@ -69,6 +69,7 @@ class RenderRequest(BaseModel):
     narration: bool = False
     narration_voice: str = "female"
     narration_mode: str = "title"  # "title" | "script"
+    narration_speed: float = 1.0
 
 
 class PreviewRequest(BaseModel):
@@ -110,6 +111,7 @@ class GenerateNarrationSubtitlesRequest(BaseModel):
     filename: str
     narration_voice: str = "female"
     narration_mode: str = "title"  # "title" | "script"
+    narration_speed: float = 1.0
 
 
 class GenerateNarrationSubtitlesResponse(BaseModel):

@@ -52,6 +52,46 @@ const SUB_FONT_OPTIONS: { value: string; label: string }[] = [
 // (Chirp3 HD는 <mark>를 지원하지 않아 나레이션 자막 생성이 동작하지 않음)
 const NARRATION_VOICE_GROUPS: { group: string; options: { value: string; label: string }[] }[] = [
   {
+    group: 'Chirp3 HD (최신·자연스러움) - 여성',
+    options: [
+      { value: 'ko-KR-Chirp3-HD-Achernar', label: 'Achernar' },
+      { value: 'ko-KR-Chirp3-HD-Aoede', label: 'Aoede' },
+      { value: 'ko-KR-Chirp3-HD-Autonoe', label: 'Autonoe' },
+      { value: 'ko-KR-Chirp3-HD-Callirrhoe', label: 'Callirrhoe' },
+      { value: 'ko-KR-Chirp3-HD-Despina', label: 'Despina' },
+      { value: 'ko-KR-Chirp3-HD-Erinome', label: 'Erinome' },
+      { value: 'ko-KR-Chirp3-HD-Gacrux', label: 'Gacrux' },
+      { value: 'ko-KR-Chirp3-HD-Kore', label: 'Kore' },
+      { value: 'ko-KR-Chirp3-HD-Laomedeia', label: 'Laomedeia' },
+      { value: 'ko-KR-Chirp3-HD-Leda', label: 'Leda' },
+      { value: 'ko-KR-Chirp3-HD-Pulcherrima', label: 'Pulcherrima' },
+      { value: 'ko-KR-Chirp3-HD-Sulafat', label: 'Sulafat' },
+      { value: 'ko-KR-Chirp3-HD-Vindemiatrix', label: 'Vindemiatrix' },
+      { value: 'ko-KR-Chirp3-HD-Zephyr', label: 'Zephyr' },
+    ],
+  },
+  {
+    group: 'Chirp3 HD (최신·자연스러움) - 남성',
+    options: [
+      { value: 'ko-KR-Chirp3-HD-Achird', label: 'Achird' },
+      { value: 'ko-KR-Chirp3-HD-Algenib', label: 'Algenib' },
+      { value: 'ko-KR-Chirp3-HD-Algieba', label: 'Algieba' },
+      { value: 'ko-KR-Chirp3-HD-Alnilam', label: 'Alnilam' },
+      { value: 'ko-KR-Chirp3-HD-Charon', label: 'Charon' },
+      { value: 'ko-KR-Chirp3-HD-Enceladus', label: 'Enceladus' },
+      { value: 'ko-KR-Chirp3-HD-Fenrir', label: 'Fenrir' },
+      { value: 'ko-KR-Chirp3-HD-Iapetus', label: 'Iapetus' },
+      { value: 'ko-KR-Chirp3-HD-Orus', label: 'Orus' },
+      { value: 'ko-KR-Chirp3-HD-Puck', label: 'Puck' },
+      { value: 'ko-KR-Chirp3-HD-Rasalgethi', label: 'Rasalgethi' },
+      { value: 'ko-KR-Chirp3-HD-Sadachbia', label: 'Sadachbia' },
+      { value: 'ko-KR-Chirp3-HD-Sadaltager', label: 'Sadaltager' },
+      { value: 'ko-KR-Chirp3-HD-Schedar', label: 'Schedar' },
+      { value: 'ko-KR-Chirp3-HD-Umbriel', label: 'Umbriel' },
+      { value: 'ko-KR-Chirp3-HD-Zubenelgenubi', label: 'Zubenelgenubi' },
+    ],
+  },
+  {
     group: 'Neural2 (고품질)',
     options: [
       { value: 'ko-KR-Neural2-A', label: '여성 A' },
@@ -578,6 +618,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [narrVolume, setNarrVolume] = useState(1.2)
   const [narrVideoVolume, setNarrVideoVolume] = useState(0.3)
   const [narrVoice, setNarrVoice]   = useState('ko-KR-Neural2-A')
+  const [narrSpeed, setNarrSpeed]   = useState(1.0)
   const [narrMode, setNarrMode]     = useState<'title' | 'script'>('title')
   const [narrationScript, setNarrationScript] = useState('')
   const [scriptMode, setScriptMode] = useState<'summary' | 'style_convert'>('summary')
@@ -790,7 +831,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     setIsRendering(true); setRenderMsg('')
     try {
       const { bgImage, bgSolidColor: bgSC } = getBgParams()
-      await api.render(raw.filename, getTitle(), subtitles, templateId, getStyle(), bgImage, bgSC, narration, narrVoice, narrMode)
+      await api.render(raw.filename, getTitle(), subtitles, templateId, getStyle(), bgImage, bgSC, narration, narrVoice, narrMode, narrSpeed)
       setRenderMsg(narration ? '✓ 나레이션 버전 렌더링 시작' : '✓ 렌더링 시작 — 완성 쇼츠 탭에서 확인')
       onStartPolling()
     } catch { setRenderMsg('오류가 발생했습니다') }
@@ -820,7 +861,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     if (!raw || isGeneratingNarrSubs) return
     setIsGeneratingNarrSubs(true); setGenNarrSubsMsg('')
     try {
-      const res = await api.generateNarrationSubtitles(raw.filename, narrVoice, narrMode)
+      const res = await api.generateNarrationSubtitles(raw.filename, narrVoice, narrMode, narrSpeed)
       setGenNarrSubsMsg(`✓ 나레이션 자막 ${res.subtitles.length}개 생성 완료`)
     } catch (e: any) {
       setGenNarrSubsMsg(e?.response?.data?.detail || '나레이션 자막 생성 실패')
@@ -1017,6 +1058,8 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                         {genNarrSubsMsg && <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>{genNarrSubsMsg}</p>}
                       </div>
                       <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <Slider label="나레이션 속도" value={narrSpeed} display={`${narrSpeed.toFixed(2)}x`}
+                          min={0.5} max={2} step={0.05} onChange={setNarrSpeed} />
                         <Slider label="나레이션 음량" value={narrVolume} display={`${Math.round(narrVolume * 100)}%`}
                           min={0} max={2} step={0.05} onChange={setNarrVolume} />
                         <Slider label="원본 영상 음량" value={narrVideoVolume} display={`${Math.round(narrVideoVolume * 100)}%`}
@@ -1266,6 +1309,8 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                       {genNarrSubsMsg && <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>{genNarrSubsMsg}</p>}
                     </div>
                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <Slider label="나레이션 속도" value={narrSpeed} display={`${narrSpeed.toFixed(2)}x`}
+                        min={0.5} max={2} step={0.05} onChange={setNarrSpeed} />
                       <Slider label="나레이션 음량" value={narrVolume} display={`${Math.round(narrVolume * 100)}%`}
                         min={0} max={2} step={0.05} onChange={setNarrVolume} />
                       <Slider label="원본 영상 음량" value={narrVideoVolume} display={`${Math.round(narrVideoVolume * 100)}%`}

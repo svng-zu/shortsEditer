@@ -1,8 +1,9 @@
 # backend/app/services/tts.py
-"""Google Cloud Text-to-Speech (Neural2) 기반 한국어 TTS 나레이션 생성"""
+"""Google Cloud Text-to-Speech (Chirp3 HD/Neural2 등) 기반 한국어 TTS 나레이션 생성"""
 
-import re
+import json
 import subprocess
+import sys
 import tempfile
 from functools import lru_cache
 from pathlib import Path
@@ -11,12 +12,44 @@ from google.cloud import texttospeech_v1beta1 as texttospeech
 
 from app.config import settings
 
-# ko-KR 음성 — SSML <mark> 타임포인트를 지원하는 Neural2/WaveNet/Standard만 포함
-# (Chirp3 HD는 <mark>를 지원하지 않아 나레이션 자막 생성(get_narration_subtitles)이 동작하지 않음)
+# ko-KR 음성
+# 나레이션 자막(get_narration_subtitles)은 생성된 오디오를 faster-whisper로 다시 분석해
+# 단어별 타임스탬프를 구하므로, 모든 음성(Chirp3 HD 포함)에서 동작한다.
 VOICES = {
     # 기존 값(하위 호환용)
     "female": "ko-KR-Neural2-A",
     "male":   "ko-KR-Neural2-C",
+    # Chirp3 HD (최신/고품질)
+    "ko-KR-Chirp3-HD-Achernar":      "ko-KR-Chirp3-HD-Achernar",
+    "ko-KR-Chirp3-HD-Achird":        "ko-KR-Chirp3-HD-Achird",
+    "ko-KR-Chirp3-HD-Algenib":       "ko-KR-Chirp3-HD-Algenib",
+    "ko-KR-Chirp3-HD-Algieba":       "ko-KR-Chirp3-HD-Algieba",
+    "ko-KR-Chirp3-HD-Alnilam":       "ko-KR-Chirp3-HD-Alnilam",
+    "ko-KR-Chirp3-HD-Aoede":         "ko-KR-Chirp3-HD-Aoede",
+    "ko-KR-Chirp3-HD-Autonoe":       "ko-KR-Chirp3-HD-Autonoe",
+    "ko-KR-Chirp3-HD-Callirrhoe":    "ko-KR-Chirp3-HD-Callirrhoe",
+    "ko-KR-Chirp3-HD-Charon":        "ko-KR-Chirp3-HD-Charon",
+    "ko-KR-Chirp3-HD-Despina":       "ko-KR-Chirp3-HD-Despina",
+    "ko-KR-Chirp3-HD-Enceladus":     "ko-KR-Chirp3-HD-Enceladus",
+    "ko-KR-Chirp3-HD-Erinome":       "ko-KR-Chirp3-HD-Erinome",
+    "ko-KR-Chirp3-HD-Fenrir":        "ko-KR-Chirp3-HD-Fenrir",
+    "ko-KR-Chirp3-HD-Gacrux":        "ko-KR-Chirp3-HD-Gacrux",
+    "ko-KR-Chirp3-HD-Iapetus":       "ko-KR-Chirp3-HD-Iapetus",
+    "ko-KR-Chirp3-HD-Kore":          "ko-KR-Chirp3-HD-Kore",
+    "ko-KR-Chirp3-HD-Laomedeia":     "ko-KR-Chirp3-HD-Laomedeia",
+    "ko-KR-Chirp3-HD-Leda":          "ko-KR-Chirp3-HD-Leda",
+    "ko-KR-Chirp3-HD-Orus":          "ko-KR-Chirp3-HD-Orus",
+    "ko-KR-Chirp3-HD-Puck":          "ko-KR-Chirp3-HD-Puck",
+    "ko-KR-Chirp3-HD-Pulcherrima":   "ko-KR-Chirp3-HD-Pulcherrima",
+    "ko-KR-Chirp3-HD-Rasalgethi":    "ko-KR-Chirp3-HD-Rasalgethi",
+    "ko-KR-Chirp3-HD-Sadachbia":     "ko-KR-Chirp3-HD-Sadachbia",
+    "ko-KR-Chirp3-HD-Sadaltager":    "ko-KR-Chirp3-HD-Sadaltager",
+    "ko-KR-Chirp3-HD-Schedar":       "ko-KR-Chirp3-HD-Schedar",
+    "ko-KR-Chirp3-HD-Sulafat":       "ko-KR-Chirp3-HD-Sulafat",
+    "ko-KR-Chirp3-HD-Umbriel":       "ko-KR-Chirp3-HD-Umbriel",
+    "ko-KR-Chirp3-HD-Vindemiatrix":  "ko-KR-Chirp3-HD-Vindemiatrix",
+    "ko-KR-Chirp3-HD-Zephyr":        "ko-KR-Chirp3-HD-Zephyr",
+    "ko-KR-Chirp3-HD-Zubenelgenubi": "ko-KR-Chirp3-HD-Zubenelgenubi",
     # Neural2
     "ko-KR-Neural2-A": "ko-KR-Neural2-A",
     "ko-KR-Neural2-B": "ko-KR-Neural2-B",
@@ -50,42 +83,43 @@ def _clean_text(text: str) -> str:
     return text.replace("\\n", " ").replace("\n", " ").strip()
 
 
-def _split_sentences(text: str) -> list[str]:
-    """문장 단위로 분리 (마침표/물음표/느낌표 기준)."""
-    parts = re.split(r"(?<=[.!?])\s+", text)
-    return [p.strip() for p in parts if p.strip()]
+def _group_words_into_frames(words: list[dict], max_chars: int = 14) -> list[dict]:
+    """단어별 타임스탬프를 max_chars 이하 줄로 그리디 줄바꿈한 뒤, 2줄씩 묶어 자막 프레임으로 반환.
 
-
-def _escape_ssml(text: str) -> str:
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
-def _wrap_lines(text: str, max_chars: int = 14) -> list[str]:
-    """단어 단위 그리디 줄바꿈. 모든 줄을 max_chars 이하로 유지한다."""
-    words = text.split()
-    lines, current, current_len = [], [], 0
+    words: [{"word": str, "start": float, "end": float}, ...] (faster-whisper 출력)
+    반환값: [{"start": float, "end": float, "text": str}, ...] — text는 '\\n'으로 구분된 최대 2줄.
+    """
+    lines: list[list[dict]] = []
+    current: list[dict] = []
+    current_len = 0
     for w in words:
-        added = len(w) + (1 if current else 0)
+        token = w["word"].strip()
+        if not token:
+            continue
+        added = len(token) + (1 if current else 0)
         if current and current_len + added > max_chars:
-            lines.append(" ".join(current))
-            current, current_len = [w], len(w)
+            lines.append(current)
+            current, current_len = [w], len(token)
         else:
             current.append(w)
             current_len += added
     if current:
-        lines.append(" ".join(current))
-    return lines
+        lines.append(current)
+
+    frames = []
+    for i in range(0, len(lines), 2):
+        frame_lines = lines[i:i + 2]
+        frame_words = [w for line in frame_lines for w in line]
+        text = "\n".join(" ".join(w["word"].strip() for w in line) for line in frame_lines)
+        frames.append({
+            "start": round(frame_words[0]["start"], 3),
+            "end": round(frame_words[-1]["end"], 3),
+            "text": text,
+        })
+    return frames
 
 
-def _chunk_sentence_frames(sentence: str, max_chars: int = 14) -> list[str]:
-    """문장을 max_chars 이하 줄들로 줄바꿈한 뒤, 2줄씩 묶어 자막 프레임 문자열로 반환.
-
-    각 프레임은 '\\n'으로 구분된 최대 2줄."""
-    lines = _wrap_lines(sentence, max_chars)
-    return ["\n".join(lines[i:i + 2]) for i in range(0, len(lines), 2)]
-
-
-def generate_narration(text: str, output_path: str, voice: str = "female") -> bool:
+def generate_narration(text: str, output_path: str, voice: str = "female", speed: float = 1.0) -> bool:
     """TTS 음성 파일 생성. 성공하면 True 반환."""
     voice_name = VOICES.get(voice, VOICES["female"])
     text = _clean_text(text)
@@ -96,7 +130,10 @@ def generate_narration(text: str, output_path: str, voice: str = "female") -> bo
         response = _tts_client().synthesize_speech(
             input=texttospeech.SynthesisInput(text=text),
             voice=texttospeech.VoiceSelectionParams(language_code="ko-KR", name=voice_name),
-            audio_config=texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3),
+            audio_config=texttospeech.AudioConfig(
+                audio_encoding=texttospeech.AudioEncoding.MP3,
+                speaking_rate=speed,
+            ),
         )
         with open(output_path, "wb") as f:
             f.write(response.audio_content)
@@ -182,75 +219,37 @@ def mix_narration_and_sfx(video_path: str, narration_path: str, output_path: str
     return True
 
 
-def _audio_duration(audio_path: str) -> float:
-    """ffprobe로 오디오 파일 길이(초) 조회"""
-    result = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", audio_path],
-        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
-    )
-    try:
-        return float(result.stdout.strip())
-    except ValueError:
-        return 0.0
-
-
-def get_narration_subtitles(text: str, voice: str = "female") -> list[dict]:
-    """나레이션 텍스트에 대해 SSML mark 타임포인트로 문장별 타이밍을 구해 자막 세그먼트를 반환한다.
+def get_narration_subtitles(text: str, voice: str = "female", speed: float = 1.0) -> list[dict]:
+    """나레이션 텍스트를 TTS로 합성한 뒤, faster-whisper로 단어별 타임스탬프를 구해 자막 세그먼트를 반환한다.
 
     반환값은 나레이션 음성(mp3) 시작 시점(0초) 기준 [{start, end, text}] 리스트.
     실제 영상 타임라인에 적용할 때는 NARRATION_DELAY를 더해 오프셋을 맞춘다.
+    모든 음성(Chirp3 HD 포함)에서 동작한다.
     """
-    voice_name = VOICES.get(voice, VOICES["female"])
     text = _clean_text(text)
     if not text:
         return []
 
-    sentences = _split_sentences(text)
-    if not sentences:
-        return []
-
-    ssml = "<speak>" + "".join(
-        f'<mark name="s{i}"/>{_escape_ssml(sent)}' for i, sent in enumerate(sentences)
-    ) + "</speak>"
-
-    try:
-        request = texttospeech.SynthesizeSpeechRequest(
-            input=texttospeech.SynthesisInput(ssml=ssml),
-            voice=texttospeech.VoiceSelectionParams(language_code="ko-KR", name=voice_name),
-            audio_config=texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3),
-            enable_time_pointing=[texttospeech.SynthesizeSpeechRequest.TimepointType.SSML_MARK],
-        )
-        response = _tts_client().synthesize_speech(request=request)
-    except Exception as e:
-        print(f"[TTS] speech marks 조회 실패: {e}")
-        return []
-
-    timepoints = {tp.mark_name: tp.time_seconds for tp in response.timepoints}
-    if not timepoints:
-        return []
-
-    # 마지막 문장의 종료 시각은 마크에 없으므로 실제 오디오 길이로 보정한다
-    audio_duration = 0.0
     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
         tmp_path = tmp.name
     try:
-        with open(tmp_path, "wb") as f:
-            f.write(response.audio_content)
-        audio_duration = _audio_duration(tmp_path)
+        if not generate_narration(text, tmp_path, voice, speed):
+            return []
+
+        result = subprocess.run(
+            [sys.executable, "-m", "app.services.narration_whisper_worker", tmp_path],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        if result.returncode != 0:
+            print(f"[TTS] 자막 타이밍 추출 실패: {result.stderr[-300:]}")
+            return []
+        words = json.loads(result.stdout).get("words", [])
+    except Exception as e:
+        print(f"[TTS] 자막 타이밍 추출 실패: {e}")
+        return []
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 
-    subtitles = []
-    for i, sent in enumerate(sentences):
-        start = timepoints.get(f"s{i}", 0.0)
-        end = timepoints.get(f"s{i+1}", start) if i + 1 < len(sentences) else max(audio_duration, start)
-        frames = _chunk_sentence_frames(sent)
-        total_chars = sum(len(f.replace("\n", "")) for f in frames) or 1
-        t = start
-        for f in frames:
-            dur = (end - start) * (len(f.replace("\n", "")) / total_chars)
-            f_end = t + dur
-            subtitles.append({"start": round(t, 3), "end": round(f_end, 3), "text": f})
-            t = f_end
-    return subtitles
+    if not words:
+        return []
+    return _group_words_into_frames(words)

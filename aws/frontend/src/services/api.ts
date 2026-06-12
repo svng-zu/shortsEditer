@@ -308,11 +308,12 @@ export const api = {
     })
   },
 
-  async generateNarrationSubtitles(filename: string, narrationVoice: string, narrationMode: string): Promise<{ subtitles: { start: number; end: number; text: string }[] }> {
+  async generateNarrationSubtitles(filename: string, narrationVoice: string, narrationMode: string, narrationSpeed?: number): Promise<{ subtitles: { start: number; end: number; text: string }[] }> {
     const { data } = await client.post('/api/generate-narration-subtitles', {
       filename,
       narration_voice: narrationVoice,
       narration_mode: narrationMode,
+      narration_speed: narrationSpeed ?? 1.0,
     })
     return data
   },
@@ -366,6 +367,7 @@ export const api = {
     narration?: boolean,
     narrationVoice?: string,
     narrationMode?: string,
+    narrationSpeed?: number,
   ): Promise<void> {
     await client.post('/api/render', {
       filename,
@@ -378,6 +380,7 @@ export const api = {
       narration: narration ?? false,
       narration_voice: narrationVoice ?? 'female',
       narration_mode: narrationMode ?? 'title',
+      narration_speed: narrationSpeed ?? 1.0,
     })
   },
 
