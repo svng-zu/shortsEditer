@@ -12,9 +12,10 @@ interface Props {
   quota?: Quota | null
   quotaNotice?: boolean
   compact?: boolean
+  onOpenAdmin?: () => void
 }
 
-export default function Header({ status, isRunning, isPaused, onPause, onResume, onStop, quota = null, quotaNotice = false, compact = false }: Props) {
+export default function Header({ status, isRunning, isPaused, onPause, onResume, onStop, quota = null, quotaNotice = false, compact = false, onOpenAdmin }: Props) {
   const { user, logout, openAuthModal } = useAuth()
   const [showProfile, setShowProfile] = useState(false)
   const [showQuotaPopover, setShowQuotaPopover] = useState(false)
@@ -178,6 +179,17 @@ export default function Header({ status, isRunning, isPaused, onPause, onResume,
             {compact ? '⏹' : '⏹ 종료'}
           </button>
         </>
+      )}
+
+      {/* 관리자 대시보드 진입 (PC 전용) */}
+      {!compact && user?.is_admin && onOpenAdmin && (
+        <button
+          onClick={onOpenAdmin}
+          className="btn-outlined"
+          style={{ padding: '6px 14px', fontSize: 13, flexShrink: 0 }}
+        >
+          관리자
+        </button>
       )}
 
       {/* 계정 */}

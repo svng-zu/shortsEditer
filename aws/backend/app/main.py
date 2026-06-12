@@ -13,7 +13,7 @@ from sqlalchemy.exc import OperationalError
 from app.config import settings
 from app.db import Base, engine
 from app.models import user  # noqa: F401  (Base.metadata에 테이블 등록)
-from app.routers import auth, pipeline, shorts, render, youtube
+from app.routers import auth, pipeline, shorts, render, youtube, admin
 
 app = FastAPI(
     title="고릴라AI API",
@@ -64,6 +64,7 @@ app.include_router(pipeline.router, prefix="/api", tags=["Pipeline"])
 app.include_router(shorts.router, prefix="/api", tags=["Shorts"])
 app.include_router(render.router, prefix="/api", tags=["Render"])
 app.include_router(youtube.router, prefix="/api", tags=["YouTube"])
+app.include_router(admin.router, prefix="/api", tags=["Admin"])
 
 # 정적 파일 서빙 (shorts/raw는 세션별 동적 서빙으로 대체)
 app.mount("/static", StaticFiles(directory=str(settings.STATIC_DIR)), name="static")

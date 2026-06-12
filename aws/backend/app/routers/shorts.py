@@ -1,6 +1,7 @@
 # backend/app/routers/shorts.py
 """쇼츠 CRUD API"""
 
+import asyncio
 import json
 import subprocess
 import requests
@@ -11,7 +12,10 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 
 from app.config import settings
 from app.session import get_session, SessionDirs, load_video_id_map
-from app.models.schemas import ShortInfo, RawInfo, UpdateTitleRequest, UpdateNarrationScriptRequest, SrtSaveRequest
+from app.models.schemas import (
+    ShortInfo, RawInfo, UpdateTitleRequest, UpdateNarrationScriptRequest, SrtSaveRequest,
+    GenerateNarrationSubtitlesRequest, GenerateNarrationSubtitlesResponse,
+)
 from app.services.s3_manager import get_s3
 
 router = APIRouter()
@@ -61,7 +65,7 @@ async def list_shorts(session: SessionDirs = Depends(get_session)):
         shorts.append(ShortInfo(
             filename=filename,
             url=f"/api/media/shorts/{session.session_id}/{quote(filename)}",
-            title=meta.get("intro_text", stem).replace("\\n", " "),
+            title=meta.get("intro_text", stem).replace("\n", " "),
             category=meta.get("category", ""),
             candidates=meta.get("candidates", []),
         ))
@@ -94,7 +98,7 @@ async def list_raws(session: SessionDirs = Depends(get_session)):
         raws.append(RawInfo(
             filename=mp4.name,
             url=f"/api/media/raw/{session.session_id}/{quote(mp4.name)}",
-            title=meta.get("intro_text", stem).replace("\\n", " / "),
+            title=meta.get("intro_text", stem).replace("\n", " / "),
             category=meta.get("category", ""),
             duration=_get_video_duration(mp4),
         ))
@@ -272,6 +276,35 @@ async def update_narration_script(req: UpdateNarrationScriptRequest, session: Se
     analysis_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     get_s3().upload(str(analysis_path), session.s3_key("analysis", analysis_path.name))
     return {"ok": True}
+
+
+@router.post("/generate-narration-subtitles", response_model=GenerateNarrationSubtitlesResponse)
+async def generate_narration_subtitles(req: GenerateNarrationSubtitlesRequest, session: SessionDirs = Depends(get_session)):
+    """나레이션 음성(TTS)에 대한 자막을 Polly speech marks로 생성해 analysis json에 저장한다.
+
+    렌더링 시 narration이 켜져 있으면 이 자막이 영상 자막 대신 사용된다.
+    """
+    stem = req.filename.replace("_shorts.mp4", "").replace("_raw.mp4", "")
+    analysis_path = session.analysis_dir / f"{stem}.json"
+    if not analysis_path.exists():
+        raise HTTPException(404, f"분석 파일 없음: {stem}.json")
+
+    data = json.loads(analysis_path.read_text(encoding="utf-8"))
+    narration_text = data.get("intro_text", "")
+    if req.narration_mode == "script":
+        narration_text = data.get("narration_script") or narration_text
+    if not narration_text.strip():
+        raise HTTPException(422, "나레이션 텍스트가 없습니다.")
+
+    from app.services.tts import get_narration_subtitles
+    subtitles = await asyncio.to_thread(get_narration_subtitles, narration_text, req.narration_voice)
+    if not subtitles:
+        raise HTTPException(500, "나레이션 자막 생성 실패")
+
+    data["narration_subtitles"] = subtitles
+    analysis_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    get_s3().upload(str(analysis_path), session.s3_key("analysis", analysis_path.name))
+    return GenerateNarrationSubtitlesResponse(subtitles=subtitles)
 
 
 @router.get("/srt/{stem}")

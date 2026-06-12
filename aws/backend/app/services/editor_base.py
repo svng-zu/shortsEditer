@@ -253,11 +253,12 @@ class EditorBase:
             ch_fontsize = int(s.get("channel_fontsize") or 36)
             ch_x_off = int(s.get("channel_x") or 0)
             ch_y_off = int(s.get("channel_y") or 0)
+            ch_color = self._css_to_ffmpeg(s.get("channel_color") or "#FFFFFF")
             cy = VIDEO_Y + VIDEO_H + (BOTTOM_H - ch_fontsize) // 2 + ch_y_off
             filters.append(
                 f"drawtext=text='{esc}'"
                 f"{font_opt}"
-                f":fontsize={ch_fontsize}:fontcolor=white@0.75"
+                f":fontsize={ch_fontsize}:fontcolor={ch_color}@0.75"
                 f":borderw=2:bordercolor=black@0.6"
                 f":x=(w-text_w)/2{f'+{ch_x_off}' if ch_x_off > 0 else f'{ch_x_off}' if ch_x_off < 0 else ''}:y={cy}"
             )
@@ -280,11 +281,12 @@ class EditorBase:
             ch_fontsize = int(s.get("channel_fontsize") or 36)
             ch_x_off = int(s.get("channel_x") or 0)
             ch_y_off = int(s.get("channel_y") or 0)
+            ch_color = self._css_to_ffmpeg(s.get("channel_color") or "#FFFFFF")
             cy = VIDEO_Y + VIDEO_H + (BOTTOM_H - ch_fontsize) // 2 + ch_y_off
             filters.append(
                 f"drawtext=text='{esc}'"
                 f"{font_opt}"
-                f":fontsize={ch_fontsize}:fontcolor=white@0.75"
+                f":fontsize={ch_fontsize}:fontcolor={ch_color}@0.75"
                 f":borderw=2:bordercolor=black@0.6"
                 f":x=(w-text_w)/2{f'+{ch_x_off}' if ch_x_off > 0 else f'{ch_x_off}' if ch_x_off < 0 else ''}:y={cy}"
             )
@@ -556,7 +558,17 @@ class EditorBase:
         shorts_dir = self._sd.shorts_dir if self._sd else settings.SHORTS_DIR
         output_path = str(shorts_dir / f"{base_name}_shorts.mp4")
 
-        sub_entries = self._generate_sub_entries(analysis_path) if subtitles else []
+        sub_entries = []
+        if subtitles:
+            narration_subs = analysis.get("narration_subtitles") if narration else None
+            if narration_subs:
+                from app.services.tts import NARRATION_DELAY
+                sub_entries = [
+                    (s["start"] + NARRATION_DELAY, s["end"] + NARRATION_DELAY, s["text"])
+                    for s in narration_subs
+                ]
+            else:
+                sub_entries = self._generate_sub_entries(analysis_path)
         sub_filters = self._build_sub_drawtext_filters(sub_entries, style)
         sub_str = ",".join(sub_filters)
 
@@ -690,8 +702,12 @@ class EditorBase:
                 old_fc = cmd[fc_idx]
                 parts = old_fc.rsplit("[out]", 1)
                 if len(parts) == 2:
+                    circle_mask = (
+                        "if(lte(pow(X-(W/2),2)+pow(Y-(H/2),2),pow(W/2,2)),255,0)"
+                    )
                     new_fc = (parts[0] + "[preav]" + parts[1]
-                              + f";[{av_idx}:v]scale={av_size}:{av_size}[avatar]"
+                              + f";[{av_idx}:v]scale={av_size}:{av_size},format=rgba,"
+                                f"geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='{circle_mask}'[avatar]"
                               + f";[preav][avatar]overlay={av_cx}:{av_cy}[out]")
                     cmd = list(cmd)
                     cmd.insert(fc_idx - 1, avatar_tmp.name)

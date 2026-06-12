@@ -84,6 +84,13 @@ async def get_current_user(
     return user
 
 
+async def require_admin(user: User = Depends(get_current_user)) -> User:
+    """관리자 전용 엔드포인트 가드 — is_admin이 아니면 403"""
+    if not user.is_admin:
+        raise HTTPException(403, "관리자 권한이 필요합니다.")
+    return user
+
+
 async def get_optional_user(
     authorization: str = Header(default=""),
     db: DbSession = Depends(get_db),

@@ -1,0 +1,53 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/＂우리가 호구냐＂ 두들기더니..＂주말 종전＂ 느닷없이 SNS [뉴스.zip⧸MBC뉴스].json",
+  "category": "politics",
+  "intro_text": "트럼프의 갑작스러운\n공습 취소",
+  "candidates": [
+    {
+      "start": 4.99,
+      "end": 9.39,
+      "title": "트럼프, 갑자기 SNS에",
+      "reason": "트럼프 대통령의 갑작스러운 공습 취소 발표는 여론의 큰 관심을 끌 수 있는 지점입니다. SNS를 통한 발표라는 점도 쇼츠에 적합합니다.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 15.63,
+      "end": 24.55,
+      "title": "하루 만에 태도 급변",
+      "reason": "오전까지 공습을 위협하다가 갑자기 태도를 바꾼 상황은 논쟁적이며, 시청자의 궁금증을 유발할 수 있습니다.",
+      "score": 8,
+      "edit_order": 2
+    },
+    {
+      "start": 73.79,
+      "end": 83.91,
+      "title": "이란, '합의 없다' 반박",
+      "reason": "트럼프의 발표와 상반되는 이란 측의 입장은 논쟁의 핵심이며, 폭로성 발언으로 볼 수 있습니다. 반전의 요소를 담고 있습니다.",
+      "score": 10,
+      "edit_order": 3
+    },
+    {
+      "start": 126.16,
+      "end": 129.96,
+      "title": "국제 유가 급락",
+      "reason": "공습 취소 소식이 국제 유가에 미친 영향은 구체적인 수치로 제시되어 시청자에게 현실적인 파장을 보여줍니다.",
+      "score": 7,
+      "edit_order": 4
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 8.92,
+      "orig_start": 15.63,
+      "orig_end": 24.55
+    },
+    {
+      "raw_start": 8.92,
+      "raw_end": 19.04,
+      "orig_start": 73.79,
+      "orig_end": 83.91
+    }
+  ]
+}

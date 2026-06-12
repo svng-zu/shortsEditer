@@ -1,0 +1,65 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/＂오세훈 당선도 부정선거!＂.. ＂맞습니다!＂ 난리난 잠실 [뉴스.zip⧸MBC뉴스].json",
+  "category": "politics",
+  "intro_text": "부정선거 주장 확산\n잠실 시위 현장",
+  "candidates": [
+    {
+      "start": 10.73,
+      "end": 25.0,
+      "title": "오세훈 당선도 부정선거?",
+      "reason": "영상 초반부터 '오세훈 당선 또한 부정선거'라는 강한 발언으로 시청자의 호기심을 자극하고, 논쟁적인 주장을 제시하여 클릭을 유도합니다.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 45.62,
+      "end": 53.56,
+      "title": "음모론 총출동!",
+      "reason": "태극기와 성조기를 든 수백 명의 시위대와 '대표적 부정 선거론자'들의 등장을 보여주며, 영상의 핵심 쟁점인 부정선거 음모론이 확산되는 배경을 설명합니다.",
+      "score": 8,
+      "edit_order": 2
+    },
+    {
+      "start": 124.39,
+      "end": 130.73,
+      "title": "극단적 목소리 커져",
+      "reason": "부정선거 음모론이 '윤호계인과 부정선거 음모론 같은 극단적 목소리'로 커지고 있음을 보여주며, 논쟁의 심화 과정을 보여주는 중요한 구간입니다.",
+      "score": 8,
+      "edit_order": 3
+    },
+    {
+      "start": 143.44,
+      "end": 152.23,
+      "title": "목숨 건 투쟁 선언",
+      "reason": "시위대의 '수개표 이것이 관철 될 때까지 제 모든 목숨까지 걸고 투쟁'이라는 강한 발언은 영상의 클라이맥스로, 시청자에게 강한 임팩트를 줄 수 있습니다.",
+      "score": 10,
+      "edit_order": 4
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 14.27,
+      "orig_start": 10.73,
+      "orig_end": 25.0
+    },
+    {
+      "raw_start": 14.27,
+      "raw_end": 22.21,
+      "orig_start": 45.62,
+      "orig_end": 53.56
+    },
+    {
+      "raw_start": 22.21,
+      "raw_end": 28.55,
+      "orig_start": 124.39,
+      "orig_end": 130.73
+    },
+    {
+      "raw_start": 28.55,
+      "raw_end": 37.34,
+      "orig_start": 143.44,
+      "orig_end": 152.23
+    }
+  ]
+}

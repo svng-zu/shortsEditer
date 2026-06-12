@@ -21,7 +21,9 @@ class Transcriber:
 
     def __init__(self, transcript_dir: str | None = None):
         self.model = WhisperModel(settings.WHISPER_MODEL, device="cpu", compute_type="int8")
-        self.language = settings.WHISPER_LANGUAGE
+        # "auto"/빈 값이면 None을 넘겨 faster-whisper가 영상마다 언어를 자동 감지하게 함
+        lang = settings.WHISPER_LANGUAGE.strip().lower()
+        self.language = None if lang in ("", "auto") else lang
         self.transcript_dir = Path(transcript_dir) if transcript_dir else settings.TRANSCRIPT_DIR
         print(f"[Transcriber] faster-whisper 초기화 완료: {settings.WHISPER_MODEL} (int8/cpu)")
 
@@ -104,7 +106,7 @@ class Transcriber:
         save_path = self.transcript_dir / f"{base_name}.json"
         transcript_data = {
             "video_path": video_path,
-            "language": self.language,
+            "language": (info.language if info else None) or self.language,
             "duration": info.duration if info else 0,
             "segments": segments
         }

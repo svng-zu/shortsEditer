@@ -46,7 +46,7 @@ class Settings(BaseSettings):
 
     # Whisper
     WHISPER_MODEL: str = "medium"
-    WHISPER_LANGUAGE: str = "ko"
+    WHISPER_LANGUAGE: str = "auto"
 
     # Paths
     BASE_DIR: Path = Path(__file__).parent.parent

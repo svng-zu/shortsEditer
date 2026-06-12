@@ -524,6 +524,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [subBgColor,   setSubBgColor]   = useState('#000000')
   const [subBgOpacity, setSubBgOpacity] = useState(0.6)
   const [channelName, setChannelName] = useState('')
+  const [channelColor, setChannelColor] = useState('#FFFFFF')
   const [channelX,    setChannelX]    = useState(0)
   const [channelY,    setChannelY]    = useState(0)
   const [channelFontsize, setChannelFontsize] = useState(36)
@@ -549,6 +550,8 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [scriptMode, setScriptMode] = useState<'summary' | 'style_convert'>('summary')
   const [isGeneratingScript, setIsGeneratingScript] = useState(false)
   const [genScriptMsg, setGenScriptMsg] = useState('')
+  const [isGeneratingNarrSubs, setIsGeneratingNarrSubs] = useState(false)
+  const [genNarrSubsMsg, setGenNarrSubsMsg] = useState('')
   const [isRendering, setIsRendering] = useState(false)
   const [renderMsg, setRenderMsg]   = useState('')
   const [showSrt, setShowSrt]       = useState(false)
@@ -576,8 +579,8 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     if (!raw) return
     const parts = raw.title.split(' / ')
     setTitle1(parts[0] || ''); setTitle2(parts[1] || ''); setChannelName(''); setRenderMsg('')
-    setChannelX(0); setChannelY(0); setChannelFontsize(36); setChannelImageUrl('')
-    setNarrMode('title'); setNarrationScript(''); setGenScriptMsg(''); setScriptMode('summary')
+    setChannelX(0); setChannelY(0); setChannelFontsize(36); setChannelColor('#FFFFFF'); setChannelImageUrl('')
+    setNarrMode('title'); setNarrationScript(''); setGenScriptMsg(''); setScriptMode('summary'); setGenNarrSubsMsg('')
     if (bgOptions.includes(raw.category)) {
       setBgType('image'); setBgImageName(raw.category); loadBg(raw.category)
     } else {
@@ -688,7 +691,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         ctx.textAlign = 'center'; ctx.textBaseline = 'top'
         ctx.font = `bold ${sz}px 'Malgun Gothic',sans-serif`
         ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2
-        ctx.fillStyle = 'rgba(255,255,255,0.75)'
+        ctx.fillStyle = _hexToRgba(channelColor, 0.75)
         ctx.fillText(channel, cX, cY)
         ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
         // 원형 아바타 이미지
@@ -708,7 +711,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     }
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleScale, subtitles, subSize, subColor, subY, subBgEnabled, subBgColor, subBgOpacity, channelName, channelX, channelY, channelFontsize, channelImageUrl, bgType, bgSolidColor, bgImageName, templateId, brightness, contrast, saturation])
+  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleScale, subtitles, subSize, subColor, subY, subBgEnabled, subBgColor, subBgOpacity, channelName, channelColor, channelX, channelY, channelFontsize, channelImageUrl, bgType, bgSolidColor, bgImageName, templateId, brightness, contrast, saturation])
 
   // 음량 조절 — 미리듣기 영상에 즉시 반영 (HTML 비디오는 0~1 범위만 지원하므로 100%까지만 미리듣기 가능, 그 이상은 렌더링 결과로 확인)
   useEffect(() => {
@@ -720,7 +723,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     title1_color: t1Color, title2_color: t2Color, title_y_extra: titleY,
     title_fontsize_scale: titleScale, sub_fontsize: subSize, sub_color: subColor, sub_margin_v: subY,
     sub_bg_enabled: subBgEnabled, sub_bg_color: subBgColor, sub_bg_opacity: subBgOpacity,
-    channel_name: channelName.trim(),
+    channel_name: channelName.trim(), channel_color: channelColor,
     channel_x: channelX, channel_y: channelY, channel_fontsize: channelFontsize,
     channel_image_url: channelImageUrl,
     font_name: subFont,
@@ -777,6 +780,19 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const handleScriptBlur = async () => {
     if (!raw) return
     try { await api.updateNarrationScript(raw.filename, narrationScript) } catch {}
+  }
+
+  const handleGenerateNarrationSubtitles = async () => {
+    if (!raw || isGeneratingNarrSubs) return
+    setIsGeneratingNarrSubs(true); setGenNarrSubsMsg('')
+    try {
+      const res = await api.generateNarrationSubtitles(raw.filename, narrVoice, narrMode)
+      setGenNarrSubsMsg(`✓ 나레이션 자막 ${res.subtitles.length}개 생성 완료`)
+    } catch (e: any) {
+      setGenNarrSubsMsg(e?.response?.data?.detail || '나레이션 자막 생성 실패')
+    } finally {
+      setIsGeneratingNarrSubs(false)
+    }
   }
 
   // 모바일: 세로 스택 (캔버스 → 컨트롤)
@@ -875,10 +891,14 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                       })}
                     </div>
                   )}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
                     <Slider label="X 위치" value={channelX} display={`${channelX}px`} min={-400} max={400} step={10} onChange={setChannelX} />
                     <Slider label="Y 위치" value={channelY} display={`${channelY}px`} min={-200} max={200} step={5} onChange={setChannelY} />
                     <Slider label="크기" value={channelFontsize} display={`${channelFontsize}px`} min={18} max={80} step={2} onChange={setChannelFontsize} />
+                    <div>
+                      <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
+                      <input type="color" value={channelColor} onChange={e => setChannelColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+                    </div>
                   </div>
                 </div>
 
@@ -951,6 +971,14 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                             className="input-field" style={{ width: '100%', marginTop: 6, minHeight: 80, resize: 'vertical', fontSize: 13, boxSizing: 'border-box' }} />
                         </div>
                       )}
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                        <button onClick={handleGenerateNarrationSubtitles} disabled={isGeneratingNarrSubs} className="btn-outlined"
+                          style={{ fontSize: 13, padding: '5px 10px', cursor: 'pointer' }}>
+                          {isGeneratingNarrSubs ? '생성 중...' : '📝 나레이션 자막 생성'}
+                        </button>
+                        <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>나레이션 음성에 맞춰 자막을 생성합니다. '자막' 옵션을 켜면 렌더링 영상에 함께 표시됩니다.</p>
+                        {genNarrSubsMsg && <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>{genNarrSubsMsg}</p>}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1103,10 +1131,14 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                     })}
                   </div>
                 )}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
                   <Slider label="X 위치" value={channelX} display={`${channelX}px`} min={-400} max={400} step={10} onChange={setChannelX} />
                   <Slider label="Y 위치" value={channelY} display={`${channelY}px`} min={-200} max={200} step={5} onChange={setChannelY} />
                   <Slider label="크기" value={channelFontsize} display={`${channelFontsize}px`} min={18} max={80} step={2} onChange={setChannelFontsize} />
+                  <div>
+                    <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
+                    <input type="color" value={channelColor} onChange={e => setChannelColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+                  </div>
                 </div>
               </div>
 
@@ -1179,6 +1211,14 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                           className="input-field" style={{ width: '100%', marginTop: 6, minHeight: 80, resize: 'vertical', fontSize: 13, boxSizing: 'border-box' }} />
                       </div>
                     )}
+                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                      <button onClick={handleGenerateNarrationSubtitles} disabled={isGeneratingNarrSubs} className="btn-outlined"
+                        style={{ fontSize: 13, padding: '5px 10px', cursor: 'pointer' }}>
+                        {isGeneratingNarrSubs ? '생성 중...' : '📝 나레이션 자막 생성'}
+                      </button>
+                      <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>나레이션 음성에 맞춰 자막을 생성합니다. '자막' 옵션을 켜면 렌더링 영상에 함께 표시됩니다.</p>
+                      {genNarrSubsMsg && <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>{genNarrSubsMsg}</p>}
+                    </div>
                   </div>
                 )}
               </div>

@@ -44,6 +44,7 @@ class StyleParams(BaseModel):
     sub_bg_color: str = "#000000"
     sub_bg_opacity: float = 0.6
     channel_name: str = ""
+    channel_color: str = "#FFFFFF"
     channel_x: int = 0
     channel_y: int = 0
     channel_fontsize: int = 36
@@ -95,6 +96,22 @@ class GenerateScriptResponse(BaseModel):
 class UpdateNarrationScriptRequest(BaseModel):
     filename: str
     narration_script: str
+
+
+class NarrationSubtitleEntry(BaseModel):
+    start: float
+    end: float
+    text: str
+
+
+class GenerateNarrationSubtitlesRequest(BaseModel):
+    filename: str
+    narration_voice: str = "female"
+    narration_mode: str = "title"  # "title" | "script"
+
+
+class GenerateNarrationSubtitlesResponse(BaseModel):
+    subtitles: List[NarrationSubtitleEntry]
 
 
 class SrtEntry(BaseModel):
@@ -203,3 +220,41 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+# ── Admin 대시보드 ──────────────────────────────────────────────────
+
+class AdminUserInfo(BaseModel):
+    id: str
+    email: str
+    name: Optional[str] = None
+    provider: str
+    is_admin: bool
+    created_at: datetime
+    session_id: str
+    quota_used: int
+    quota_limit: Optional[int] = None
+
+
+class AdminUserUpdateRequest(BaseModel):
+    is_admin: bool
+
+
+class AdminStats(BaseModel):
+    total_sessions: int
+    total_users: int
+    downloads: int
+    transcripts: int
+    analyses: int
+    raws: int
+    shorts: int
+    category_counts: dict[str, int]
+
+
+class AdminPipelineInfo(BaseModel):
+    session_id: str
+    step: PipelineStep
+    message: str
+    progress: int
+    is_paused: bool
+    user_email: Optional[str] = None

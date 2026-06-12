@@ -154,6 +154,38 @@ export interface DownloadInfo {
   duration: number | null
 }
 
+export interface AdminUserInfo {
+  id: string
+  email: string
+  name?: string | null
+  provider: string
+  is_admin: boolean
+  created_at: string
+  session_id: string
+  quota_used: number
+  quota_limit: number | null
+}
+
+export interface AdminStats {
+  total_sessions: number
+  total_users: number
+  downloads: number
+  transcripts: number
+  analyses: number
+  raws: number
+  shorts: number
+  category_counts: Record<string, number>
+}
+
+export interface AdminPipelineInfo {
+  session_id: string
+  step: string
+  message: string
+  progress: number
+  is_paused: boolean
+  user_email: string | null
+}
+
 export interface StyleParams {
   title1_color: string
   title2_color: string
@@ -166,6 +198,7 @@ export interface StyleParams {
   sub_bg_color?: string
   sub_bg_opacity?: number
   channel_name?: string
+  channel_color?: string
   channel_x?: number
   channel_y?: number
   channel_fontsize?: number
@@ -271,6 +304,15 @@ export const api = {
       filename,
       narration_script: narrationScript,
     })
+  },
+
+  async generateNarrationSubtitles(filename: string, narrationVoice: string, narrationMode: string): Promise<{ subtitles: { start: number; end: number; text: string }[] }> {
+    const { data } = await client.post('/api/generate-narration-subtitles', {
+      filename,
+      narration_voice: narrationVoice,
+      narration_mode: narrationMode,
+    })
+    return data
   },
 
   // Channels
@@ -458,5 +500,25 @@ export const api = {
 
   async saveSrt(stem: string, entries: { index: string; times: string; text: string }[]): Promise<void> {
     await client.post('/api/srt', { stem, entries })
+  },
+
+  // Admin
+  async getAdminUsers(): Promise<AdminUserInfo[]> {
+    const { data } = await client.get('/api/admin/users')
+    return data
+  },
+
+  async setUserAdmin(userId: string, isAdmin: boolean): Promise<void> {
+    await client.patch(`/api/admin/users/${userId}`, { is_admin: isAdmin })
+  },
+
+  async getAdminStats(): Promise<AdminStats> {
+    const { data } = await client.get('/api/admin/stats')
+    return data
+  },
+
+  async getAdminPipelines(): Promise<AdminPipelineInfo[]> {
+    const { data } = await client.get('/api/admin/pipelines')
+    return data
   },
 }

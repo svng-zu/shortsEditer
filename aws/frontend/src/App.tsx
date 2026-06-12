@@ -4,6 +4,7 @@ import Pipeline from './components/Pipeline'
 import ShortsPanel from './components/ShortsPanel'
 import AuthModal from './components/AuthModal'
 import LandingPage from './components/LandingPage'
+import AdminPage from './components/AdminPage'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { api, PipelineStatus, ShortInfo, RawInfo, Quota, DownloadInfo } from './services/api'
 
@@ -26,7 +27,7 @@ const MOBILE_TABS: { key: MobileView; icon: string; label: string }[] = [
   { key: 'shorts',   icon: '🎬', label: '편집실' },
 ]
 
-function ShortsStudio() {
+function ShortsStudio({ onOpenAdmin }: { onOpenAdmin?: () => void }) {
   const [status, setStatus]     = useState<PipelineStatus>({ step: 'idle', message: '대기 중', progress: 0 })
   const [shorts, setShorts]     = useState<ShortInfo[]>([])
   const [raws, setRaws]         = useState<RawInfo[]>([])
@@ -105,6 +106,7 @@ function ShortsStudio() {
             onResume={async () => { await api.resume(); setIsPaused(false) }}
             onStop={handleStop}
             quota={quota} quotaNotice={quotaNotice}
+            onOpenAdmin={onOpenAdmin}
             compact
           />
           {progressBar}
@@ -158,6 +160,7 @@ function ShortsStudio() {
           onResume={async () => { await api.resume(); setIsPaused(false) }}
           onStop={handleStop}
           quota={quota} quotaNotice={quotaNotice}
+          onOpenAdmin={onOpenAdmin}
         />
         {progressBar}
       </div>
@@ -180,7 +183,7 @@ function ShortsStudio() {
 }
 
 const SEEN_APP_KEY = 'gorila_seen_app'
-type AppView = 'landing' | 'app'
+type AppView = 'landing' | 'app' | 'admin'
 
 function AppShell() {
   const { user, showAuthModal } = useAuth()
@@ -202,7 +205,9 @@ function AppShell() {
 
   return (
     <>
-      {view === 'landing' ? <LandingPage onStart={enterApp} /> : <ShortsStudio />}
+      {view === 'landing' && <LandingPage onStart={enterApp} />}
+      {view === 'app' && <ShortsStudio onOpenAdmin={() => setView('admin')} />}
+      {view === 'admin' && <AdminPage onBack={() => setView('app')} />}
       {showAuthModal && <AuthModal />}
     </>
   )

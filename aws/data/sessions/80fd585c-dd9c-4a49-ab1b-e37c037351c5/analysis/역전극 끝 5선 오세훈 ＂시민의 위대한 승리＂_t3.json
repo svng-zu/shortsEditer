@@ -1,0 +1,51 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/역전극 끝 5선 오세훈 ＂시민의 위대한 승리＂.json",
+  "category": "politics",
+  "intro_text": "선관위 논란\n해체 촉구",
+  "candidates": [
+    {
+      "start": 772,
+      "end": 801,
+      "title": "투표 용지 부족 사태",
+      "reason": "민주주의 국가에서 발생한 투표 용지 부족 사태를 지적하며 선관위 조직의 긴장감 부족과 반성을 촉구하는 내용입니다. 선거 과정에서의 문제점을 명확히 짚어내어 시청자의 공감을 얻을 수 있습니다.",
+      "score": 8,
+      "edit_order": 1
+    },
+    {
+      "start": 801,
+      "end": 809,
+      "title": "선관위 해체 및 혁신",
+      "reason": "선관위 해체 및 근본적인 혁신을 각오해야 한다는 강력한 주장으로, 문제 해결에 대한 단호한 의지를 보여줍니다. 행안부와 대통령에게도 책임이 있음을 언급하며 논란의 범위를 확장합니다.",
+      "score": 9,
+      "edit_order": 2
+    },
+    {
+      "start": 835,
+      "end": 847,
+      "title": "본질적인 개혁 촉구",
+      "reason": "이번 기회에 선관위에 대한 모든 불신을 씻어낼 수 있는 '본질적인 개혁'을 촉구하며 마무리합니다. 문제 해결에 대한 강력한 메시지로 시청자들에게 깊은 인상을 남길 수 있습니다.",
+      "score": 8,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 29.0,
+      "orig_start": 772,
+      "orig_end": 801
+    },
+    {
+      "raw_start": 29.0,
+      "raw_end": 37.0,
+      "orig_start": 801,
+      "orig_end": 809
+    },
+    {
+      "raw_start": 37.0,
+      "raw_end": 49.0,
+      "orig_start": 835,
+      "orig_end": 847
+    }
+  ]
+}
