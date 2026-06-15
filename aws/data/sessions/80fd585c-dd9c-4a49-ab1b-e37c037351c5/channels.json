@@ -1,10 +1,5 @@
 [
   {
-    "url": "https://youtube.com/@joongangilbo?si=vKHFxzh5Y82EZwCy",
-    "category": "politics",
-    "thumbnail_url": "https://yt3.googleusercontent.com/iqcE5aK4gFUjm5A-QO4FLDCDrTgOXTfU3oCyirTZcT9Ev1i_sKtx82GqfF2rPDfbBgFtBqL0uw=s0"
-  },
-  {
     "url": "https://www.youtube.com/@JTBC_news",
     "category": "politics",
     "thumbnail_url": "https://yt3.googleusercontent.com/xlEW51OEZy5U90ITbOW-jRwdPm3OxlxOECdSlHFa38P-cQYwY7meJiJlPeulhxgCvwvo1nfkX5c=s0"
@@ -13,5 +8,15 @@
     "url": "https://www.youtube.com/@MBCNEWS11",
     "category": "politics",
     "thumbnail_url": "https://yt3.googleusercontent.com/ytc/AIdro_nKpBrT7zzqTfdlfUHzw60wMU5KqV-kBmiFjU9dvMI8ePo=s0"
+  },
+  {
+    "url": "https://www.youtube.com/@newskbs",
+    "category": "politics",
+    "thumbnail_url": "https://yt3.googleusercontent.com/LIRDgU59ID6x9CqOQQR5TO9WsaenXRWOwD5kj4pwY4mz24hRW6qxIiKZl1JSso-u6auqakRj0g=s0"
+  },
+  {
+    "url": "https://www.youtube.com/@sbsnews8",
+    "category": "politics",
+    "thumbnail_url": "https://yt3.googleusercontent.com/SqFZwlQcqLs4JMZd3lthkg79kCHi68eerNpkkahvEYSPWhm2afUNqFkbMC6J6JJcy9JJ_DzQ8w=s0"
   }
 ]

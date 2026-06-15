@@ -38,7 +38,7 @@ _LOGO_PATH = str(settings.STATIC_DIR / "logos" / "sports_emblem.png")
 class SportsEditor(EditorBase):
     """스포츠 에디터"""
     TEMPLATES = TEMPLATES
-    MAX_TOTAL_SEC = 59
+    MAX_TOTAL_SEC = 120
 
     def _get_logo_path(self) -> str:
         return _LOGO_PATH if os.path.exists(_LOGO_PATH) else None

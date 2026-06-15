@@ -3,6 +3,7 @@
 
 import os
 import json
+import re
 import subprocess
 import uuid
 import cv2
@@ -24,6 +25,10 @@ BUFFER_SEC = 0
 MIN_SEGMENT_SEC = 5
 MAX_TOTAL_SEC = 90
 FACE_SAMPLE_FRAMES = 10
+MIN_KEEP_SEC = 0.3
+
+# "OOO 기자입니다." / "OOO 특파원입니다" 같은 리포터 클로징 멘트 — 쇼츠에서는 불필요해 잘라낸다
+REPORTER_SIGNOFF_RE = re.compile(r"(기자|특파원)\s*입니다[.!?]?\s*$")
 
 TEMP_DIR = settings.BASE_DIR / "data" / "temp"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -51,6 +56,7 @@ class EditorBase:
         # 세션 경로 (없으면 기본 settings 경로 사용)
         self._sd = session_dirs
         self.font = self._resolve_font()
+        self.title_font = self.font
         templates = self.__class__.TEMPLATES
         if template_id is not None and template_id in templates:
             self.template = templates[template_id]
@@ -166,6 +172,36 @@ class EditorBase:
 
         return crop_x, crop_y, crop_w, crop_h
 
+    @staticmethod
+    def _find_signoff_ranges(segments, start, end):
+        """[start, end] 구간 내 "OOO 기자입니다."류 클로징 멘트의 (start, end) 목록을 반환"""
+        ranges = []
+        for seg in segments:
+            s, e = seg["start"], seg["end"]
+            if s >= start and e <= end and REPORTER_SIGNOFF_RE.search(seg["text"].strip()):
+                ranges.append((s, e))
+        return ranges
+
+    @staticmethod
+    def _subtract_ranges(start, end, cuts):
+        """[start, end]에서 cuts에 해당하는 구간들을 제외한 (start, end) 목록을 반환"""
+        cuts = sorted((max(c[0], start), min(c[1], end)) for c in cuts if c[1] > start and c[0] < end)
+        merged = []
+        for cs, ce in cuts:
+            if merged and cs <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], ce))
+            else:
+                merged.append((cs, ce))
+        keep = []
+        cur = start
+        for cs, ce in merged:
+            if cs > cur:
+                keep.append((cur, cs))
+            cur = max(cur, ce)
+        if cur < end:
+            keep.append((cur, end))
+        return keep
+
     def _build_drawtext(self, text, y_center, fontsize, color, border_color="0xFFD700", style=None):
         s = style or {}
         lines = [l.strip() for l in text.replace("\\n", "\n").split("\n") if l.strip()][:2]
@@ -184,8 +220,8 @@ class EditorBase:
         else:
             auto_size = int(fontsize * 0.54)
 
-        scale = s.get("title_fontsize_scale", 1.0)
-        auto_size = max(30, int(auto_size * scale))
+        fontsize_delta = s.get("title_fontsize_delta", 0)
+        auto_size = max(20, auto_size + int(fontsize_delta))
 
         c1 = self._css_to_ffmpeg(s.get("title1_color", "#FFD700"))
         c2 = self._css_to_ffmpeg(s.get("title2_color", "#FFFFFF"))
@@ -194,19 +230,40 @@ class EditorBase:
         line_h = auto_size + 20
         y_extra = s.get("title_y_extra", 0)
         start_y = (y_center + y_extra) - (len(lines) * line_h) // 2
-        font_opt = f":fontfile='{self.font}'" if self.font else ""
+        font_opt = f":fontfile='{self.title_font}'" if self.title_font else ""
+
+        def _box_opt(idx):
+            prefix = f"title{idx + 1}_bg"
+            if not s.get(f"{prefix}_enabled"):
+                return ""
+            bg_color = self._css_to_ffmpeg(s.get(f"{prefix}_color", "#000000"))
+            bg_opacity = max(0.0, min(1.0, s.get(f"{prefix}_opacity", 0.6)))
+            return f":box=1:boxcolor={bg_color}@{bg_opacity:.2f}:boxborderw=14"
+
+        border_colors = [
+            self._css_to_ffmpeg(s.get("title1_border_color", "#000000")),
+            self._css_to_ffmpeg(s.get("title2_border_color", "#000000")),
+        ]
+        border_widths = [
+            max(0.0, s.get("title1_border_width", 3.0)),
+            max(0.0, s.get("title2_border_width", 3.0)),
+        ]
 
         filters = []
         for i, line in enumerate(lines):
-            esc = line.replace("'", "\\'").replace(":", "\\:").replace("%", "\\%")
+            esc = line.replace("'", "'\\''").replace(":", "\\:").replace("%", "\\%")
             fc = line_colors[i] if i < len(line_colors) else "0xFFFFFF"
+            bw = border_widths[i] if i < len(border_widths) else 3.0
+            bc = border_colors[i] if i < len(border_colors) else "0x000000"
+            border_opt = f":borderw={bw}:bordercolor={bc}@0.85" if bw > 0 else ""
             filters.append(
                 f"drawtext=text='{esc}'"
                 f"{font_opt}"
                 f":fontsize={auto_size}"
                 f":fontcolor={fc}"
-                f":borderw=2:bordercolor={fc}"
+                f"{border_opt}"
                 f":shadowx=3:shadowy=3:shadowcolor=black@0.8"
+                f"{_box_opt(i)}"
                 f":x=(w-text_w)/2:y={start_y + i * line_h}"
             )
         return filters
@@ -233,6 +290,26 @@ class EditorBase:
             f"setsar=1"
         )
 
+    def _build_channel_topleft_filter(self, style=None):
+        """영상 좌측상단에 채널명을 표시하는 drawtext 필터 (출처 채널명과 별개)"""
+        s = style or {}
+        text = (s.get("channel_topleft_text") or "").strip()
+        if not text:
+            return None
+        esc = text.replace("'", "'\\''").replace(":", "\\:").replace("%", "\\%")
+        font_opt = f":fontfile='{self.font}'" if self.font else ""
+        fontsize = int(s.get("channel_topleft_fontsize") or 32)
+        color = self._css_to_ffmpeg(s.get("channel_topleft_color") or "#FFFFFF")
+        x_off = int(s.get("channel_topleft_x") or 0)
+        y_off = int(s.get("channel_topleft_y") or 0)
+        return (
+            f"drawtext=text='{esc}'"
+            f"{font_opt}"
+            f":fontsize={fontsize}:fontcolor={color}"
+            f":borderw=2:bordercolor=black@0.6"
+            f":x={x_off}:y={VIDEO_Y + y_off}"
+        )
+
     def _build_overlay_vf(self, title_text, style=None, bg_color_override=None):
         t = self.template
         s = style or {}
@@ -248,7 +325,7 @@ class EditorBase:
             )
         channel = (s.get("channel_name") or "").strip()
         if channel:
-            esc = channel.replace("'", "\\'").replace(":", "\\:").replace("%", "\\%")
+            esc = channel.replace("'", "'\\''").replace(":", "\\:").replace("%", "\\%")
             font_opt = f":fontfile='{self.font}'" if self.font else ""
             ch_fontsize = int(s.get("channel_fontsize") or 36)
             ch_x_off = int(s.get("channel_x") or 0)
@@ -262,6 +339,9 @@ class EditorBase:
                 f":borderw=2:bordercolor=black@0.6"
                 f":x=(w-text_w)/2{f'+{ch_x_off}' if ch_x_off > 0 else f'{ch_x_off}' if ch_x_off < 0 else ''}:y={cy}"
             )
+        topleft = self._build_channel_topleft_filter(style)
+        if topleft:
+            filters.append(topleft)
         return ",".join(filters)
 
     def _build_text_filters(self, title_text, style=None):
@@ -276,7 +356,7 @@ class EditorBase:
             )
         channel = (s.get("channel_name") or "").strip()
         if channel:
-            esc = channel.replace("'", "\\'").replace(":", "\\:").replace("%", "\\%")
+            esc = channel.replace("'", "'\\''").replace(":", "\\:").replace("%", "\\%")
             font_opt = f":fontfile='{self.font}'" if self.font else ""
             ch_fontsize = int(s.get("channel_fontsize") or 36)
             ch_x_off = int(s.get("channel_x") or 0)
@@ -290,6 +370,9 @@ class EditorBase:
                 f":borderw=2:bordercolor=black@0.6"
                 f":x=(w-text_w)/2{f'+{ch_x_off}' if ch_x_off > 0 else f'{ch_x_off}' if ch_x_off < 0 else ''}:y={cy}"
             )
+        topleft = self._build_channel_topleft_filter(style)
+        if topleft:
+            filters.append(topleft)
         return filters
 
     def _generate_sub_entries(self, analysis_path):
@@ -318,15 +401,23 @@ class EditorBase:
         return entries
 
     @staticmethod
-    def _split_subtitle_line(text, max_chars=14):
-        if len(text) <= max_chars:
-            return [text]
-        mid = len(text) // 2
-        for delta in range(mid):
-            for pos in [mid - delta, mid + delta]:
-                if 0 < pos < len(text) and text[pos] == " ":
-                    return [text[:pos].strip(), text[pos:].strip()]
-        return [text[:mid], text[mid:]]
+    def _wrap_subtitle_lines(text, max_chars=12):
+        """단어 단위 그리디 줄바꿈. 모든 줄을 max_chars 이하로 유지한다."""
+        words = text.split()
+        if not words:
+            return []
+        lines, current, current_len = [], [], 0
+        for w in words:
+            added = len(w) + (1 if current else 0)
+            if current and current_len + added > max_chars:
+                lines.append(" ".join(current))
+                current, current_len = [w], len(w)
+            else:
+                current.append(w)
+                current_len += added
+        if current:
+            lines.append(" ".join(current))
+        return lines
 
     def _build_sub_drawtext_filters(self, entries, style=None):
         if not entries:
@@ -348,26 +439,35 @@ class EditorBase:
         filters = []
         for (t_start, t_end, text) in entries:
             raw_lines = [l for l in text.replace("\\n", "\n").split("\n") if l.strip()]
-            lines = []
+            wrapped = []
             for l in raw_lines:
-                lines.extend(self._split_subtitle_line(l, max_chars=14))
-            if not lines:
+                wrapped.extend(self._wrap_subtitle_lines(l, max_chars=12))
+            if not wrapped:
                 continue
-            n = min(len(lines), 2)
-            lines = lines[:n]
-            enable = f"between(t,{t_start:.3f},{t_end:.3f})"
-            for i, line in enumerate(lines):
-                y = base_y - (n - i) * line_h
-                esc = line.replace("'", "\\'").replace(":", "\\:").replace("%", "\\%")
-                filters.append(
-                    f"drawtext=text='{esc}'{font_opt}"
-                    f":fontsize={fontsize}:fontcolor={fontcolor}"
-                    f":borderw=4:bordercolor=black@0.95"
-                    f":shadowx=3:shadowy=3:shadowcolor=black@0.7"
-                    f"{box_opt}"
-                    f":x=(w-text_w)/2:y={y}"
-                    f":enable='{enable}'"
-                )
+
+            # 줄이 2개를 넘으면 여러 프레임으로 나눠, 구간을 글자수 비례로 분배한다
+            frames = ["\n".join(wrapped[i:i + 2]) for i in range(0, len(wrapped), 2)]
+            total_chars = sum(len(f) for f in frames) or 1
+            duration = max(0.0, t_end - t_start)
+            cursor = t_start
+            for frame in frames:
+                frame_lines = frame.split("\n")
+                frame_end = cursor + duration * (len(frame) / total_chars)
+                enable = f"between(t,{cursor:.3f},{frame_end:.3f})"
+                n = len(frame_lines)
+                for i, line in enumerate(frame_lines):
+                    y = base_y - (n - i) * line_h
+                    esc = line.replace("'", "'\\''").replace(":", "\\:").replace("%", "\\%")
+                    filters.append(
+                        f"drawtext=text='{esc}'{font_opt}"
+                        f":fontsize={fontsize}:fontcolor={fontcolor}"
+                        f":borderw=4:bordercolor=black@0.95"
+                        f":shadowx=3:shadowy=3:shadowcolor=black@0.7"
+                        f"{box_opt}"
+                        f":x=(w-text_w)/2:y={y}"
+                        f":enable='{enable}'"
+                    )
+                cursor = frame_end
         return filters
 
     def _render_clip(self, video_path, seek, duration, vf, output_path):
@@ -446,7 +546,66 @@ class EditorBase:
     def _get_logo_path(self) -> str:
         return None
 
-    def edit_video(self, analysis_path) -> str:
+    def _select_candidates_v1(self, candidates):
+        """전체 후보 길이가 MAX_TOTAL_SEC를 초과하면 score가 높은 구간을 우선 유지한다.
+        선택된 구간은 다시 edit_order 순서로 재배열해 자연스러운 흐름을 유지한다."""
+        valid = [c for c in candidates if (c["end"] - c["start"]) >= MIN_SEGMENT_SEC]
+        total = sum(c["end"] - c["start"] for c in valid)
+        if total <= self.MAX_TOTAL_SEC:
+            return valid
+
+        by_score = sorted(valid, key=lambda c: c.get("score", 0), reverse=True)
+        selected = []
+        budget = self.MAX_TOTAL_SEC
+        for c in by_score:
+            dur = c["end"] - c["start"]
+            if dur <= budget:
+                selected.append(c)
+                budget -= dur
+
+        selected.sort(key=lambda c: c.get("edit_order", 99))
+        return selected
+
+    @staticmethod
+    def _renumber_edit_order(candidates):
+        result = []
+        for i, c in enumerate(candidates):
+            c = dict(c)
+            c["edit_order"] = i + 1
+            result.append(c)
+        return result
+
+    def _select_candidates(self, candidates, variant=1):
+        """variant별로 다른 구간 선택/배치 전략을 적용한다.
+        - v1: 기존 로직 (내러티브 순서)
+        - v2: v1과 동일한 구간 선택, 단 가장 score가 높은 구간을 맨 앞으로 배치 (하이라이트 인트로)
+        - v3: 전체 후보를 score 내림차순으로 정렬해 더 작은 예산 안에서 선택 (압축 하이라이트)"""
+        if variant == 1:
+            return self._select_candidates_v1(candidates)
+
+        if variant == 2:
+            selected = self._select_candidates_v1(candidates)
+            if len(selected) > 1:
+                best = max(selected, key=lambda c: c.get("score", 0))
+                rest = [c for c in selected if c is not best]
+                selected = [best] + rest
+            return self._renumber_edit_order(selected)
+
+        if variant == 3:
+            valid = [c for c in candidates if (c["end"] - c["start"]) >= MIN_SEGMENT_SEC]
+            by_score = sorted(valid, key=lambda c: c.get("score", 0), reverse=True)
+            selected = []
+            budget = self.MAX_TOTAL_SEC * 0.6
+            for c in by_score:
+                dur = c["end"] - c["start"]
+                if dur <= budget:
+                    selected.append(c)
+                    budget -= dur
+            return self._renumber_edit_order(selected)
+
+        return self._select_candidates_v1(candidates)
+
+    def edit_video(self, analysis_path, variant: int = 1) -> str:
         with open(analysis_path, "r", encoding="utf-8") as f:
             analysis = json.load(f)
 
@@ -470,18 +629,21 @@ class EditorBase:
         src_w, src_h = self._get_video_info(video_path)
         video_duration = self._get_video_duration(video_path)
 
+        transcript_segments = []
+        if transcript_path and os.path.exists(transcript_path):
+            with open(transcript_path, "r", encoding="utf-8") as f:
+                transcript_segments = json.load(f).get("segments", [])
+
         parts = []
         total_sec = 0.0
         raw_time = 0.0
         raw_segments = []
 
-        for i, candidate in enumerate(candidates):
+        selected_candidates = self._select_candidates(candidates, variant=variant)
+        for i, candidate in enumerate(selected_candidates):
             start = candidate["start"]
             end = candidate["end"]
             edit_order = candidate.get("edit_order", i + 1)
-
-            if (end - start) < MIN_SEGMENT_SEC:
-                continue
 
             buffered_start = max(0, start - BUFFER_SEC)
             buffered_end = min(video_duration, end + BUFFER_SEC)
@@ -498,18 +660,29 @@ class EditorBase:
 
             cx, cy, cw, ch = self._detect_face_crop(video_path, buffered_start, src_w, src_h)
             vf = self._build_segment_vf(cw, ch, cx, cy)
-            seg_path = str(job_temp / f"seg_{edit_order}.mp4")
-            self._render_clip(video_path, buffered_start, duration, vf, seg_path)
-            parts.append(seg_path)
 
-            raw_segments.append({
-                "raw_start": round(raw_time, 3),
-                "raw_end": round(raw_time + duration, 3),
-                "orig_start": round(buffered_start, 3),
-                "orig_end": round(buffered_end, 3),
-            })
-            raw_time += duration
-            total_sec += duration
+            cut_ranges = self._find_signoff_ranges(transcript_segments, buffered_start, buffered_end)
+            keep_ranges = self._subtract_ranges(buffered_start, buffered_end, cut_ranges)
+            if cut_ranges:
+                for cs, ce in cut_ranges:
+                    print(f"      ✂ 기자/특파원 클로징 멘트 컷: {cs:.1f}s~{ce:.1f}s")
+
+            for j, (k_start, k_end) in enumerate(keep_ranges):
+                k_duration = k_end - k_start
+                if k_duration < MIN_KEEP_SEC:
+                    continue
+                seg_path = str(job_temp / f"seg_{edit_order}_{j}.mp4")
+                self._render_clip(video_path, k_start, k_duration, vf, seg_path)
+                parts.append(seg_path)
+
+                raw_segments.append({
+                    "raw_start": round(raw_time, 3),
+                    "raw_end": round(raw_time + k_duration, 3),
+                    "orig_start": round(k_start, 3),
+                    "orig_end": round(k_end, 3),
+                })
+                raw_time += k_duration
+                total_sec += k_duration
 
         if not parts:
             print("[Stage 1] 편집할 구간 없음")
@@ -517,12 +690,20 @@ class EditorBase:
 
         base_name = os.path.splitext(os.path.basename(analysis_path))[0]
         raw_dir = self._sd.raw_dir if self._sd else settings.RAW_DIR
-        raw_path = str(raw_dir / f"{base_name}_raw.mp4")
+        out_name = base_name if variant == 1 else f"{base_name}_v{variant}"
+        raw_path = str(raw_dir / f"{out_name}_raw.mp4")
         self._concat_raw(parts, raw_path)
 
         analysis["raw_segments"] = raw_segments
-        with open(analysis_path, "w", encoding="utf-8") as f:
-            json.dump(analysis, f, ensure_ascii=False, indent=2)
+        if variant == 1:
+            with open(analysis_path, "w", encoding="utf-8") as f:
+                json.dump(analysis, f, ensure_ascii=False, indent=2)
+        else:
+            analysis["candidates"] = selected_candidates
+            analysis_dir = self._sd.analysis_dir if self._sd else settings.ANALYSIS_DIR
+            variant_analysis_path = analysis_dir / f"{out_name}.json"
+            with open(variant_analysis_path, "w", encoding="utf-8") as f:
+                json.dump(analysis, f, ensure_ascii=False, indent=2)
 
         for f_name in os.listdir(job_temp):
             fp = job_temp / f_name
@@ -549,6 +730,8 @@ class EditorBase:
         # style의 font_name으로 폰트 갱신
         if style and style.get("font_name"):
             self.font = self._resolve_font(style["font_name"])
+        if style and style.get("title_font_name"):
+            self.title_font = self._resolve_font(style["title_font_name"])
         with open(analysis_path, "r", encoding="utf-8") as f:
             analysis = json.load(f)
 
@@ -725,10 +908,13 @@ class EditorBase:
                 print(f"  [avatar] 오버레이 실패: {e}")
                 avatar_tmp = None
 
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         if avatar_tmp:
             try: os.unlink(avatar_tmp.name)
             except Exception: pass
+        if result.returncode != 0 or not os.path.exists(output_path):
+            stderr_tail = result.stderr.decode("utf-8", "ignore")[-1000:]
+            raise RuntimeError(f"FFmpeg 오버레이 실패 (code {result.returncode}): {stderr_tail}")
         print(f"  [Stage 2] 완료 → {os.path.basename(output_path)}")
 
         # 나레이션 믹싱
@@ -783,9 +969,21 @@ class EditorBase:
             events.append({"time": p.get("raw_time", 0), "file": str(file_path)})
         return events
 
-    def preview_frame(self, raw_path, analysis_path, title=None, style=None, seek=2.0, bg_image=None, bg_solid_color=None):
+    def _preview_sub_filters(self, analysis_path, seek, style=None):
+        """정밀 미리보기용 — seek 시점에 가장 관련있는 자막 한 줄을 always-on으로 그린다."""
+        entries = self._generate_sub_entries(analysis_path)
+        if not entries:
+            return []
+        active = next((e for e in entries if e[0] <= seek <= e[1]), None)
+        if not active:
+            active = min(entries, key=lambda e: abs(e[0] - seek))
+        return self._build_sub_drawtext_filters([(0, 999999, active[2])], style)
+
+    def preview_frame(self, raw_path, analysis_path, title=None, style=None, seek=2.0, bg_image=None, bg_solid_color=None, subtitles=False):
         if style and style.get("font_name"):
             self.font = self._resolve_font(style["font_name"])
+        if style and style.get("title_font_name"):
+            self.title_font = self._resolve_font(style["title_font_name"])
         with open(analysis_path, "r", encoding="utf-8") as f:
             analysis = json.load(f)
 
@@ -799,10 +997,13 @@ class EditorBase:
         has_logo = bool(logo_path and os.path.exists(logo_path))
 
         color_f = self._color_filter_str(style)
+        sub_filters = self._preview_sub_filters(analysis_path, seek, style) if subtitles else []
+        sub_str = ",".join(sub_filters)
 
         if bg_path and os.path.exists(bg_path):
             text_filters = self._build_text_filters(title, style=style)
-            text_str = ",".join(text_filters) if text_filters else "null"
+            parts = [f for f in [",".join(text_filters), sub_str] if f]
+            text_str = ",".join(parts) if parts else "null"
             mid = "prelogo" if has_logo else "out"
             logo_filter = (
                 f";[2]scale=200:-1[logo];[prelogo][logo]overlay=W-w-16:{VIDEO_Y+16}[out]"
@@ -827,6 +1028,8 @@ class EditorBase:
         elif bg_solid_color:
             # 단색 배경 미리보기
             vf = self._build_overlay_vf(title, style=style, bg_color_override=bg_solid_color.strip())
+            if sub_str:
+                vf = f"{vf},{sub_str}"
             if color_f:
                 vf = f"{color_f},{vf}"
             cmd = [
@@ -835,6 +1038,8 @@ class EditorBase:
             ]
         else:
             vf = self._build_overlay_vf(title, style=style)
+            if sub_str:
+                vf = f"{vf},{sub_str}"
             if color_f:
                 vf = f"{color_f},{vf}"
             cmd = [

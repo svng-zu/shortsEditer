@@ -2,7 +2,9 @@
 """쇼츠 CRUD API"""
 
 import asyncio
+import base64
 import json
+import re
 import subprocess
 import requests
 from pathlib import Path
@@ -11,10 +13,10 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 
 from app.config import settings
-from app.session import get_session, SessionDirs, load_video_id_map
+from app.session import get_session, SessionDirs, load_video_id_map, load_channel_map
 from app.models.schemas import (
     ShortInfo, RawInfo, UpdateTitleRequest, UpdateNarrationScriptRequest, SrtSaveRequest,
-    GenerateNarrationSubtitlesRequest, GenerateNarrationSubtitlesResponse,
+    GenerateNarrationSubtitlesRequest, GenerateNarrationSubtitlesResponse, NarrationPreviewResponse,
 )
 from app.services.s3_manager import get_s3
 
@@ -42,6 +44,20 @@ def _write_srt(entries: list, srt_path):
     srt_path.write_text(content, encoding="utf-8")
 
 
+def _lookup_channel(ch_map: dict, stem: str) -> dict:
+    """analysis stem(예: {download_stem}_t1_v2)에서 채널 정보 조회.
+    여러 주제로 분할된 경우 _t{n}, 여러 편집 버전인 경우 _v{n} 접미사가 붙으므로 떼고 재조회한다."""
+    if stem in ch_map:
+        return ch_map[stem]
+    return ch_map.get(re.sub(r"(_t\d+)?(_v\d+)?$", "", stem), {})
+
+
+def _variant_of(stem: str) -> int:
+    """stem 끝의 _v{n} 접미사에서 편집 버전 번호를 추출한다 (없으면 1)."""
+    m = re.search(r"_v(\d+)$", stem)
+    return int(m.group(1)) if m else 1
+
+
 def _get_video_duration(video_path) -> float | None:
     cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", str(video_path)]
     try:
@@ -55,6 +71,7 @@ def _get_video_duration(video_path) -> float | None:
 async def list_shorts(session: SessionDirs = Depends(get_session)):
     shorts = []
     seen = set()
+    ch_map = load_channel_map(session)
 
     def _add(filename: str):
         stem = Path(filename).stem.replace("_shorts", "")
@@ -62,12 +79,16 @@ async def list_shorts(session: SessionDirs = Depends(get_session)):
         meta = {}
         if analysis_file.exists():
             meta = json.loads(analysis_file.read_text(encoding="utf-8"))
+        ch = _lookup_channel(ch_map, stem)
         shorts.append(ShortInfo(
             filename=filename,
             url=f"/api/media/shorts/{session.session_id}/{quote(filename)}",
             title=meta.get("intro_text", stem).replace("\n", " "),
             category=meta.get("category", ""),
             candidates=meta.get("candidates", []),
+            channel_name=ch.get("name", ""),
+            channel_thumbnail_url=ch.get("thumbnail_url", ""),
+            variant=_variant_of(stem),
         ))
         seen.add(filename)
 
@@ -89,18 +110,23 @@ async def list_shorts(session: SessionDirs = Depends(get_session)):
 @router.get("/raws")
 async def list_raws(session: SessionDirs = Depends(get_session)):
     raws = []
+    ch_map = load_channel_map(session)
     for mp4 in sorted(session.raw_dir.glob("*.mp4")):
         stem = mp4.stem.replace("_raw", "")
         analysis_file = session.analysis_dir / f"{stem}.json"
         meta = {}
         if analysis_file.exists():
             meta = json.loads(analysis_file.read_text(encoding="utf-8"))
+        ch = _lookup_channel(ch_map, stem)
         raws.append(RawInfo(
             filename=mp4.name,
             url=f"/api/media/raw/{session.session_id}/{quote(mp4.name)}",
             title=meta.get("intro_text", stem).replace("\n", " / "),
             category=meta.get("category", ""),
             duration=_get_video_duration(mp4),
+            channel_name=ch.get("name", ""),
+            channel_thumbnail_url=ch.get("thumbnail_url", ""),
+            variant=_variant_of(stem),
         ))
     return {"raws": raws}
 
@@ -305,6 +331,34 @@ async def generate_narration_subtitles(req: GenerateNarrationSubtitlesRequest, s
     analysis_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     get_s3().upload(str(analysis_path), session.s3_key("analysis", analysis_path.name))
     return GenerateNarrationSubtitlesResponse(subtitles=subtitles)
+
+
+@router.post("/narration-preview", response_model=NarrationPreviewResponse)
+async def narration_preview(req: GenerateNarrationSubtitlesRequest, session: SessionDirs = Depends(get_session)):
+    """나레이션(TTS) 오디오와 자막 타이밍을 렌더링 전에 미리듣기/미리보기용으로 생성한다.
+
+    analysis json에 저장하지 않는 일회성 미리듣기 — 렌더링 결과에 영향을 주지 않는다.
+    """
+    stem = req.filename.replace("_shorts.mp4", "").replace("_raw.mp4", "")
+    analysis_path = session.analysis_dir / f"{stem}.json"
+    if not analysis_path.exists():
+        raise HTTPException(404, f"분석 파일 없음: {stem}.json")
+
+    data = json.loads(analysis_path.read_text(encoding="utf-8"))
+    narration_text = data.get("intro_text", "")
+    if req.narration_mode == "script":
+        narration_text = data.get("narration_script") or narration_text
+    if not narration_text.strip():
+        raise HTTPException(422, "나레이션 텍스트가 없습니다.")
+
+    from app.services.tts import generate_narration_preview
+    audio_bytes, subtitles = await asyncio.to_thread(
+        generate_narration_preview, narration_text, req.narration_voice, req.narration_speed
+    )
+    if not audio_bytes:
+        raise HTTPException(500, "나레이션 미리듣기 생성 실패")
+
+    return NarrationPreviewResponse(audio_base64=base64.b64encode(audio_bytes).decode(), subtitles=subtitles)
 
 
 @router.get("/srt/{stem}")

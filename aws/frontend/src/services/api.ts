@@ -106,6 +106,9 @@ export interface ShortInfo {
   title: string
   category: string
   candidates: Candidate[]
+  channel_name?: string
+  channel_thumbnail_url?: string
+  variant?: number
 }
 
 export interface AuthUser {
@@ -136,6 +139,9 @@ export interface RawInfo {
   title: string
   category: string
   duration?: number | null
+  channel_name?: string
+  channel_thumbnail_url?: string
+  variant?: number
 }
 
 export interface VideoInfo {
@@ -152,6 +158,8 @@ export interface DownloadInfo {
   category: string
   thumbnail_url: string | null
   duration: number | null
+  channel_name?: string
+  channel_thumbnail_url?: string
 }
 
 export interface AdminUserInfo {
@@ -190,7 +198,18 @@ export interface StyleParams {
   title1_color: string
   title2_color: string
   title_y_extra: number
-  title_fontsize_scale: number
+  title_fontsize_delta: number
+  title_font_name?: string
+  title1_border_width?: number
+  title2_border_width?: number
+  title1_border_color?: string
+  title2_border_color?: string
+  title1_bg_enabled?: boolean
+  title1_bg_color?: string
+  title1_bg_opacity?: number
+  title2_bg_enabled?: boolean
+  title2_bg_color?: string
+  title2_bg_opacity?: number
   sub_fontsize: number
   sub_color: string
   sub_margin_v: number
@@ -203,6 +222,11 @@ export interface StyleParams {
   channel_y?: number
   channel_fontsize?: number
   channel_image_url?: string
+  channel_topleft_text?: string
+  channel_topleft_color?: string
+  channel_topleft_fontsize?: number
+  channel_topleft_x?: number
+  channel_topleft_y?: number
   font_name?: string
   brightness?: number
   contrast?: number
@@ -318,6 +342,19 @@ export const api = {
     return data
   },
 
+  async narrationPreview(filename: string, narrationVoice: string, narrationMode: string, narrationSpeed?: number): Promise<{ audio: Blob; subtitles: { start: number; end: number; text: string }[] }> {
+    const { data } = await client.post('/api/narration-preview', {
+      filename,
+      narration_voice: narrationVoice,
+      narration_mode: narrationMode,
+      narration_speed: narrationSpeed ?? 1.0,
+    })
+    const binary = atob(data.audio_base64)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return { audio: new Blob([bytes], { type: 'audio/mpeg' }), subtitles: data.subtitles }
+  },
+
   // Channels
   async getChannels(): Promise<{ channels: { url: string; category: string; thumbnail_url?: string }[] }> {
     const { data } = await client.get('/api/channels')
@@ -391,6 +428,7 @@ export const api = {
     seek: number = 2.0,
     bgImage?: string,
     bgSolidColor?: string,
+    subtitles: boolean = false,
   ): Promise<Blob> {
     const { data } = await client.post(
       '/api/preview',
@@ -401,6 +439,7 @@ export const api = {
         seek,
         bg_image: bgImage,
         bg_solid_color: bgSolidColor ?? null,
+        subtitles,
       },
       { responseType: 'blob' }
     )

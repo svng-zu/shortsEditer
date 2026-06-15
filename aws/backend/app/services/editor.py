@@ -37,8 +37,8 @@ class Editor:
     def edit(self, analysis_path: str):
         return self._get_editor(analysis_path).edit(analysis_path)
 
-    def edit_video(self, analysis_path: str):
-        return self._get_editor(analysis_path).edit_video(analysis_path)
+    def edit_video(self, analysis_path: str, variant: int = 1):
+        return self._get_editor(analysis_path).edit_video(analysis_path, variant=variant)
 
     def apply_overlay(self, raw_path: str, analysis_path: str,
                       title_override=None, subtitles=False, style=None, bg_image=None,
@@ -57,9 +57,9 @@ class Editor:
             style=style, bg_image=bg_image, bg_solid_color=bg_solid_color
         )
 
-    def preview_frame(self, raw_path: str, analysis_path: str, title=None, style=None, seek=2.0, bg_image=None, bg_solid_color=None):
+    def preview_frame(self, raw_path: str, analysis_path: str, title=None, style=None, seek=2.0, bg_image=None, bg_solid_color=None, subtitles=False):
         return self._get_editor(analysis_path).preview_frame(
-            raw_path, analysis_path, title=title, style=style, seek=seek, bg_image=bg_image, bg_solid_color=bg_solid_color
+            raw_path, analysis_path, title=title, style=style, seek=seek, bg_image=bg_image, bg_solid_color=bg_solid_color, subtitles=subtitles
         )
 
     def run(self, analysis_paths: list):

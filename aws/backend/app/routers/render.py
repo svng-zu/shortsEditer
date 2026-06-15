@@ -62,6 +62,8 @@ async def render(req: RenderRequest, background_tasks: BackgroundTasks,
     status = get_session_status(session.session_id)
     if status.step in (PipelineStep.COLLECTING, PipelineStep.TRANSCRIBING, PipelineStep.ANALYZING):
         raise HTTPException(400, "파이프라인이 실행 중입니다. 분석 완료 후 렌더링하세요.")
+    if status.step == PipelineStep.EDITING:
+        raise HTTPException(400, "이미 렌더링이 진행 중입니다. 완료 후 다시 시도하세요.")
     background_tasks.add_task(
         _run_render, session.session_id, req.filename, req.title,
         req.subtitles, req.template_id, req.style.model_dump(), req.bg_image,
@@ -92,6 +94,7 @@ async def preview(req: PreviewRequest, session: SessionDirs = Depends(get_sessio
         seek=req.seek,
         bg_image=req.bg_image,
         bg_solid_color=req.bg_solid_color,
+        subtitles=req.subtitles,
     )
     if not png_path:
         raise HTTPException(500, "미리보기 생성 실패")

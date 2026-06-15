@@ -52,6 +52,16 @@ const SUB_FONT_OPTIONS: { value: string; label: string }[] = [
 // (Chirp3 HD는 <mark>를 지원하지 않아 나레이션 자막 생성이 동작하지 않음)
 const NARRATION_VOICE_GROUPS: { group: string; options: { value: string; label: string }[] }[] = [
   {
+    group: 'ElevenLabs (멀티링구얼)',
+    options: [
+      { value: 'el-rachel', label: 'Rachel (여성)' },
+      { value: 'el-sarah', label: 'Sarah (여성)' },
+      { value: 'el-charlotte', label: 'Charlotte (여성)' },
+      { value: 'el-adam', label: 'Adam (남성)' },
+      { value: 'el-antoni', label: 'Antoni (남성)' },
+    ],
+  },
+  {
     group: 'Chirp3 HD (최신·자연스러움) - 여성',
     options: [
       { value: 'ko-KR-Chirp3-HD-Achernar', label: 'Achernar' },
@@ -204,6 +214,17 @@ function CategoryBadge({ cat }: { cat: string }) {
   const s = map[cat]
   if (!s) return null
   return <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: s.bg, color: s.color }}>{s.label}</span>
+}
+
+const VARIANT_LABELS: Record<number, string> = {
+  1: '버전1 · 기본',
+  2: '버전2 · 하이라이트 인트로',
+  3: '버전3 · 압축 하이라이트',
+}
+
+function VariantBadge({ variant }: { variant?: number }) {
+  if (!variant || variant <= 1) return null
+  return <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: '#f3e8fd', color: '#9334e6' }}>{VARIANT_LABELS[variant] || `버전${variant}`}</span>
 }
 
 export default function ShortsPanel({
@@ -371,8 +392,15 @@ export default function ShortsPanel({
                         <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', marginBottom: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {r.title || r.filename}
                         </div>
+                        {r.channel_name && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--muted)', marginBottom: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {r.channel_thumbnail_url && <img src={r.channel_thumbnail_url} alt="" style={{ width: 14, height: 14, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.channel_name}</span>
+                          </div>
+                        )}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <CategoryBadge cat={r.category} />
+                          <VariantBadge variant={r.variant} />
                           {r.duration != null && <span style={{ fontSize: 13, color: 'var(--muted)' }}>{fmtDuration(r.duration)}</span>}
                         </div>
                       </div>
@@ -422,7 +450,16 @@ export default function ShortsPanel({
                         <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', marginBottom: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {s.title || s.filename}
                         </div>
-                        <span style={{ fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>탭하여 재생 ▶</span>
+                        {s.channel_name && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--muted)', marginBottom: 5 }}>
+                            {s.channel_thumbnail_url && <img src={s.channel_thumbnail_url} alt="" style={{ width: 14, height: 14, borderRadius: '50%', objectFit: 'cover' }} />}
+                            {s.channel_name}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <VariantBadge variant={s.variant} />
+                          <span style={{ fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>탭하여 재생 ▶</span>
+                        </div>
                       </div>
                       <span style={{ color: '#bdc1c6', fontSize: 22, flexShrink: 0 }}>›</span>
                     </div>
@@ -459,7 +496,7 @@ export default function ShortsPanel({
         {/* ─── RAW 탭 ─── */}
         {activeTab === 'raws' && (
           <>
-            <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface2)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: 300, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface2)', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: 'var(--text2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 {raws.length > 0 && (
                   <input type="checkbox" checked={rawSelected.size === raws.length && raws.length > 0} onChange={rawToggleAll} style={{ cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }} />
@@ -491,8 +528,15 @@ export default function ShortsPanel({
                         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {r.title || r.filename}
                         </div>
+                        {r.channel_name && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {r.channel_thumbnail_url && <img src={r.channel_thumbnail_url} alt="" style={{ width: 13, height: 13, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.channel_name}</span>
+                          </div>
+                        )}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <CategoryBadge cat={r.category} />
+                          <VariantBadge variant={r.variant} />
                           {r.duration != null && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDuration(r.duration)}</span>}
                           <button onClick={e => deleteRaw(r.filename, e)}
                             style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4, background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', marginLeft: 'auto' }}>삭제</button>
@@ -509,7 +553,7 @@ export default function ShortsPanel({
         {/* ─── SHORTS 탭 ─── */}
         {activeTab === 'shorts' && (
           <>
-            <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface2)' }}>
+            <div style={{ width: 300, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface2)' }}>
               <div style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: 'var(--text2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 {shorts.length > 0 && (
                   <input type="checkbox" checked={shortSelected.size === shorts.length && shorts.length > 0} onChange={shortToggleAll} style={{ cursor: 'pointer', accentColor: 'var(--primary)', flexShrink: 0 }} />
@@ -543,6 +587,15 @@ export default function ShortsPanel({
                         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {s.title || s.filename}
                         </div>
+                        {s.channel_name && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {s.channel_thumbnail_url && <img src={s.channel_thumbnail_url} alt="" style={{ width: 13, height: 13, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.channel_name}</span>
+                          </div>
+                        )}
+                        {s.variant != null && s.variant > 1 && (
+                          <div style={{ marginBottom: 4 }}><VariantBadge variant={s.variant} /></div>
+                        )}
                         <div style={{ display: 'flex', gap: 4 }}>
                           <a href={`${s.url}/download`} download={s.filename} onClick={e => e.stopPropagation()}
                             className="btn-outlined" style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4 }}>다운</a>
@@ -585,7 +638,18 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [t1Color, setT1Color]       = useState('#FFD700')
   const [t2Color, setT2Color]       = useState('#FFFFFF')
   const [titleY, setTitleY]         = useState(0)
-  const [titleScale, setTitleScale] = useState(1.0)
+  const [titleFontSizeDelta, setTitleFontSizeDelta] = useState(0)
+  const [titleFont, setTitleFont]   = useState('NanumSquareRoundEB')
+  const [title1BorderWidth, setTitle1BorderWidth] = useState(3)
+  const [title2BorderWidth, setTitle2BorderWidth] = useState(3)
+  const [title1BorderColor, setTitle1BorderColor] = useState('#000000')
+  const [title2BorderColor, setTitle2BorderColor] = useState('#000000')
+  const [title1BgEnabled, setTitle1BgEnabled] = useState(false)
+  const [title1BgColor,   setTitle1BgColor]   = useState('#000000')
+  const [title1BgOpacity, setTitle1BgOpacity] = useState(0.6)
+  const [title2BgEnabled, setTitle2BgEnabled] = useState(false)
+  const [title2BgColor,   setTitle2BgColor]   = useState('#000000')
+  const [title2BgOpacity, setTitle2BgOpacity] = useState(0.6)
   const [subtitles, setSubtitles]   = useState(false)
   const [subSize,   setSubSize]     = useState(52)
   const [subColor,  setSubColor]    = useState('#FFFFFF')
@@ -600,6 +664,11 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [channelY,    setChannelY]    = useState(0)
   const [channelFontsize, setChannelFontsize] = useState(36)
   const [channelImageUrl, setChannelImageUrl] = useState('')
+  const [channelTopLeftText, setChannelTopLeftText] = useState('')
+  const [channelTopLeftColor, setChannelTopLeftColor] = useState('#FFFFFF')
+  const [channelTopLeftFontsize, setChannelTopLeftFontsize] = useState(32)
+  const [channelTopLeftX, setChannelTopLeftX] = useState(16)
+  const [channelTopLeftY, setChannelTopLeftY] = useState(16)
   const [regChannels, setRegChannels] = useState<{url: string; category: string; thumbnail_url?: string}[]>([])
   const avatarImgRef = useRef<HTMLImageElement | null>(null)
   const [bgOptions,     setBgOptions]     = useState<string[]>([])
@@ -629,11 +698,25 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [isRendering, setIsRendering] = useState(false)
   const [renderMsg, setRenderMsg]   = useState('')
   const [showSrt, setShowSrt]       = useState(false)
+  const [isPreviewingNarration, setIsPreviewingNarration] = useState(false)
+  const [isNarrPreviewPlaying, setIsNarrPreviewPlaying] = useState(false)
+  const [narrPreviewMsg, setNarrPreviewMsg] = useState('')
+  const [narrPreviewSubs, setNarrPreviewSubs] = useState<{ start: number; end: number; text: string }[]>([])
 
   const canvasRef  = useRef<HTMLCanvasElement>(null)
   const hidVidRef  = useRef<HTMLVideoElement>(null)
+  const narrAudioRef = useRef<HTMLAudioElement>(null)
+  const narrAudioUrlRef = useRef<string>('')
   const rafRef     = useRef<number>(0)
   const [isPlaying, setIsPlaying] = useState(true)
+
+  // 캔버스 미리보기가 실제 렌더링과 동일한 폰트로 보이도록 웹폰트를 미리 로드
+  useEffect(() => {
+    for (const f of ['NanumSquareRoundEB', 'NanumSquareRoundB', 'NanumSquareB']) {
+      document.fonts.load(`900 100px '${f}'`).catch(() => {})
+      document.fonts.load(`bold 100px '${f}'`).catch(() => {})
+    }
+  }, [])
 
   const togglePlay = useCallback(() => {
     const vid = hidVidRef.current
@@ -652,9 +735,14 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   useEffect(() => {
     if (!raw) return
     const parts = raw.title.split(' / ')
-    setTitle1(parts[0] || ''); setTitle2(parts[1] || ''); setChannelName(''); setRenderMsg('')
-    setChannelX(0); setChannelY(0); setChannelFontsize(36); setChannelColor('#FFFFFF'); setChannelImageUrl('')
+    setTitle1(parts[0] || ''); setTitle2(parts[1] || ''); setRenderMsg('')
+    setChannelName(raw.channel_name || '')
+    setChannelX(0); setChannelY(0); setChannelFontsize(36); setChannelColor('#FFFFFF')
+    setChannelImageUrl(raw.channel_thumbnail_url || '')
     setNarrMode('title'); setNarrationScript(''); setGenScriptMsg(''); setScriptMode('summary'); setGenNarrSubsMsg('')
+    setNarrPreviewMsg(''); setNarrPreviewSubs([]); setIsNarrPreviewPlaying(false)
+    if (narrAudioRef.current) { narrAudioRef.current.pause(); narrAudioRef.current.removeAttribute('src') }
+    if (narrAudioUrlRef.current) { URL.revokeObjectURL(narrAudioUrlRef.current); narrAudioUrlRef.current = '' }
     if (bgOptions.includes(raw.category)) {
       setBgType('image'); setBgImageName(raw.category); loadBg(raw.category)
     } else {
@@ -732,29 +820,67 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
       if (lines.length) {
         const maxLen = Math.max(...lines.map(l => l.t.length))
         let sz = maxLen<=7?115:maxLen<=10?101:maxLen<=13?86:maxLen<=16?72:62
-        sz = Math.max(8, Math.round(sz * titleScale * SCALE))
+        sz = Math.max(8, Math.round((sz + titleFontSizeDelta) * SCALE))
         const lineH = sz + Math.round(20*SCALE)
         const yCenter = Math.round((555/2+140+titleY)*SCALE)
         const startY = yCenter - (lines.length*lineH)/2
         ctx.textAlign = 'center'; ctx.textBaseline = 'top'
+        ctx.font = `900 ${sz}px '${titleFont}','Malgun Gothic','Apple SD Gothic Neo',sans-serif`
+        const lineBg = [
+          { enabled: title1BgEnabled, color: title1BgColor, opacity: title1BgOpacity },
+          { enabled: title2BgEnabled, color: title2BgColor, opacity: title2BgOpacity },
+        ]
         lines.forEach((line, i) => {
-          ctx.font = `900 ${sz}px 'Malgun Gothic','Apple SD Gothic Neo',sans-serif`
+          const bg = lineBg[i]
+          if (bg?.enabled) {
+            const tw = ctx.measureText(line.t).width + 8
+            ctx.fillStyle = _hexToRgba(bg.color, bg.opacity)
+            ctx.fillRect(CV_W/2-tw/2, startY+i*lineH-2, tw, sz+4)
+          }
+        })
+        const lineBorderWidths = [title1BorderWidth, title2BorderWidth]
+        const lineBorderColors = [title1BorderColor, title2BorderColor]
+        lines.forEach((line, i) => {
           ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 3
+          const bw = lineBorderWidths[i] ?? 3
+          if (bw > 0) {
+            ctx.lineWidth = bw * 2 * SCALE
+            ctx.lineJoin = 'round'
+            ctx.strokeStyle = _hexToRgba(lineBorderColors[i] ?? '#000000', 0.85)
+            ctx.strokeText(line.t, CV_W/2, startY+i*lineH)
+          }
           ctx.fillStyle = line.c; ctx.fillText(line.t, CV_W/2, startY+i*lineH)
         })
         ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
       }
       if (subtitles) {
         const sz = Math.round(subSize*SCALE)
+        const lineH = Math.round(sz*1.35)
         const sY = VID_Y_PX+VID_H_PX-Math.round(subY*SCALE)-sz-4
-        ctx.textAlign = 'center'; ctx.textBaseline = 'top'
-        ctx.font = `bold ${sz}px 'Malgun Gothic',sans-serif`
-        if (subBgEnabled) {
-          const tw = ctx.measureText('자막 샘플').width+8
-          ctx.fillStyle = _hexToRgba(subBgColor, subBgOpacity)
-          ctx.fillRect(CV_W/2-tw/2,sY-2,tw,sz+4)
+        // 나레이션 미리듣기 재생 중이면 현재 재생 위치에 맞는 실제 자막을 보여준다
+        let lines = ['자막 샘플']
+        const narrAudio = narrAudioRef.current
+        if (narrAudio && !narrAudio.paused && narrPreviewSubs.length) {
+          const t = narrAudio.currentTime
+          const active = narrPreviewSubs.find(s => t >= s.start && t <= s.end)
+          if (active) {
+            const activeLines = active.text.split('\n').map(l => l.trim()).filter(Boolean)
+            if (activeLines.length) lines = activeLines
+          } else {
+            lines = []
+          }
         }
-        ctx.fillStyle = subColor; ctx.fillText('자막 샘플', CV_W/2, sY)
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top'
+        ctx.font = `bold ${sz}px '${subFont}','Malgun Gothic',sans-serif`
+        lines.forEach((line, i) => {
+          const y = sY - (lines.length - 1 - i) * lineH
+          if (subBgEnabled) {
+            const tw = ctx.measureText(line).width+8
+            ctx.fillStyle = _hexToRgba(subBgColor, subBgOpacity)
+            ctx.fillRect(CV_W/2-tw/2,y-2,tw,sz+4)
+          }
+          ctx.fillStyle = subColor; ctx.fillText(line, CV_W/2, y)
+        })
       }
       const channel = channelName.trim()
       if (channel) {
@@ -763,7 +889,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         const cY = VID_Y_PX + VID_H_PX + Math.round((bottomH - sz) / 2) + Math.round(channelY * SCALE)
         const cX = CV_W / 2 + Math.round(channelX * SCALE)
         ctx.textAlign = 'center'; ctx.textBaseline = 'top'
-        ctx.font = `bold ${sz}px 'Malgun Gothic',sans-serif`
+        ctx.font = `bold ${sz}px '${subFont}','Malgun Gothic',sans-serif`
         ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2
         ctx.fillStyle = _hexToRgba(channelColor, 0.75)
         ctx.fillText(channel, cX, cY)
@@ -781,11 +907,23 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
           ctx.restore()
         }
       }
+      const topLeftText = channelTopLeftText.trim()
+      if (topLeftText) {
+        const sz = Math.round(channelTopLeftFontsize * SCALE)
+        const x = Math.round(channelTopLeftX * SCALE)
+        const y = VID_Y_PX + Math.round(channelTopLeftY * SCALE)
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top'
+        ctx.font = `bold ${sz}px '${subFont}','Malgun Gothic',sans-serif`
+        ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2
+        ctx.fillStyle = channelTopLeftColor
+        ctx.fillText(topLeftText, x, y)
+        ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
+      }
       rafRef.current = requestAnimationFrame(draw)
     }
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleScale, subtitles, subSize, subColor, subY, subBgEnabled, subBgColor, subBgOpacity, channelName, channelColor, channelX, channelY, channelFontsize, channelImageUrl, bgType, bgSolidColor, bgImageName, templateId, brightness, contrast, saturation])
+  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleFontSizeDelta, titleFont, title1BorderWidth, title2BorderWidth, title1BorderColor, title2BorderColor, title1BgEnabled, title1BgColor, title1BgOpacity, title2BgEnabled, title2BgColor, title2BgOpacity, subtitles, subSize, subColor, subFont, subY, subBgEnabled, subBgColor, subBgOpacity, channelName, channelColor, channelX, channelY, channelFontsize, channelImageUrl, channelTopLeftText, channelTopLeftColor, channelTopLeftFontsize, channelTopLeftX, channelTopLeftY, bgType, bgSolidColor, bgImageName, templateId, brightness, contrast, saturation, narrPreviewSubs])
 
   // 음량 조절 — 미리듣기 영상에 즉시 반영 (HTML 비디오는 0~1 범위만 지원하므로 100%까지만 미리듣기 가능, 그 이상은 렌더링 결과로 확인)
   useEffect(() => {
@@ -795,11 +933,19 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
 
   const getStyle = (): StyleParams => ({
     title1_color: t1Color, title2_color: t2Color, title_y_extra: titleY,
-    title_fontsize_scale: titleScale, sub_fontsize: subSize, sub_color: subColor, sub_margin_v: subY,
+    title_fontsize_delta: titleFontSizeDelta,
+    title_font_name: titleFont,
+    title1_border_width: title1BorderWidth, title2_border_width: title2BorderWidth,
+    title1_border_color: title1BorderColor, title2_border_color: title2BorderColor,
+    title1_bg_enabled: title1BgEnabled, title1_bg_color: title1BgColor, title1_bg_opacity: title1BgOpacity,
+    title2_bg_enabled: title2BgEnabled, title2_bg_color: title2BgColor, title2_bg_opacity: title2BgOpacity,
+    sub_fontsize: subSize, sub_color: subColor, sub_margin_v: subY,
     sub_bg_enabled: subBgEnabled, sub_bg_color: subBgColor, sub_bg_opacity: subBgOpacity,
     channel_name: channelName.trim(), channel_color: channelColor,
     channel_x: channelX, channel_y: channelY, channel_fontsize: channelFontsize,
     channel_image_url: channelImageUrl,
+    channel_topleft_text: channelTopLeftText.trim(), channel_topleft_color: channelTopLeftColor,
+    channel_topleft_fontsize: channelTopLeftFontsize, channel_topleft_x: channelTopLeftX, channel_topleft_y: channelTopLeftY,
     font_name: subFont,
     brightness, contrast, saturation, volume,
     narration_volume: narrVolume, narration_video_volume: narrVideoVolume,
@@ -811,21 +957,6 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     bgSolidColor: bgType === 'solid' ? bgSolidColor : undefined,
   })
 
-  const handlePreview = useCallback(async () => {
-    if (!raw) return
-    try {
-      const { bgImage, bgSolidColor: bgSC } = getBgParams()
-      const blob = await api.preview(raw.filename, getTitle(), getStyle(), 2.0, bgImage, bgSC)
-      const url = URL.createObjectURL(blob)
-      const modal = document.createElement('div')
-      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer;'
-      modal.onclick = () => { modal.remove(); URL.revokeObjectURL(url) }
-      const img = document.createElement('img')
-      img.src = url; img.style.cssText = 'height:min(90vh,600px);width:auto;aspect-ratio:9/16;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.4);'
-      modal.appendChild(img); document.body.appendChild(modal)
-    } catch { alert('미리보기 오류') }
-  }, [raw, title1, title2, t1Color, t2Color, titleY, titleScale, bgType, bgSolidColor, bgImageName, templateId])
-
   const handleRender = async () => {
     if (!raw || isRendering) return
     setIsRendering(true); setRenderMsg('')
@@ -834,7 +965,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
       await api.render(raw.filename, getTitle(), subtitles, templateId, getStyle(), bgImage, bgSC, narration, narrVoice, narrMode, narrSpeed)
       setRenderMsg(narration ? '✓ 나레이션 버전 렌더링 시작' : '✓ 렌더링 시작 — 완성 쇼츠 탭에서 확인')
       onStartPolling()
-    } catch { setRenderMsg('오류가 발생했습니다') }
+    } catch (e: any) { setRenderMsg(e?.response?.data?.detail || '오류가 발생했습니다') }
     finally { setIsRendering(false) }
   }
 
@@ -870,12 +1001,44 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     }
   }
 
+  // 나레이션 미리듣기 — TTS 오디오를 재생하면서, 자막 스타일대로 캔버스에 캡션을 동기 표시한다
+  const handleNarrationPreview = async () => {
+    const audio = narrAudioRef.current
+    if (!raw || !audio) return
+
+    if (audio.src && !audio.ended) {
+      if (audio.paused) audio.play().catch(() => {})
+      else audio.pause()
+      return
+    }
+
+    setIsPreviewingNarration(true); setNarrPreviewMsg('')
+    try {
+      const { audio: blob, subtitles } = await api.narrationPreview(raw.filename, narrVoice, narrMode, narrSpeed)
+      if (narrAudioUrlRef.current) URL.revokeObjectURL(narrAudioUrlRef.current)
+      const url = URL.createObjectURL(blob)
+      narrAudioUrlRef.current = url
+      setNarrPreviewSubs(subtitles)
+      audio.src = url
+      audio.currentTime = 0
+      await audio.play()
+    } catch (e: any) {
+      setNarrPreviewMsg(e?.response?.data?.detail || '나레이션 미리듣기 생성 실패')
+    } finally {
+      setIsPreviewingNarration(false)
+    }
+  }
+
   // 모바일: 세로 스택 (캔버스 → 컨트롤)
   // 데스크톱: 가로 분할 (280px 미리보기 | flex 컨트롤)
   if (isMobile) {
     return (
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface)' }}>
         <video ref={hidVidRef} style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }} playsInline />
+        <audio ref={narrAudioRef} style={{ display: 'none' }}
+          onPlay={() => setIsNarrPreviewPlaying(true)}
+          onPause={() => setIsNarrPreviewPlaying(false)}
+          onEnded={() => setIsNarrPreviewPlaying(false)} />
         {!raw
           ? <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: 8 }}>
               <div style={{ fontSize: 40, opacity: 0.15 }}>🎬</div>
@@ -895,9 +1058,6 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                     {isPlaying ? '⏸' : '▶'}
                   </button>
                 </div>
-                <button onClick={handlePreview} className="btn-outlined" style={{ width: '60%', maxWidth: 200, padding: '7px 0', fontSize: 14 }}>
-                  🔍 고화질 미리보기
-                </button>
               </div>
 
               {/* 컨트롤 */}
@@ -920,8 +1080,21 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <Slider label="Y 위치" value={titleY} display={`${titleY}px`} min={-150} max={150} step={5} onChange={setTitleY} />
-                      <Slider label="크기" value={titleScale} display={`${titleScale.toFixed(1)}×`} min={0.5} max={1.8} step={0.1} onChange={setTitleScale} />
+                      <Slider label="글자 크기" value={titleFontSizeDelta} display={`${titleFontSizeDelta > 0 ? '+' : ''}${titleFontSizeDelta}px`} min={-40} max={40} step={2} onChange={setTitleFontSizeDelta} />
                     </div>
+                    <TitleStyleControls
+                      titleFont={titleFont} setTitleFont={setTitleFont}
+                      title1BorderWidth={title1BorderWidth} setTitle1BorderWidth={setTitle1BorderWidth}
+                      title2BorderWidth={title2BorderWidth} setTitle2BorderWidth={setTitle2BorderWidth}
+                      title1BorderColor={title1BorderColor} setTitle1BorderColor={setTitle1BorderColor}
+                      title2BorderColor={title2BorderColor} setTitle2BorderColor={setTitle2BorderColor}
+                      title1BgEnabled={title1BgEnabled} setTitle1BgEnabled={setTitle1BgEnabled}
+                      title1BgColor={title1BgColor} setTitle1BgColor={setTitle1BgColor}
+                      title1BgOpacity={title1BgOpacity} setTitle1BgOpacity={setTitle1BgOpacity}
+                      title2BgEnabled={title2BgEnabled} setTitle2BgEnabled={setTitle2BgEnabled}
+                      title2BgColor={title2BgColor} setTitle2BgColor={setTitle2BgColor}
+                      title2BgOpacity={title2BgOpacity} setTitle2BgOpacity={setTitle2BgOpacity}
+                    />
                   </div>
                 </div>
 
@@ -973,6 +1146,21 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                     <div>
                       <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
                       <input type="color" value={channelColor} onChange={e => setChannelColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 채널명 (영상 좌측상단) */}
+                <div>
+                  <div className="section-label">채널명 (영상 좌측상단)</div>
+                  <input value={channelTopLeftText} onChange={e => setChannelTopLeftText(e.target.value)} placeholder="예: @채널명" className="input-field" style={{ marginBottom: 8 }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
+                    <Slider label="X 위치" value={channelTopLeftX} display={`${channelTopLeftX}px`} min={0} max={500} step={10} onChange={setChannelTopLeftX} />
+                    <Slider label="Y 위치" value={channelTopLeftY} display={`${channelTopLeftY}px`} min={0} max={300} step={5} onChange={setChannelTopLeftY} />
+                    <Slider label="크기" value={channelTopLeftFontsize} display={`${channelTopLeftFontsize}px`} min={16} max={72} step={2} onChange={setChannelTopLeftFontsize} />
+                    <div>
+                      <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
+                      <input type="color" value={channelTopLeftColor} onChange={e => setChannelTopLeftColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
                     </div>
                   </div>
                 </div>
@@ -1061,9 +1249,17 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                         <Slider label="나레이션 속도" value={narrSpeed} display={`${narrSpeed.toFixed(2)}x`}
                           min={0.5} max={2} step={0.05} onChange={setNarrSpeed} />
                         <Slider label="나레이션 음량" value={narrVolume} display={`${Math.round(narrVolume * 100)}%`}
-                          min={0} max={2} step={0.05} onChange={setNarrVolume} />
+                          min={0} max={3} step={0.05} onChange={setNarrVolume} />
                         <Slider label="원본 영상 음량" value={narrVideoVolume} display={`${Math.round(narrVideoVolume * 100)}%`}
                           min={0} max={2} step={0.05} onChange={setNarrVideoVolume} />
+                      </div>
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                        <button onClick={handleNarrationPreview} disabled={isPreviewingNarration} className="btn-outlined"
+                          style={{ fontSize: 13, padding: '5px 10px', cursor: 'pointer' }}>
+                          {isPreviewingNarration ? '생성 중...' : isNarrPreviewPlaying ? '⏸ 일시정지' : '🎙 나레이션 미리듣기'}
+                        </button>
+                        <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>현재 설정의 나레이션 음성을 들으며, 위 미리보기 화면에서 자막이 표시되는 모습을 확인합니다.</p>
+                        {narrPreviewMsg && <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>{narrPreviewMsg}</p>}
                       </div>
                     </div>
                   )}
@@ -1102,6 +1298,10 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', background: 'var(--surface)' }}>
       <video ref={hidVidRef} style={{ display: 'none' }} playsInline />
+      <audio ref={narrAudioRef} style={{ display: 'none' }}
+        onPlay={() => setIsNarrPreviewPlaying(true)}
+        onPause={() => setIsNarrPreviewPlaying(false)}
+        onEnded={() => setIsNarrPreviewPlaying(false)} />
 
       {/* 왼쪽: 캔버스 미리보기 */}
       <div style={{ width: 'clamp(220px, 28vw, 380px)', flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface2)' }}>
@@ -1131,10 +1331,6 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   <video key={raw.url} src={raw.url} controls style={{ width: '100%', maxHeight: 180, display: 'block' }} />
                 </div>
               </details>
-
-              <button onClick={handlePreview} className="btn-outlined" style={{ width: '100%', padding: '7px 0' }}>
-                🔍 정밀 미리보기 (고화질)
-              </button>
             </>
           ) : (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: 10, padding: 20, minHeight: 300 }}>
@@ -1171,8 +1367,21 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <Slider label="Y 위치" value={titleY} display={`${titleY}px`} min={-150} max={150} step={5} onChange={setTitleY} />
-                    <Slider label="크기" value={titleScale} display={`${titleScale.toFixed(1)}×`} min={0.5} max={1.8} step={0.1} onChange={setTitleScale} />
+                    <Slider label="글자 크기" value={titleFontSizeDelta} display={`${titleFontSizeDelta > 0 ? '+' : ''}${titleFontSizeDelta}px`} min={-40} max={40} step={2} onChange={setTitleFontSizeDelta} />
                   </div>
+                  <TitleStyleControls
+                    titleFont={titleFont} setTitleFont={setTitleFont}
+                    title1BorderWidth={title1BorderWidth} setTitle1BorderWidth={setTitle1BorderWidth}
+                    title2BorderWidth={title2BorderWidth} setTitle2BorderWidth={setTitle2BorderWidth}
+                    title1BorderColor={title1BorderColor} setTitle1BorderColor={setTitle1BorderColor}
+                    title2BorderColor={title2BorderColor} setTitle2BorderColor={setTitle2BorderColor}
+                    title1BgEnabled={title1BgEnabled} setTitle1BgEnabled={setTitle1BgEnabled}
+                    title1BgColor={title1BgColor} setTitle1BgColor={setTitle1BgColor}
+                    title1BgOpacity={title1BgOpacity} setTitle1BgOpacity={setTitle1BgOpacity}
+                    title2BgEnabled={title2BgEnabled} setTitle2BgEnabled={setTitle2BgEnabled}
+                    title2BgColor={title2BgColor} setTitle2BgColor={setTitle2BgColor}
+                    title2BgOpacity={title2BgOpacity} setTitle2BgOpacity={setTitle2BgOpacity}
+                  />
                 </div>
               </div>
 
@@ -1224,6 +1433,21 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   <div>
                     <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
                     <input type="color" value={channelColor} onChange={e => setChannelColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* 채널명 (영상 좌측상단) */}
+              <div>
+                <div className="section-label">채널명 (영상 좌측상단)</div>
+                <input value={channelTopLeftText} onChange={e => setChannelTopLeftText(e.target.value)} placeholder="예: @채널명" className="input-field" style={{ marginBottom: 8 }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
+                  <Slider label="X 위치" value={channelTopLeftX} display={`${channelTopLeftX}px`} min={0} max={500} step={10} onChange={setChannelTopLeftX} />
+                  <Slider label="Y 위치" value={channelTopLeftY} display={`${channelTopLeftY}px`} min={0} max={300} step={5} onChange={setChannelTopLeftY} />
+                  <Slider label="크기" value={channelTopLeftFontsize} display={`${channelTopLeftFontsize}px`} min={16} max={72} step={2} onChange={setChannelTopLeftFontsize} />
+                  <div>
+                    <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
+                    <input type="color" value={channelTopLeftColor} onChange={e => setChannelTopLeftColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
                   </div>
                 </div>
               </div>
@@ -1312,9 +1536,17 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                       <Slider label="나레이션 속도" value={narrSpeed} display={`${narrSpeed.toFixed(2)}x`}
                         min={0.5} max={2} step={0.05} onChange={setNarrSpeed} />
                       <Slider label="나레이션 음량" value={narrVolume} display={`${Math.round(narrVolume * 100)}%`}
-                        min={0} max={2} step={0.05} onChange={setNarrVolume} />
+                        min={0} max={3} step={0.05} onChange={setNarrVolume} />
                       <Slider label="원본 영상 음량" value={narrVideoVolume} display={`${Math.round(narrVideoVolume * 100)}%`}
                         min={0} max={2} step={0.05} onChange={setNarrVideoVolume} />
+                    </div>
+                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                      <button onClick={handleNarrationPreview} disabled={isPreviewingNarration} className="btn-outlined"
+                        style={{ fontSize: 13, padding: '5px 10px', cursor: 'pointer' }}>
+                        {isPreviewingNarration ? '생성 중...' : isNarrPreviewPlaying ? '⏸ 일시정지' : '🎙 나레이션 미리듣기'}
+                      </button>
+                      <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>현재 설정의 나레이션 음성을 들으며, 왼쪽 미리보기 화면에서 자막이 표시되는 모습을 확인합니다.</p>
+                      {narrPreviewMsg && <p style={{ fontSize: 12, color: 'var(--text2)', margin: '4px 0 0' }}>{narrPreviewMsg}</p>}
                     </div>
                   </div>
                 )}
@@ -1386,6 +1618,90 @@ function ColorVolumeControls({
   )
 }
 
+function TitleLineBgControls({
+  label, bgEnabled, setBgEnabled, bgColor, setBgColor, bgOpacity, setBgOpacity,
+}: {
+  label: string
+  bgEnabled: boolean; setBgEnabled: (v: boolean) => void
+  bgColor: string; setBgColor: (v: string) => void
+  bgOpacity: number; setBgOpacity: (v: number) => void
+}) {
+  return (
+    <div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--text2)', cursor: 'pointer', marginBottom: bgEnabled ? 8 : 0 }}>
+        <input type="checkbox" checked={bgEnabled} onChange={e => setBgEnabled(e.target.checked)} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+        {label} 배경 표시
+      </label>
+      {bgEnabled && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'end' }}>
+          <div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>배경색</div>
+            <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+          </div>
+          <Slider label="투명도" value={bgOpacity} display={`${Math.round(bgOpacity * 100)}%`} min={0.1} max={1} step={0.05} onChange={setBgOpacity} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TitleStyleControls({
+  titleFont, setTitleFont,
+  title1BorderWidth, setTitle1BorderWidth, title2BorderWidth, setTitle2BorderWidth,
+  title1BorderColor, setTitle1BorderColor, title2BorderColor, setTitle2BorderColor,
+  title1BgEnabled, setTitle1BgEnabled, title1BgColor, setTitle1BgColor, title1BgOpacity, setTitle1BgOpacity,
+  title2BgEnabled, setTitle2BgEnabled, title2BgColor, setTitle2BgColor, title2BgOpacity, setTitle2BgOpacity,
+}: {
+  titleFont: string; setTitleFont: (v: string) => void
+  title1BorderWidth: number; setTitle1BorderWidth: (v: number) => void
+  title2BorderWidth: number; setTitle2BorderWidth: (v: number) => void
+  title1BorderColor: string; setTitle1BorderColor: (v: string) => void
+  title2BorderColor: string; setTitle2BorderColor: (v: string) => void
+  title1BgEnabled: boolean; setTitle1BgEnabled: (v: boolean) => void
+  title1BgColor: string; setTitle1BgColor: (v: string) => void
+  title1BgOpacity: number; setTitle1BgOpacity: (v: number) => void
+  title2BgEnabled: boolean; setTitle2BgEnabled: (v: boolean) => void
+  title2BgColor: string; setTitle2BgColor: (v: string) => void
+  title2BgOpacity: number; setTitle2BgOpacity: (v: number) => void
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div>
+        <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>글꼴</div>
+        <select value={titleFont} onChange={e => setTitleFont(e.target.value)} className="input-field" style={{ fontSize: 14, padding: '7px 8px', width: '100%' }}>
+          {SUB_FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+        </select>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'end' }}>
+        <Slider label="외곽선 두께 (1줄)" value={title1BorderWidth} display={`${title1BorderWidth}px`} min={0} max={10} step={1} onChange={setTitle1BorderWidth} />
+        <div>
+          <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>외곽선 색상 (1줄)</div>
+          <input type="color" value={title1BorderColor} onChange={e => setTitle1BorderColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'end' }}>
+        <Slider label="외곽선 두께 (2줄)" value={title2BorderWidth} display={`${title2BorderWidth}px`} min={0} max={10} step={1} onChange={setTitle2BorderWidth} />
+        <div>
+          <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>외곽선 색상 (2줄)</div>
+          <input type="color" value={title2BorderColor} onChange={e => setTitle2BorderColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+        </div>
+      </div>
+      <TitleLineBgControls
+        label="1줄"
+        bgEnabled={title1BgEnabled} setBgEnabled={setTitle1BgEnabled}
+        bgColor={title1BgColor} setBgColor={setTitle1BgColor}
+        bgOpacity={title1BgOpacity} setBgOpacity={setTitle1BgOpacity}
+      />
+      <TitleLineBgControls
+        label="2줄"
+        bgEnabled={title2BgEnabled} setBgEnabled={setTitle2BgEnabled}
+        bgColor={title2BgColor} setBgColor={setTitle2BgColor}
+        bgOpacity={title2BgOpacity} setBgOpacity={setTitle2BgOpacity}
+      />
+    </div>
+  )
+}
+
 function SubtitleStyleControls({
   subSize, setSubSize, subColor, setSubColor, subY, setSubY, subFont, setSubFont,
   subBgEnabled, setSubBgEnabled, subBgColor, setSubBgColor, subBgOpacity, setSubBgOpacity,
@@ -1406,8 +1722,11 @@ function SubtitleStyleControls({
           <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
           <input type="color" value={subColor} onChange={e => setSubColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
         </div>
-        <Slider label="하단 여백" value={subY} display={`${subY}px`} min={5} max={120} step={5} onChange={setSubY} />
+        <Slider label="Y 위치" value={subY} display={`${subY}px`} min={-500} max={1200} step={10} onChange={setSubY} />
       </div>
+      <p style={{ fontSize: 12, color: 'var(--text2)', margin: '-4px 0 0' }}>
+        음수: 영상 아래쪽 바깥 여백 / 큰 값: 영상 위쪽 바깥 여백으로 이동
+      </p>
       <div>
         <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>글꼴</div>
         <select value={subFont} onChange={e => setSubFont(e.target.value)} className="input-field" style={{ fontSize: 14, padding: '7px 8px', width: '100%' }}>

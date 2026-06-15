@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # TTS: Google Cloud Text-to-Speech (서비스 계정 키 파일 경로)
     GCP_TTS_CREDENTIALS: str = ""
 
+    # TTS: ElevenLabs (나레이션 음성 목록의 ElevenLabs 음성 선택 시 사용, 실패 시 Google Cloud TTS로 폴백)
+    ELEVENLABS_API_KEY: str = ""
+
     # YouTube OAuth2 (Google Cloud Console에서 발급)
     YOUTUBE_CLIENT_ID: str = ""
     YOUTUBE_CLIENT_SECRET: str = ""

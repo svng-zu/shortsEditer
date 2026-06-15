@@ -155,6 +155,7 @@ def _videos_from_channel(channel_url: str, fetch_count: int = 30) -> list[dict]:
             "video_url":   f"https://youtube.com/watch?v={vid}",
             "duration":    entry.get("duration"),
             "channel":     channel_name,
+            "channel_url": base_url,
             "upload_date": entry.get("upload_date") or "",
         })
     return videos
@@ -245,25 +246,28 @@ class YoutubeCollector:
 
     def get_channel_info(self, channel_url: str) -> dict:
         """채널 URL에서 채널 아바타 썸네일 URL 추출 (yt-dlp extract_flat)"""
-        opts = {
-            **_auth_opts(),
+        base_opts = {
             "quiet": True,
             "skip_download": True,
             "no_warnings": True,
             "extract_flat": True,
             "playlistend": 1,
         }
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(channel_url, download=False)
-            thumbnails = info.get("thumbnails") or []
-            # 가장 높은 해상도(마지막 항목)의 URL 사용
-            thumbnail_url = next(
-                (t["url"] for t in reversed(thumbnails) if t.get("url")), None
-            )
-            return {"thumbnail_url": thumbnail_url or info.get("thumbnail") or ""}
-        except Exception:
-            return {"thumbnail_url": ""}
+        # 일부 핸들(예: @sbsnews8)은 OAuth2 클라이언트로 tab 추출 시
+        # "Failed to resolve url" 오류가 발생 → 인증 없이 재시도
+        for opts in ({**_auth_opts(), **base_opts}, base_opts):
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info(channel_url, download=False)
+                thumbnails = info.get("thumbnails") or []
+                # 가장 높은 해상도(마지막 항목)의 URL 사용
+                thumbnail_url = next(
+                    (t["url"] for t in reversed(thumbnails) if t.get("url")), None
+                )
+                return {"thumbnail_url": thumbnail_url or info.get("thumbnail") or ""}
+            except Exception:
+                continue
+        return {"thumbnail_url": ""}
 
     def download_video(self, video_url: str, on_progress: callable = None) -> dict:
         """영상 다운로드 (yt-dlp + 인증)"""
@@ -294,6 +298,7 @@ class YoutubeCollector:
                 "filepath": ydl.prepare_filename(info),
                 "duration": info.get("duration"),
                 "channel":  info.get("channel"),
+                "channel_url": info.get("channel_url") or info.get("uploader_url") or "",
                 "video_id": info.get("id"),
             }
 

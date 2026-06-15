@@ -9,7 +9,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
@@ -17,6 +17,7 @@ from app.config import settings
 from app.session import (
     get_session, get_optional_user, make_session, SessionDirs,
     load_video_id_map, save_video_id_map,
+    load_channel_map, save_channel_map,
 )
 from app.models.user import User
 from app.models.schemas import (
@@ -146,6 +147,17 @@ def save_category_map(s: SessionDirs, mapping: dict):
     )
 
 
+def _channel_thumbnail(s: SessionDirs, channel_url: str) -> str:
+    """등록된 채널 목록(channels.json)에서 channel_url과 일치하는 채널의 썸네일을 찾는다."""
+    if not channel_url:
+        return ""
+    target = urlsplit(channel_url).path.rstrip("/").lower()
+    for c in _load_channels(s):
+        if urlsplit(c["url"]).path.rstrip("/").lower() == target:
+            return c.get("thumbnail_url", "")
+    return ""
+
+
 def clear_pipeline_files(s: SessionDirs):
     for d, ext in [
         (s.download_dir, ".mp4"),
@@ -250,6 +262,16 @@ async def _run_url_download(session_id: str, url: str, category: str):
                 id_map[stem] = video_id
                 save_video_id_map(s, id_map)
 
+            channel_name = info.get("channel") or info.get("uploader") or ""
+            channel_url = info.get("channel_url") or info.get("uploader_url") or ""
+            if channel_name:
+                ch_map = load_channel_map(s)
+                ch_map[stem] = {
+                    "name": channel_name,
+                    "thumbnail_url": _channel_thumbnail(s, channel_url),
+                }
+                save_channel_map(s, ch_map)
+
             fname = os.path.basename(filename)
             get_s3().upload(filename, s.s3_key("downloads", fname))
             return fname
@@ -336,6 +358,15 @@ async def _run_collect(session_id: str, clear_existing: bool, limit_per_channel:
             if "filepath" in v and v.get("video_id"):
                 id_map[Path(v["filepath"]).stem] = v["video_id"]
         save_video_id_map(s, id_map)
+
+        ch_map = load_channel_map(s)
+        for v in results:
+            if "filepath" in v and v.get("channel"):
+                ch_map[Path(v["filepath"]).stem] = {
+                    "name": v["channel"],
+                    "thumbnail_url": _channel_thumbnail(s, v.get("channel_url", "")),
+                }
+        save_channel_map(s, ch_map)
 
         s3 = get_s3()
         for v in results:
@@ -487,6 +518,9 @@ async def analyze(session: SessionDirs = Depends(get_session)):
 
 # ── 4. 영상 편집 ────────────────────────────────────────────────
 
+EDIT_VARIANTS = (1, 2, 3)
+
+
 async def _run_edit(session_id: str, template_id: int):
     s = make_session(session_id)
     try:
@@ -495,15 +529,24 @@ async def _run_edit(session_id: str, template_id: int):
             set_status(session_id, PipelineStep.ERROR, "분석 결과가 없습니다.", 0)
             return
 
-        set_status(session_id, PipelineStep.EDITING, f"영상 편집 중 (총 {len(analyses)}개)...", 10)
+        total_jobs = len(analyses) * len(EDIT_VARIANTS)
+        set_status(session_id, PipelineStep.EDITING,
+                   f"영상 편집 중 (총 {len(analyses)}개, 버전 {len(EDIT_VARIANTS)}개)...", 10)
         editor = Editor(template_id=template_id, session_dirs=s)
         s3 = get_s3()
         for i, a in enumerate(analyses):
-            set_status(session_id, PipelineStep.EDITING, f"영상 편집: {a.name}",
-                       int((i / len(analyses)) * 90))
-            raw_path = await asyncio.to_thread(editor.edit_video, str(a))
-            if raw_path and os.path.exists(raw_path):
-                s3.upload(raw_path, s.s3_key("raw", os.path.basename(raw_path)))
+            base_name = a.stem
+            for variant in EDIT_VARIANTS:
+                set_status(session_id, PipelineStep.EDITING,
+                           f"영상 편집: {a.name} (버전 {variant})",
+                           int(((i * len(EDIT_VARIANTS) + (variant - 1)) / total_jobs) * 90))
+                raw_path = await asyncio.to_thread(editor.edit_video, str(a), variant)
+                if raw_path and os.path.exists(raw_path):
+                    s3.upload(raw_path, s.s3_key("raw", os.path.basename(raw_path)))
+                    if variant >= 2:
+                        variant_analysis = s.analysis_dir / f"{base_name}_v{variant}.json"
+                        if variant_analysis.exists():
+                            s3.upload(str(variant_analysis), s.s3_key("analysis", variant_analysis.name))
 
         raws = list(s.raw_dir.glob("*.mp4"))
         set_status(session_id, PipelineStep.DONE, f"영상 편집 완료 — raw {len(raws)}개 생성", 100)
@@ -605,18 +648,22 @@ def _ffprobe_duration(video_path: str) -> float | None:
 async def list_downloads(session: SessionDirs = Depends(get_session)):
     """다운로드된 영상 목록 + 카테고리 + 썸네일 + 길이 반환"""
     cat_map = load_category_map(session)
+    ch_map = load_channel_map(session)
 
     def _build():
         result = []
         seen = set()
         for f in sorted(session.download_dir.glob("*.mp4")):
             thumbnail_url = f"/api/media/downloads/{session.session_id}/{quote(f.name)}/thumbnail"
+            ch = ch_map.get(f.stem, {})
             result.append(DownloadInfo(
                 filename=f.name,
                 stem=f.stem,
                 category=cat_map.get(f.stem, "economy"),
                 thumbnail_url=thumbnail_url,
                 duration=_ffprobe_duration(str(f)),
+                channel_name=ch.get("name", ""),
+                channel_thumbnail_url=ch.get("thumbnail_url", ""),
             ))
             seen.add(f.name)
 
@@ -628,12 +675,15 @@ async def list_downloads(session: SessionDirs = Depends(get_session)):
                 continue
             stem = Path(filename).stem
             thumbnail_url = f"/api/media/downloads/{session.session_id}/{quote(filename)}/thumbnail"
+            ch = ch_map.get(stem, {})
             result.append(DownloadInfo(
                 filename=filename,
                 stem=stem,
                 category=cat_map.get(stem, "economy"),
                 thumbnail_url=thumbnail_url,
                 duration=None,
+                channel_name=ch.get("name", ""),
+                channel_thumbnail_url=ch.get("thumbnail_url", ""),
             ))
         return result
 

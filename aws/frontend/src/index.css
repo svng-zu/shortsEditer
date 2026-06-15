@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 미리보기 캔버스를 실제 렌더링(FFmpeg) 폰트와 맞추기 위한 웹폰트
+   — NanumSquareRoundEB는 서버에 EB 파일이 없어 NanumSquareRoundB로 대체 렌더링되므로 동일하게 매핑 */
+@font-face {
+  font-family: 'NanumSquareRoundEB';
+  src: url('/fonts/NanumSquareRoundB.ttf') format('truetype');
+  font-display: block;
+}
+@font-face {
+  font-family: 'NanumSquareRoundB';
+  src: url('/fonts/NanumSquareRoundB.ttf') format('truetype');
+  font-display: block;
+}
+@font-face {
+  font-family: 'NanumSquareB';
+  src: url('/fonts/NanumSquareB.ttf') format('truetype');
+  font-display: block;
+}
+
 :root {
   --bg:        #f1f3f4;
   --surface:   #ffffff;

@@ -36,7 +36,18 @@ class StyleParams(BaseModel):
     title1_color: str = "#FFD700"
     title2_color: str = "#FFFFFF"
     title_y_extra: int = 0
-    title_fontsize_scale: float = 1.0
+    title_fontsize_delta: int = 0
+    title_font_name: str = "NanumSquareRoundEB"
+    title1_border_width: float = 3.0
+    title2_border_width: float = 3.0
+    title1_border_color: str = "#000000"
+    title2_border_color: str = "#000000"
+    title1_bg_enabled: bool = False
+    title1_bg_color: str = "#000000"
+    title1_bg_opacity: float = 0.6
+    title2_bg_enabled: bool = False
+    title2_bg_color: str = "#000000"
+    title2_bg_opacity: float = 0.6
     sub_fontsize: int = 68
     sub_color: str = "#FFFFFF"
     sub_margin_v: int = 20
@@ -49,6 +60,11 @@ class StyleParams(BaseModel):
     channel_y: int = 0
     channel_fontsize: int = 36
     channel_image_url: str = ""
+    channel_topleft_text: str = ""
+    channel_topleft_color: str = "#FFFFFF"
+    channel_topleft_fontsize: int = 32
+    channel_topleft_x: int = 16
+    channel_topleft_y: int = 16
     font_name: str = "NanumSquareRoundEB"
     brightness: float = 0.0
     contrast: float = 1.0
@@ -79,6 +95,7 @@ class PreviewRequest(BaseModel):
     seek: float = 2.0
     bg_image: Optional[str] = None
     bg_solid_color: Optional[str] = None
+    subtitles: bool = False
 
 
 class UpdateTitleRequest(BaseModel):
@@ -118,6 +135,11 @@ class GenerateNarrationSubtitlesResponse(BaseModel):
     subtitles: List[NarrationSubtitleEntry]
 
 
+class NarrationPreviewResponse(BaseModel):
+    audio_base64: str
+    subtitles: List[NarrationSubtitleEntry]
+
+
 class SrtEntry(BaseModel):
     index: str
     times: str
@@ -143,6 +165,8 @@ class DownloadInfo(BaseModel):
     category: str
     thumbnail_url: Optional[str] = None
     duration: Optional[float] = None
+    channel_name: str = ""
+    channel_thumbnail_url: str = ""
 
 
 class ProcessSelectedItem(BaseModel):
@@ -171,6 +195,9 @@ class ShortInfo(BaseModel):
     title: str
     category: str
     candidates: List[Candidate] = []
+    channel_name: str = ""
+    channel_thumbnail_url: str = ""
+    variant: int = 1
 
 
 class RawInfo(BaseModel):
@@ -179,6 +206,9 @@ class RawInfo(BaseModel):
     title: str
     category: str
     duration: Optional[float] = None
+    channel_name: str = ""
+    channel_thumbnail_url: str = ""
+    variant: int = 1
 
 
 # ── 사용자 계정 / 인증 ──────────────────────────────────────

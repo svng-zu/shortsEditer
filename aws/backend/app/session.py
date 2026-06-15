@@ -34,6 +34,10 @@ class SessionDirs:
     def video_id_map_path(self) -> Path:
         return self.download_dir.parent / "video_ids.json"
 
+    @property
+    def channel_map_path(self) -> Path:
+        return self.download_dir.parent / "channel_map.json"
+
     def s3_key(self, subdir: str, filename: str) -> str:
         return f"sessions/{self.session_id}/{subdir}/{filename}"
 
@@ -50,6 +54,22 @@ def load_video_id_map(s: SessionDirs) -> dict:
 
 def save_video_id_map(s: SessionDirs, mapping: dict):
     s.video_id_map_path.write_text(
+        json.dumps(mapping, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def load_channel_map(s: SessionDirs) -> dict:
+    """다운로드 파일명(stem) → 출처 채널 {name, thumbnail_url} 매핑"""
+    if not s.channel_map_path.exists():
+        return {}
+    try:
+        return json.loads(s.channel_map_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_channel_map(s: SessionDirs, mapping: dict):
+    s.channel_map_path.write_text(
         json.dumps(mapping, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
