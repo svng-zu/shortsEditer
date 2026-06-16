@@ -1,0 +1,65 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/영상틀자 '익숙한 얼굴' 소름.. 결국 칼 빌려서 출국 [뉴스.zip⧸MBC뉴스].json",
+  "category": "politics",
+  "intro_text": "체육단체 봉쇄\n60억 피해 발생",
+  "candidates": [
+    {
+      "start": 19.38,
+      "end": 24.38,
+      "title": "직원 항의에 '한마디'",
+      "reason": "시위대가 직원들의 출입을 막는 상황에서, 직원들의 항의에 대해 정치인이 짧고 강렬하게 한마디만 하고 사라지는 장면은 시청자의 호기심을 자극하고 논쟁적인 발언으로 이어질 수 있습니다.",
+      "score": 8,
+      "edit_order": 1
+    },
+    {
+      "start": 72.68,
+      "end": 79.36,
+      "title": "피해액 60억 발생",
+      "reason": "출입 봉쇄 장기화로 인한 피해액이 60억 원까지 불어났다는 내용은 여론을 뒤흔들 만한 폭로/주장에 해당하며, 사태의 심각성을 단적으로 보여줍니다.",
+      "score": 9,
+      "edit_order": 2
+    },
+    {
+      "start": 85.48,
+      "end": 93.0,
+      "title": "모든 법적 대응 검토",
+      "reason": "체육단체 측에서 민, 형사상 책임을 포함한 모든 법적 대응 방안을 검토하겠다는 발언은 사태의 파장을 보여주는 핵심적인 내용입니다.",
+      "score": 9,
+      "edit_order": 3
+    },
+    {
+      "start": 105.4,
+      "end": 118.0,
+      "title": "공범 되면 폐가망신",
+      "reason": "경찰이 시위대의 불법 행위에 대해 '공범이 되면 폐가망신할 수 있다'고 강력 경고하는 부분은 정치인의 강한 발언이자 논쟁적인 발언으로, 시청자의 이목을 집중시킬 수 있습니다.",
+      "score": 10,
+      "edit_order": 4
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 5.0,
+      "orig_start": 19.38,
+      "orig_end": 24.38
+    },
+    {
+      "raw_start": 5.0,
+      "raw_end": 11.68,
+      "orig_start": 72.68,
+      "orig_end": 79.36
+    },
+    {
+      "raw_start": 11.68,
+      "raw_end": 19.2,
+      "orig_start": 85.48,
+      "orig_end": 93.0
+    },
+    {
+      "raw_start": 19.2,
+      "raw_end": 31.8,
+      "orig_start": 105.4,
+      "orig_end": 118.0
+    }
+  ]
+}

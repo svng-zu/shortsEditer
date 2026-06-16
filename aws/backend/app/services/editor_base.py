@@ -548,7 +548,8 @@ class EditorBase:
 
     def _select_candidates_v1(self, candidates):
         """전체 후보 길이가 MAX_TOTAL_SEC를 초과하면 score가 높은 구간을 우선 유지한다.
-        선택된 구간은 다시 edit_order 순서로 재배열해 자연스러운 흐름을 유지한다."""
+        선택된 구간은 다시 edit_order 순서로 재배열해 자연스러운 흐름을 유지한다.
+        예산보다 큰 후보만 있을 경우 최고점 후보 하나를 포함시키고 edit_video()에서 트리밍."""
         valid = [c for c in candidates if (c["end"] - c["start"]) >= MIN_SEGMENT_SEC]
         total = sum(c["end"] - c["start"] for c in valid)
         if total <= self.MAX_TOTAL_SEC:
@@ -562,6 +563,10 @@ class EditorBase:
             if dur <= budget:
                 selected.append(c)
                 budget -= dur
+            elif not selected:
+                # 모든 후보가 예산보다 클 때: 최고점 후보 하나만 포함하고 edit_video()에서 트리밍
+                selected.append(c)
+                break
 
         selected.sort(key=lambda c: c.get("edit_order", 99))
         return selected
@@ -621,13 +626,30 @@ class EditorBase:
             print(f"[Editor] 원본 영상 없음")
             return None
 
+        # 타임스탬프 범위 검증 — Gemini 환각으로 영상 길이를 초과한 타임스탬프 방어
+        video_duration_pre = self._get_video_duration(video_path)
+        valid_candidates = []
+        for c in candidates:
+            if c["start"] >= video_duration_pre:
+                print(f"  [Editor] ⚠ 후보 범위 초과 스킵: start={c['start']:.1f}s (영상={video_duration_pre:.1f}s)")
+            else:
+                valid_candidates.append(c)
+        if len(valid_candidates) < len(candidates):
+            skipped = len(candidates) - len(valid_candidates)
+            print(f"  [Editor] {skipped}개 후보 제거 (타임스탬프 환각) → 유효 후보 {len(valid_candidates)}개")
+        candidates = valid_candidates
+
+        if not candidates:
+            print(f"[Editor] 유효한 후보 없음 (모두 범위 초과): {analysis_path}")
+            return None
+
         # 편집마다 고유 temp 디렉토리 사용 (동시 실행 충돌 방지)
         job_temp = TEMP_DIR / uuid.uuid4().hex[:12]
         job_temp.mkdir(parents=True, exist_ok=True)
 
         print(f"\n[Stage 1] {os.path.basename(video_path)}")
         src_w, src_h = self._get_video_info(video_path)
-        video_duration = self._get_video_duration(video_path)
+        video_duration = video_duration_pre
 
         transcript_segments = []
         if transcript_path and os.path.exists(transcript_path):

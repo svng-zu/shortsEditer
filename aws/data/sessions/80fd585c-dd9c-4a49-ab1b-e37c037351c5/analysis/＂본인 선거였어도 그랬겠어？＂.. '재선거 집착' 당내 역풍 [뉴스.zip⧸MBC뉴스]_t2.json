@@ -1,0 +1,51 @@
+{
+  "transcript_path": "/app/data/sessions/80fd585c-dd9c-4a49-ab1b-e37c037351c5/transcripts/＂본인 선거였어도 그랬겠어？＂.. '재선거 집착' 당내 역풍 [뉴스.zip⧸MBC뉴스].json",
+  "category": "politics",
+  "intro_text": "오세훈 시장\n재선거 부담",
+  "candidates": [
+    {
+      "start": 27,
+      "end": 33,
+      "title": "본인 선거였어도?",
+      "reason": "장동혁 지도부의 재선거 주장에 대해 '본인 선거였으면 재선거하자고 했겠냐'는 질문을 던지며 논리의 허점을 지적하는 구간입니다.",
+      "score": 9,
+      "edit_order": 1
+    },
+    {
+      "start": 80,
+      "end": 88,
+      "title": "재선거 요구 아냐",
+      "reason": "정점식 원내대표가 재선거 요구가 아니라 투표용지 부족 사태가 결과에 영향을 미쳤는지 판단해달라는 소청이라는 점을 명확히 하며 입장을 정리하는 구간입니다.",
+      "score": 8,
+      "edit_order": 2
+    },
+    {
+      "start": 91,
+      "end": 99,
+      "title": "오세훈 시장 부담",
+      "reason": "오세훈 시장이 재선거를 전면에 내세우기 부담스러워하는 상황을 설명하며, 정치적 셈법을 보여줍니다.",
+      "score": 7,
+      "edit_order": 3
+    }
+  ],
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 6.0,
+      "orig_start": 27,
+      "orig_end": 33
+    },
+    {
+      "raw_start": 6.0,
+      "raw_end": 14.0,
+      "orig_start": 80,
+      "orig_end": 88
+    },
+    {
+      "raw_start": 14.0,
+      "raw_end": 22.0,
+      "orig_start": 91,
+      "orig_end": 99
+    }
+  ]
+}
