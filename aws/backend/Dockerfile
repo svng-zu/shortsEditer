@@ -45,12 +45,13 @@ RUN mkdir -p /app/data/downloads \
     /app/static/fonts
 
 # Google Fonts 다운로드 (FFmpeg drawtext 렌더링용)
+# Black Han Sans — 고정 URL (버전 안정적)
 RUN curl -fL -o /app/static/fonts/BlackHanSans-Regular.ttf \
-      "https://fonts.gstatic.com/s/blackhansans/v17/ea8Aad44WunzF9a-dL6toA8r8nqVIXSkH-Hc.ttf" && \
-    curl -fL -o /app/static/fonts/NotoSerifKR-Bold.otf \
-      "https://fonts.gstatic.com/s/notoserifkr/v15/DtV4JwqzAL5hcRFDhCwEsJrY8E2tYEWxq-EMVCs.otf" && \
-    curl -fL -o /app/static/fonts/NotoSansKR-Bold.otf \
-      "https://fonts.gstatic.com/s/notosanskr/v36/PbyxFmXiEBPT4ITbgNA5Cgm20xz64px_1hVWr0wuPNGmlQNMEfD4.otf"
+      "https://fonts.gstatic.com/s/blackhansans/v17/ea8Aad44WunzF9a-dL6toA8r8nqVIXSkH-Hc.ttf"
+
+# Noto CJK 폰트 — Google Fonts CSS API에서 URL 동적 추출 (버전 변경에 무관)
+# 실패해도 빌드 중단 없음 (_resolve_font가 Nanum 폰트로 자동 fallback)
+RUN python3 /app/download_fonts.py || true
 
 EXPOSE 8000
 
