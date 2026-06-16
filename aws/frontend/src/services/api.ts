@@ -142,6 +142,8 @@ export interface RawInfo {
   channel_name?: string
   channel_thumbnail_url?: string
   variant?: number
+  hook_segment?: { start: number; end: number; reason?: string } | null
+  download_filename?: string | null
 }
 
 export interface VideoInfo {
@@ -399,6 +401,11 @@ export const api = {
   },
 
   // Render
+  async getSubtitleEntries(stem: string): Promise<{ entries: { start: number; end: number; text: string }[] }> {
+    const { data } = await client.get(`/api/subtitle-entries/${encodeURIComponent(stem)}`)
+    return data
+  },
+
   async render(
     filename: string,
     title: string,
@@ -416,6 +423,7 @@ export const api = {
     hookSfxOffset?: number,
     hookSfxVolume?: number,
     customSfxEntries?: Array<{ time: number; sfx_id: string; volume: number }>,
+    textOverlays?: Array<{ time: number; end: number; text: string; color: string; x_pct?: number; y_pct?: number; size?: number }>,
   ): Promise<void> {
     await client.post('/api/render', {
       filename,
@@ -434,6 +442,7 @@ export const api = {
       hook_sfx_offset: hookSfxOffset ?? 0.0,
       hook_sfx_volume: hookSfxVolume ?? 0.8,
       custom_sfx_entries: customSfxEntries ?? [],
+      text_overlays: textOverlays ?? [],
     })
   },
 

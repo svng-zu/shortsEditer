@@ -80,6 +80,16 @@ class SfxEntry(BaseModel):
     volume: float = 0.8
 
 
+class TextOverlayEntry(BaseModel):
+    time: float
+    end: float
+    text: str
+    color: str = "#FFFFFF"
+    x_pct: float = 0.5   # 0=left edge, 0.5=center, 1=right edge
+    y_pct: float = 0.12  # 0=top of video area, 1=bottom of video area
+    size: float = 1.0    # 폰트 크기 배율 (1.0 = 기본)
+
+
 class RenderRequest(BaseModel):
     filename: str
     title: str = ""
@@ -97,6 +107,7 @@ class RenderRequest(BaseModel):
     hook_sfx_offset: float = 0.0
     hook_sfx_volume: float = 0.8
     custom_sfx_entries: List[SfxEntry] = []
+    text_overlays: List[TextOverlayEntry] = []
 
 
 class PreviewRequest(BaseModel):
@@ -220,6 +231,8 @@ class RawInfo(BaseModel):
     channel_name: str = ""
     channel_thumbnail_url: str = ""
     variant: int = 1
+    hook_segment: Optional[dict] = None
+    download_filename: Optional[str] = None
 
 
 # ── 사용자 계정 / 인증 ──────────────────────────────────────

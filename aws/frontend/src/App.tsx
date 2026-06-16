@@ -152,7 +152,7 @@ function ShortsStudio({ onOpenAdmin }: { onOpenAdmin?: () => void }) {
   }
 
   return (
-    <div style={{ height: '100vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
+    <div style={{ minHeight: '100vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 100, background: 'white', boxShadow: '0 1px 6px rgba(0,0,0,0.06)' }}>
         <Header
           status={status} isRunning={isRunning} isPaused={isPaused}
@@ -165,17 +165,14 @@ function ShortsStudio({ onOpenAdmin }: { onOpenAdmin?: () => void }) {
         {progressBar}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '16px 80px', maxWidth: 1300, margin: '0 auto', width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 80px', maxWidth: 1600, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
         <Pipeline
           status={status} isRunning={isRunning}
           onStartPolling={startPolling} onRefresh={handleRefresh} isMobile={false}
           onQuotaError={onQuotaError} downloads={downloads}
         />
-        <div style={{ display: 'grid', height: '78vh', minHeight: 520 }}>
+        <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column' }}>
           <ShortsPanel {...shortsPanelProps} />
-        </div>
-        <div style={{ textAlign: 'center', padding: '12px 0 20px', fontSize: 12, color: 'var(--muted)' }}>
-          © 2026 고릴라AI. All rights reserved.
         </div>
       </div>
     </div>

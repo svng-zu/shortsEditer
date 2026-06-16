@@ -121,6 +121,8 @@ class EditorBase:
 
     def _find_video_path(self, transcript_path):
         base = os.path.splitext(os.path.basename(transcript_path))[0]
+        if not base:
+            return None
         download_dir = self._sd.download_dir if self._sd else settings.DOWNLOAD_DIR
         for f in os.listdir(download_dir):
             if f.endswith(".mp4") and base in f:
@@ -754,6 +756,39 @@ class EditorBase:
         print(f"  [Stage 1] 완료 → {os.path.basename(raw_path)}")
         return raw_path
 
+    def _build_text_overlay_filters(self, text_overlays: list) -> list:
+        if not text_overlays:
+            return []
+        font_opt = f":fontfile='{self.font}'" if self.font else ""
+        filters = []
+        for ov in text_overlays:
+            text = str(ov.get("text", "")).strip()
+            if not text:
+                continue
+            t_start = float(ov.get("time", 0))
+            t_end = float(ov.get("end", t_start + 3))
+            color = self._css_to_ffmpeg(ov.get("color", "#FFFFFF"))
+            esc = text.replace("'", "'\\''").replace(":", "\\:").replace("%", "\\%")
+            x_pct = float(ov.get("x_pct", 0.5))
+            y_pct = float(ov.get("y_pct", 0.12))
+            size_scale = float(ov.get("size", 1.0))
+            fontsize = max(24, int(72 * size_scale))
+            y_pos = VIDEO_Y + int(VIDEO_H * y_pct)
+            if abs(x_pct - 0.5) < 0.05:
+                x_expr = "(w-text_w)/2"
+            else:
+                x_px = int(CANVAS_W * x_pct)
+                x_expr = f"{x_px}-text_w/2"
+            filters.append(
+                f"drawtext=text='{esc}'{font_opt}"
+                f":fontsize={fontsize}:fontcolor={color}"
+                f":borderw=4:bordercolor=black@0.9"
+                f":shadowx=3:shadowy=3:shadowcolor=black@0.7"
+                f":x={x_expr}:y={y_pos}"
+                f":enable='between(t,{t_start:.3f},{t_end:.3f})'"
+            )
+        return filters
+
     def apply_overlay(self, raw_path, analysis_path,
                       title_override: str = None,
                       subtitles: bool = False,
@@ -768,7 +803,8 @@ class EditorBase:
                       hook_sfx_id: str = None,
                       hook_sfx_offset: float = 0.0,
                       hook_sfx_volume: float = 0.8,
-                      custom_sfx_entries: list = None) -> str:
+                      custom_sfx_entries: list = None,
+                      text_overlays: list = None) -> str:
         # style의 font_name으로 폰트 갱신
         if style and style.get("font_name"):
             self.font = self._resolve_font(style["font_name"])
@@ -779,6 +815,9 @@ class EditorBase:
 
         title = title_override if title_override is not None else analysis.get("intro_text", "")
         category = analysis.get("category", "")
+
+        # 훅 처리 전에 원본 raw 경로 저장 (출력 파일명 계산에 사용)
+        original_raw_path = raw_path
 
         # ── 훅 클립 전처리 (use_hook=True 시) ──
         hook_clip = None
@@ -810,7 +849,7 @@ class EditorBase:
             raw_path = merged_raw
             print(f"  [Hook] 훅 클립 합산 완료 (총 {hook_duration:.1f}s 추가)")
 
-        base_name = os.path.splitext(os.path.basename(raw_path))[0].replace("_raw", "")
+        base_name = os.path.splitext(os.path.basename(original_raw_path))[0].replace("_raw", "")
         shorts_dir = self._sd.shorts_dir if self._sd else settings.SHORTS_DIR
         output_path = str(shorts_dir / f"{base_name}_shorts.mp4")
 
@@ -833,9 +872,10 @@ class EditorBase:
             else:
                 sub_entries = self._generate_sub_entries(analysis_path)
         sub_filters = self._build_sub_drawtext_filters(sub_entries, style)
-        sub_str = ",".join(sub_filters)
+        text_overlay_filters = self._build_text_overlay_filters(text_overlays or [])
+        sub_str = ",".join(sub_filters + text_overlay_filters)
 
-        print(f"  [Stage 2] '{title[:20]}' | 자막={'O' if sub_entries else 'X'}")
+        print(f"  [Stage 2] '{title[:20]}' | 자막={'O' if sub_entries else 'X'} | 텍스트오버레이={len(text_overlays or [])}개")
 
         bg_path = self._resolve_bg_path(category, bg_image) if not bg_solid_color else None
         logo_path = self._get_logo_path()

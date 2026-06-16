@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { api, ShortInfo, RawInfo, StyleParams } from '../services/api'
+import { api, ShortInfo, RawInfo, StyleParams, getSessionId } from '../services/api'
 import YouTubeUploadModal from './YouTubeUploadModal'
 
 interface Props {
@@ -27,6 +27,18 @@ const TMPL_COLORS: Record<string, Record<number, { bg: string }>> = {
   sports:   { 1: { bg: '#0d0d0d' }, 2: { bg: '#f5f5f5' }, 3: { bg: '#1a1a0d' } },
   economy:  { 1: { bg: '#0a0f0a' }, 2: { bg: '#f5f5f5' }, 3: { bg: '#0d1b2a' } },
   politics: { 1: { bg: '#0d0505' }, 2: { bg: '#f5f5f5' }, 3: { bg: '#111111' } },
+}
+
+function wrapSubtitle(text: string, maxChars = 12): string[] {
+  const words = text.split('')
+  const lines: string[] = []
+  let cur = ''
+  for (const ch of words) {
+    if ((cur + ch).length > maxChars) { if (cur) lines.push(cur); cur = ch }
+    else cur += ch
+  }
+  if (cur) lines.push(cur)
+  return lines.slice(0, 2)
 }
 
 function _hexToRgba(hex: string, alpha: number): string {
@@ -497,7 +509,7 @@ export default function ShortsPanel({
 
   // ── 데스크톱 레이아웃 ──
   return (
-    <main className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <main className="card" style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       {uploadTarget && <YouTubeUploadModal filename={uploadTarget.filename} defaultTitle={uploadTarget.title} onClose={() => setUploadTarget(null)} />}
 
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', padding: '0 16px', flexShrink: 0 }}>
@@ -514,7 +526,7 @@ export default function ShortsPanel({
         ))}
       </div>
 
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex' }}>
 
         {/* ─── RAW 탭 ─── */}
         {activeTab === 'raws' && (
@@ -634,8 +646,8 @@ export default function ShortsPanel({
             </div>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'var(--surface)', overflow: 'hidden' }}>
               {selectedShort
-                ? <div style={{ aspectRatio: '9/16', maxHeight: '100%', width: 'auto', background: '#202124', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }}>
-                    <video key={selectedShort.url} src={selectedShort.url} controls style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
+                ? <div style={{ aspectRatio: '9/16', height: 'min(72vh, 624px)', width: 'auto', background: '#202124', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }}>
+                    <video key={selectedShort.url} src={selectedShort.url} controls style={{ height: '100%', width: '100%', objectFit: 'contain' }} />
                   </div>
                 : <div style={{ textAlign: 'center', color: 'var(--muted)' }}>
                     <div style={{ fontSize: 40, marginBottom: 8, opacity: 0.3 }}>▶</div>
@@ -651,57 +663,394 @@ export default function ShortsPanel({
 }
 
 // Raw 편집 영역
+const THUMB_W = 54
+const THUMB_H = 96
+const PX_PER_SEC = 50
+
+interface SfxEntry { time: number; sfx_id: string; volume: number }
+interface TextOverlay { id: string; time: number; end: number; text: string; color: string; x_pct: number; y_pct: number; size: number }
+
+interface SubEntry { start: number; end: number; text: string }
+
+interface RenderTimelineProps {
+  videoRef: RefObject<HTMLVideoElement>
+  duration: number
+  sfxList: {id: string; file: string; description: string}[]
+  customSfx: SfxEntry[]
+  setCustomSfx: (v: SfxEntry[]) => void
+  textOverlays: TextOverlay[]
+  setTextOverlays: (v: TextOverlay[]) => void
+  subEntries?: SubEntry[]
+  hookDuration?: number
+  hookEnabled?: boolean
+}
+
+function RenderTimeline({ videoRef, duration, sfxList, customSfx, setCustomSfx, textOverlays, setTextOverlays, subEntries = [], hookDuration = 0, hookEnabled = false }: RenderTimelineProps) {
+  const [thumbs, setThumbs] = useState<{time: number; src: string}[]>([])
+  const [loadingThumbs, setLoadingThumbs] = useState(false)
+  const [popover, setPopover] = useState<{type:'sfx'|'text'; idx:number} | null>(null)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [activeSub, setActiveSub] = useState('')
+  const stripRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<{type:'sfx'|'text'; idx: number; startX: number; startTime: number} | null>(null)
+  const hookPx = hookEnabled && hookDuration > 0 ? hookDuration * PX_PER_SEC : 0
+
+  // 비디오 currentTime → 플레이헤드 + 현재 자막
+  useEffect(() => {
+    const vid = videoRef.current
+    if (!vid) return
+    const onTime = () => {
+      const t = vid.currentTime
+      setCurrentTime(t)
+      if (subEntries.length > 0) {
+        const active = subEntries.find(s => t >= s.start && t <= s.end)
+        setActiveSub(active ? active.text : '')
+      }
+    }
+    vid.addEventListener('timeupdate', onTime)
+    return () => vid.removeEventListener('timeupdate', onTime)
+  }, [videoRef, duration, subEntries])
+
+  // 썸네일 생성
+  useEffect(() => {
+    const vid = videoRef.current
+    if (!vid || duration <= 0) { setThumbs([]); return }
+    setLoadingThumbs(true)
+    const count = Math.min(20, Math.max(6, Math.ceil(duration / 2)))
+    const offscreen = document.createElement('canvas')
+    offscreen.width = THUMB_W; offscreen.height = THUMB_H
+    const ctx = offscreen.getContext('2d')!
+    const results: {time: number; src: string}[] = []
+    let cancelled = false
+
+    const savedTime = vid.currentTime
+    const savedPaused = vid.paused
+    vid.pause()
+
+    const capture = async () => {
+      for (let i = 0; i < count; i++) {
+        if (cancelled) break
+        const t = (duration / Math.max(count - 1, 1)) * i
+        vid.currentTime = t
+        await new Promise<void>(r => { vid.addEventListener('seeked', () => r(), { once: true }) })
+        if (cancelled) break
+        ctx.drawImage(vid, 0, 0, THUMB_W, THUMB_H)
+        results.push({ time: t, src: offscreen.toDataURL('image/jpeg', 0.5) })
+      }
+      if (!cancelled) {
+        vid.currentTime = savedTime
+        if (!savedPaused) vid.play().catch(() => {})
+        setThumbs(results)
+        setLoadingThumbs(false)
+      }
+    }
+    capture()
+    return () => { cancelled = true }
+  }, [duration, videoRef])
+
+  const totalW = Math.max(300, hookPx + duration * PX_PER_SEC)
+
+  // 클릭 → 해당 시간으로 영상 시크 (미리보기)
+  const handleStripClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!stripRef.current) return
+    const rect = stripRef.current.getBoundingClientRect()
+    const x = e.clientX - rect.left + stripRef.current.scrollLeft
+    const rawX = Math.max(0, x - hookPx)
+    const t = Math.max(0, Math.min(duration, rawX / PX_PER_SEC))
+    const vid = videoRef.current
+    if (vid) { vid.pause(); vid.currentTime = t }
+    setCurrentTime(t)
+    setPopover(null)
+  }
+
+  const addSfxHere = () => {
+    if (sfxList.length === 0) return
+    const t = +(currentTime.toFixed(1))
+    setCustomSfx([...customSfx, { time: t, sfx_id: sfxList[0].id, volume: 0.8 }])
+    setPopover({ type: 'sfx', idx: customSfx.length })
+  }
+
+  const addTextHere = () => {
+    const t = +(currentTime.toFixed(1))
+    const newOv: TextOverlay = { id: `tx_${Date.now()}`, time: t, end: +(Math.min(duration, t + 3).toFixed(1)), text: '', color: '#FFFFFF', x_pct: 0.5, y_pct: 0.12, size: 1 }
+    setTextOverlays([...textOverlays, newOv])
+    setPopover({ type: 'text', idx: textOverlays.length })
+  }
+
+  const updateSfx = (i: number, patch: Partial<SfxEntry>) =>
+    setCustomSfx(customSfx.map((e, j) => j === i ? { ...e, ...patch } : e))
+  const removeSfx = (i: number) => {
+    setCustomSfx(customSfx.filter((_, j) => j !== i))
+    if (popover?.type === 'sfx' && popover.idx === i) setPopover(null)
+  }
+
+  const updateText = (id: string, patch: Partial<TextOverlay>) =>
+    setTextOverlays(textOverlays.map(ov => ov.id === id ? { ...ov, ...patch } : ov))
+  const removeText = (id: string) => {
+    setTextOverlays(textOverlays.filter(ov => ov.id !== id))
+    setPopover(null)
+  }
+
+  const onPinMouseDown = (e: React.MouseEvent, type: 'sfx' | 'text', idx: number, startTime: number) => {
+    e.stopPropagation()
+    dragRef.current = { type, idx, startX: e.clientX, startTime }
+    const onMove = (me: MouseEvent) => {
+      if (!dragRef.current) return
+      const dx = me.clientX - dragRef.current.startX
+      const newT = Math.max(0, Math.min(duration, dragRef.current.startTime + dx / PX_PER_SEC))
+      if (dragRef.current.type === 'sfx') updateSfx(dragRef.current.idx, { time: +newT.toFixed(1) })
+      else {
+        const ov = textOverlays[dragRef.current.idx]
+        if (ov) {
+          const span = ov.end - ov.time
+          updateText(ov.id, { time: +newT.toFixed(1), end: +(Math.min(duration, newT + span).toFixed(1)) })
+        }
+      }
+    }
+    const onUp = () => { dragRef.current = null; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  // 트랙 높이
+  const TRACK_H = 22
+  const SUB_TRACK_H = 16
+  const hasSub = subEntries.length > 0
+  const hasHook = hookEnabled && hookDuration > 0
+  const totalH = THUMB_H + 20
+    + (hasHook ? TRACK_H + 4 : 0)
+    + (hasSub ? SUB_TRACK_H + 4 : 0)
+    + (customSfx.length > 0 ? TRACK_H + 4 : 0)
+    + (textOverlays.length > 0 ? TRACK_H + 4 : 0)
+
+  return (
+    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+      {/* 헤더 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, paddingInline: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+          <span style={{ fontWeight: 600, fontSize: 12, flexShrink: 0 }}>타임라인</span>
+          {duration > 0 && <span style={{ fontSize: 11, color: 'var(--text2)', flexShrink: 0 }}>{(currentTime + (hookEnabled ? hookDuration : 0)).toFixed(1)}s</span>}
+          {activeSub && <span style={{ fontSize: 11, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'var(--primary-bg)', padding: '1px 6px', borderRadius: 4 }}>"{activeSub}"</span>}
+        </div>
+        <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+          {sfxList.length > 0 && duration > 0 && (
+            <button onClick={addSfxHere} className="btn-outlined"
+              style={{ fontSize: 11, padding: '2px 7px', cursor: 'pointer' }}>+ SFX</button>
+          )}
+          {duration > 0 && (
+            <button onClick={addTextHere} className="btn-outlined"
+              style={{ fontSize: 11, padding: '2px 7px', cursor: 'pointer', borderColor: '#f97316', color: '#f97316' }}>+ 텍스트</button>
+          )}
+        </div>
+      </div>
+
+      {/* 스크롤 스트립 */}
+      <div ref={stripRef} style={{ overflowX: 'auto', overflowY: 'visible', paddingBottom: 6, cursor: 'pointer' }}
+        onClick={handleStripClick}>
+        <div style={{ position: 'relative', width: totalW, height: totalH + 8, userSelect: 'none' }}>
+
+          {/* 시간 눈금 (훅 오프셋 포함) */}
+          <div style={{ position: 'absolute', top: 0, left: 0, height: 16 }}>
+            {hookPx > 0 && (
+              <div style={{ position: 'absolute', left: hookPx / 2 - 10, fontSize: 9, color: '#9334e6', fontWeight: 700 }}>HOOK</div>
+            )}
+            {Array.from({ length: Math.floor(duration) + 1 }, (_, s) => (
+              <div key={s} style={{ position: 'absolute', left: hookPx + s * PX_PER_SEC, fontSize: 10, color: 'var(--text2)', whiteSpace: 'nowrap' }}>
+                {s % 5 === 0 ? `${s}s` : '·'}
+              </div>
+            ))}
+          </div>
+
+          {/* 훅 블록 */}
+          {hookPx > 0 && (
+            <div style={{ position: 'absolute', top: 18, left: 0, width: hookPx, height: THUMB_H, background: 'rgba(147,52,230,0.25)', border: '1px solid #9334e6', borderRadius: '4px 0 0 4px', zIndex: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+              <span style={{ fontSize: 10, color: '#9334e6', fontWeight: 700 }}>🎬 훅</span>
+            </div>
+          )}
+
+          {/* 썸네일 스트립 */}
+          <div style={{ position: 'absolute', top: 18, left: hookPx, display: 'flex', height: THUMB_H, borderRadius: 4, overflow: 'hidden', border: '1px solid var(--border)' }}>
+            {loadingThumbs ? (
+              <div style={{ width: Math.max(100, duration * PX_PER_SEC), height: THUMB_H, background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>썸네일 생성 중...</span>
+              </div>
+            ) : thumbs.length > 0 ? (
+              thumbs.map((th, i) => <img key={i} src={th.src} width={THUMB_W} height={THUMB_H} style={{ display: 'block', objectFit: 'cover', flexShrink: 0 }} alt="" />)
+            ) : (
+              <div style={{ width: Math.max(100, duration * PX_PER_SEC), height: THUMB_H, background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>영상을 선택하세요</span>
+              </div>
+            )}
+          </div>
+
+          {/* 플레이헤드 */}
+          {duration > 0 && (
+            <div style={{ position: 'absolute', top: 12, left: hookPx + currentTime * PX_PER_SEC, width: 2, height: totalH - 4, background: '#ff3b3b', transform: 'translateX(-50%)', pointerEvents: 'none', zIndex: 5 }}>
+              <div style={{ position: 'absolute', top: -4, left: '50%', transform: 'translateX(-50%)', width: 8, height: 8, borderRadius: '50%', background: '#ff3b3b' }} />
+            </div>
+          )}
+
+          {/* 자막 트랙 */}
+          {hasSub && (() => {
+            return (
+              <div style={{ position: 'absolute', top: 18 + THUMB_H + 4, left: 0, width: totalW, height: SUB_TRACK_H, background: 'var(--surface2)', borderRadius: 3, border: '1px solid var(--border)' }}>
+                <span style={{ position: 'absolute', left: 4, top: 2, fontSize: 9, color: '#16a34a', fontWeight: 700, pointerEvents: 'none' }}>자막</span>
+                {subEntries.map((s, i) => {
+                  const startPx = hookPx + s.start * PX_PER_SEC
+                  const wPx = Math.max(3, (s.end - s.start) * PX_PER_SEC)
+                  return (
+                    <div key={i} title={s.text} style={{ position: 'absolute', top: 2, left: startPx, width: wPx, height: SUB_TRACK_H - 4, background: '#16a34a', borderRadius: 2, opacity: 0.7, cursor: 'pointer' }}
+                      onClick={ev => { ev.stopPropagation(); const vid = videoRef.current; if (vid) { vid.currentTime = s.start; setCurrentTime(s.start) } }} />
+                  )
+                })}
+              </div>
+            )
+          })()}
+
+          {/* SFX 트랙 */}
+          {customSfx.length > 0 && (() => {
+            const sfxTop = 18 + THUMB_H + 4 + (hasSub ? SUB_TRACK_H + 4 : 0)
+            return (
+              <div style={{ position: 'absolute', top: sfxTop, left: 0, width: totalW, height: TRACK_H, background: 'var(--surface2)', borderRadius: 3, border: '1px solid var(--border)' }}>
+                <span style={{ position: 'absolute', left: 4, top: 3, fontSize: 10, color: 'var(--primary)', fontWeight: 700, pointerEvents: 'none' }}>SFX</span>
+                {customSfx.map((e, i) => {
+                  const px = hookPx + e.time * PX_PER_SEC
+                  const isOpen = popover?.type === 'sfx' && popover.idx === i
+                  return (
+                    <div key={i} style={{ position: 'absolute', top: 2, left: px, transform: 'translateX(-50%)', zIndex: 10 }}>
+                      <div
+                        onMouseDown={ev => onPinMouseDown(ev, 'sfx', i, e.time)}
+                        onClick={ev => { ev.stopPropagation(); setPopover(isOpen ? null : { type: 'sfx', idx: i }) }}
+                        style={{ background: 'var(--primary)', color: 'white', borderRadius: 3, padding: '1px 5px', fontSize: 10, whiteSpace: 'nowrap', cursor: 'grab', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
+                        ♪ {e.time.toFixed(1)}s
+                      </div>
+                      {isOpen && (
+                        <div style={{ position: 'absolute', top: 22, left: 0, zIndex: 200, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', minWidth: 200 }}
+                          onClick={ev => ev.stopPropagation()}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <span style={{ fontSize: 11, color: 'var(--text2)', minWidth: 28 }}>시간</span>
+                              <input type="number" min={0} step={0.5} value={e.time} onChange={ev => updateSfx(i, { time: Math.max(0, +ev.target.value) })} className="input-field" style={{ width: 65, fontSize: 11, padding: '2px 4px' }} />
+                              <span style={{ fontSize: 11, color: 'var(--muted)' }}>s</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <span style={{ fontSize: 11, color: 'var(--text2)', minWidth: 28 }}>SFX</span>
+                              <select value={e.sfx_id} onChange={ev => updateSfx(i, { sfx_id: ev.target.value })} className="input-field" style={{ flex: 1, fontSize: 11, cursor: 'pointer' }}>
+                                {sfxList.map(s => <option key={s.id} value={s.id}>{s.id}</option>)}
+                              </select>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <span style={{ fontSize: 11, color: 'var(--text2)', minWidth: 28 }}>음량</span>
+                              <input type="range" min={0} max={2} step={0.05} value={e.volume} onChange={ev => updateSfx(i, { volume: +ev.target.value })} style={{ flex: 1, accentColor: 'var(--primary)' }} />
+                              <span style={{ fontSize: 11, minWidth: 30, textAlign: 'right' }}>{Math.round(e.volume * 100)}%</span>
+                            </div>
+                            <button onClick={() => removeSfx(i)} style={{ background: 'var(--error)', border: 'none', color: 'white', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>삭제</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
+
+          {/* 텍스트 오버레이 트랙 */}
+          {textOverlays.length > 0 && (() => {
+            const txtTop = 18 + THUMB_H + 4 + (hasSub ? SUB_TRACK_H + 4 : 0) + (customSfx.length > 0 ? TRACK_H + 4 : 0)
+            return (
+              <div style={{ position: 'absolute', top: txtTop, left: 0, width: totalW, height: TRACK_H, background: 'var(--surface2)', borderRadius: 3, border: '1px solid var(--border)' }}>
+                <span style={{ position: 'absolute', left: 4, top: 3, fontSize: 10, color: '#f97316', fontWeight: 700, pointerEvents: 'none' }}>텍스트</span>
+                {textOverlays.map((ov, i) => {
+                  const startPx = hookPx + ov.time * PX_PER_SEC
+                  const spanW = Math.max(40, (ov.end - ov.time) * PX_PER_SEC)
+                  const isOpen = popover?.type === 'text' && popover.idx === i
+                  return (
+                    <div key={ov.id} style={{ position: 'absolute', top: 2, left: startPx, width: spanW, height: TRACK_H - 4, zIndex: 10 }}>
+                      <div
+                        onMouseDown={ev => onPinMouseDown(ev, 'text', i, ov.time)}
+                        onClick={ev => { ev.stopPropagation(); setPopover(isOpen ? null : { type: 'text', idx: i }) }}
+                        style={{ height: '100%', background: '#f97316', color: 'white', borderRadius: 3, padding: '1px 5px', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'grab', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
+                        T {ov.text || '(텍스트 입력)'}
+                      </div>
+                      {isOpen && (
+                        <div style={{ position: 'absolute', top: 22, left: 0, zIndex: 200, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', minWidth: 220 }}
+                          onClick={ev => ev.stopPropagation()}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                            <input value={ov.text} onChange={ev => updateText(ov.id, { text: ev.target.value })} placeholder="표시할 텍스트" className="input-field" style={{ fontSize: 12, padding: '4px 6px' }} />
+                            <div style={{ display: 'flex', gap: 5 }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 2 }}>시작</div>
+                                <input type="number" min={0} step={0.5} value={ov.time} onChange={ev => updateText(ov.id, { time: Math.max(0, +ev.target.value) })} className="input-field" style={{ width: '100%', fontSize: 11, padding: '2px 4px' }} />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 2 }}>종료</div>
+                                <input type="number" min={0} step={0.5} value={ov.end} onChange={ev => updateText(ov.id, { end: Math.max(ov.time + 0.5, +ev.target.value) })} className="input-field" style={{ width: '100%', fontSize: 11, padding: '2px 4px' }} />
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 11, color: 'var(--text2)' }}>색상</span>
+                              <input type="color" value={ov.color} onChange={ev => updateText(ov.id, { color: ev.target.value })} style={{ width: 36, height: 28, border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', padding: 2 }} />
+                              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{ov.color}</span>
+                            </div>
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                                <span style={{ fontSize: 11, color: 'var(--text2)' }}>크기</span>
+                                <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600 }}>{((ov.size ?? 1) * 100).toFixed(0)}%</span>
+                              </div>
+                              <input type="range" min={0.5} max={3} step={0.1} value={ov.size ?? 1}
+                                onChange={ev => updateText(ov.id, { size: +ev.target.value })}
+                                style={{ width: '100%', accentColor: 'var(--primary)' }} />
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--muted)' }}>💡 캔버스에서 드래그해서 위치 변경</div>
+                            <button onClick={() => removeText(ov.id)} style={{ background: 'var(--error)', border: 'none', color: 'white', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>삭제</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
+        </div>
+      </div>
+      <p style={{ fontSize: 10, color: 'var(--muted)', margin: '0 0 2px' }}>
+        클릭 → 해당 장면 이동 · 핀/블록 드래그 → 시간 이동 · 클릭 → 편집
+      </p>
+    </div>
+  )
+}
+
 interface HookSfxPanelProps {
   useHook: boolean; setUseHook: (v: boolean) => void
   hookSfxId: string | null; setHookSfxId: (v: string | null) => void
   hookSfxOffset: number; setHookSfxOffset: (v: number) => void
   hookSfxVolume: number; setHookSfxVolume: (v: number) => void
   sfxList: {id: string; file: string; description: string}[]
-  customSfx: {time: number; sfx_id: string; volume: number}[]
-  setCustomSfx: (v: {time: number; sfx_id: string; volume: number}[]) => void
 }
 
-function HookSfxPanel({
-  useHook, setUseHook, hookSfxId, setHookSfxId,
-  hookSfxOffset, setHookSfxOffset, hookSfxVolume, setHookSfxVolume,
-  sfxList, customSfx, setCustomSfx,
-}: HookSfxPanelProps) {
-  const addSfx = () => {
-    const id = sfxList.length > 0 ? sfxList[0].id : ''
-    setCustomSfx([...customSfx, { time: 0, sfx_id: id, volume: 0.8 }])
-  }
-  const updateSfx = (i: number, patch: Partial<{time:number;sfx_id:string;volume:number}>) => {
-    const next = customSfx.map((e, j) => j === i ? { ...e, ...patch } : e)
-    setCustomSfx(next)
-  }
-  const removeSfx = (i: number) => setCustomSfx(customSfx.filter((_, j) => j !== i))
-
+function HookSfxPanel({ useHook, setUseHook, hookSfxId, setHookSfxId, hookSfxOffset, setHookSfxOffset, hookSfxVolume, setHookSfxVolume, sfxList }: HookSfxPanelProps) {
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, background: 'var(--surface2)' }}>
-      {/* 훅 토글 헤더 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 16 }}>🎬</span>
           <span style={{ fontWeight: 600, fontSize: 15 }}>하이라이트 훅</span>
         </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 14, color: 'var(--text2)', cursor: 'pointer' }}>
-          <input type="checkbox" checked={useHook} onChange={e => setUseHook(e.target.checked)}
-            style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+          <input type="checkbox" checked={useHook} onChange={e => setUseHook(e.target.checked)} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
           삽입
         </label>
       </div>
-
       {useHook && (
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <p style={{ fontSize: 12, color: 'var(--text2)', margin: 0 }}>
-            영상 앞에 Gemini가 선택한 3~5초 하이라이트 클립을 삽입합니다. 분석을 먼저 실행하세요.
-          </p>
+          <p style={{ fontSize: 12, color: 'var(--text2)', margin: 0 }}>영상 앞에 Gemini가 선택한 3~5초 하이라이트 클립을 삽입합니다. 분석을 먼저 실행하세요.</p>
           {sfxList.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13, color: 'var(--text2)', minWidth: 60 }}>전환 효과음</span>
-                <select value={hookSfxId ?? ''} onChange={e => setHookSfxId(e.target.value || null)}
-                  className="input-field" style={{ flex: 1, fontSize: 13, cursor: 'pointer' }}>
+                <select value={hookSfxId ?? ''} onChange={e => setHookSfxId(e.target.value || null)} className="input-field" style={{ flex: 1, fontSize: 13, cursor: 'pointer' }}>
                   <option value="">없음</option>
                   {sfxList.map(s => <option key={s.id} value={s.id}>{s.id} — {s.description}</option>)}
                 </select>
@@ -710,19 +1059,13 @@ function HookSfxPanel({
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 13, color: 'var(--text2)', minWidth: 60 }}>타이밍</span>
-                    <input type="range" min={-1} max={1} step={0.1} value={hookSfxOffset}
-                      onChange={e => setHookSfxOffset(+e.target.value)} style={{ flex: 1, accentColor: 'var(--primary)' }} />
-                    <span style={{ fontSize: 13, color: 'var(--text2)', minWidth: 36, textAlign: 'right' }}>
-                      {hookSfxOffset >= 0 ? `+${hookSfxOffset.toFixed(1)}` : hookSfxOffset.toFixed(1)}s
-                    </span>
+                    <input type="range" min={-1} max={1} step={0.1} value={hookSfxOffset} onChange={e => setHookSfxOffset(+e.target.value)} style={{ flex: 1, accentColor: 'var(--primary)' }} />
+                    <span style={{ fontSize: 13, color: 'var(--text2)', minWidth: 36, textAlign: 'right' }}>{hookSfxOffset >= 0 ? `+${hookSfxOffset.toFixed(1)}` : hookSfxOffset.toFixed(1)}s</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 13, color: 'var(--text2)', minWidth: 60 }}>음량</span>
-                    <input type="range" min={0} max={2} step={0.05} value={hookSfxVolume}
-                      onChange={e => setHookSfxVolume(+e.target.value)} style={{ flex: 1, accentColor: 'var(--primary)' }} />
-                    <span style={{ fontSize: 13, color: 'var(--text2)', minWidth: 36, textAlign: 'right' }}>
-                      {Math.round(hookSfxVolume * 100)}%
-                    </span>
+                    <input type="range" min={0} max={2} step={0.05} value={hookSfxVolume} onChange={e => setHookSfxVolume(+e.target.value)} style={{ flex: 1, accentColor: 'var(--primary)' }} />
+                    <span style={{ fontSize: 13, color: 'var(--text2)', minWidth: 36, textAlign: 'right' }}>{Math.round(hookSfxVolume * 100)}%</span>
                   </div>
                 </>
               )}
@@ -730,47 +1073,6 @@ function HookSfxPanel({
           )}
         </div>
       )}
-
-      {/* SFX 타임라인 구분선 */}
-      <div style={{ borderTop: '1px solid var(--border)', margin: '12px 0 10px' }} />
-
-      {/* SFX 타임라인 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: customSfx.length > 0 ? 8 : 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 15 }}>🔊</span>
-          <span style={{ fontWeight: 600, fontSize: 14 }}>효과음 타임라인</span>
-        </div>
-        {sfxList.length > 0 && (
-          <button onClick={addSfx} className="btn-outlined"
-            style={{ fontSize: 12, padding: '3px 9px', cursor: 'pointer' }}>+ 추가</button>
-        )}
-      </div>
-
-      {customSfx.length === 0 && sfxList.length === 0 && (
-        <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>SFX 목록을 불러오는 중...</p>
-      )}
-      {customSfx.length === 0 && sfxList.length > 0 && (
-        <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>원하는 시간대에 효과음을 배치하세요.</p>
-      )}
-
-      {customSfx.map((e, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <input type="number" min={0} step={0.5} value={e.time}
-            onChange={ev => updateSfx(i, { time: Math.max(0, +ev.target.value) })}
-            className="input-field" style={{ width: 64, fontSize: 13, padding: '4px 6px' }} />
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>s</span>
-          <select value={e.sfx_id} onChange={ev => updateSfx(i, { sfx_id: ev.target.value })}
-            className="input-field" style={{ flex: 1, fontSize: 13, cursor: 'pointer' }}>
-            {sfxList.map(s => <option key={s.id} value={s.id}>{s.id}</option>)}
-          </select>
-          <input type="range" min={0} max={2} step={0.05} value={e.volume}
-            onChange={ev => updateSfx(i, { volume: +ev.target.value })}
-            style={{ width: 64, accentColor: 'var(--primary)' }} />
-          <span style={{ fontSize: 12, color: 'var(--text2)', minWidth: 30 }}>{Math.round(e.volume * 100)}%</span>
-          <button onClick={() => removeSfx(i)}
-            style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>✕</button>
-        </div>
-      ))}
     </div>
   )
 }
@@ -852,6 +1154,18 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [hookSfxVolume, setHookSfxVolume] = useState(0.8)
   const [sfxList, setSfxList]             = useState<{id:string; file:string; description:string}[]>([])
   const [customSfx, setCustomSfx]         = useState<{time:number; sfx_id:string; volume:number}[]>([])
+  const [textOverlays, setTextOverlays]   = useState<TextOverlay[]>([])
+  // 자막 항목 (타임라인 + 캔버스 미리보기용)
+  const [subEntries, setSubEntries]       = useState<SubEntry[]>([])
+  // 훅 미리보기
+  const hookVidRef    = useRef<HTMLVideoElement>(null)
+  const hookSegRef    = useRef<{start:number;end:number}|null>(null)
+  const hookReadyRef  = useRef(false)
+  const [isPlayingHook, setIsPlayingHook] = useState(false)
+  const [videoDuration, setVideoDuration] = useState(0)
+  // 캔버스 텍스트 오버레이 드래그
+  const [draggingOvId, setDraggingOvId] = useState<string | null>(null)
+  const canvasDragRef = useRef<{id:string; startX:number; startY:number; startXpct:number; startYpct:number} | null>(null)
   const [isPreviewingNarration, setIsPreviewingNarration] = useState(false)
   const [isNarrPreviewPlaying, setIsNarrPreviewPlaying] = useState(false)
   const [narrPreviewMsg, setNarrPreviewMsg] = useState('')
@@ -882,14 +1196,60 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
 
   const togglePlay = useCallback(() => {
     const vid = hidVidRef.current
+    const hookVid = hookVidRef.current
     if (!vid) return
-    if (vid.paused || vid.ended) {
+
+    // 재생 중이면 모두 정지
+    if (!vid.paused || (hookVid && !hookVid.paused)) {
+      vid.pause()
+      hookVid?.pause()
+      setIsPlayingHook(false)
+      return
+    }
+
+    const hookSeg = (hookVid && useHook && hookSegRef.current && hookVid.getAttribute('src')) ? hookSegRef.current : null
+
+    const startMainVideo = () => {
       if (vid.ended) vid.currentTime = 0
       vid.play().catch(() => {})
-    } else {
-      vid.pause()
     }
-  }, [])
+
+    if (hookSeg && hookVid) {
+      const playHookAfterSeek = () => {
+        setIsPlayingHook(true)
+        hookVid.play().catch(() => { setIsPlayingHook(false); startMainVideo() })
+
+        const onTimeUpdate = () => {
+          if (hookVid.currentTime >= hookSeg.end) {
+            hookVid.removeEventListener('timeupdate', onTimeUpdate)
+            hookVid.pause()
+            setIsPlayingHook(false)
+            startMainVideo()
+          }
+        }
+        hookVid.addEventListener('timeupdate', onTimeUpdate)
+      }
+
+      const seekAndPlay = () => {
+        hookVid.currentTime = hookSeg.start
+        if (hookVid.seeking) {
+          hookVid.addEventListener('seeked', playHookAfterSeek, { once: true })
+        } else {
+          playHookAfterSeek()
+        }
+      }
+
+      // 아직 메타데이터 없으면 로드 기다린 후 재생
+      if (hookVid.readyState < 1) {
+        hookVid.load()
+        hookVid.addEventListener('loadedmetadata', seekAndPlay, { once: true })
+      } else {
+        seekAndPlay()
+      }
+    } else {
+      startMainVideo()
+    }
+  }, [useHook])
 
   useEffect(() => { api.getBackgrounds().then(r => { setBgOptions(r.backgrounds); r.backgrounds.forEach(loadBg) }).catch(() => {}) }, [])
   useEffect(() => { api.getChannels().then(r => setRegChannels(r.channels)).catch(() => {}) }, [])
@@ -916,6 +1276,10 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     } else {
       setBgType('blur')
     }
+    // 자막 항목 로드
+    const stem = raw.filename.replace('_raw.mp4', '')
+    setSubEntries([])
+    api.getSubtitleEntries(stem).then(r => setSubEntries(r.entries)).catch(() => {})
   }, [raw?.filename])
 
   useEffect(() => {
@@ -951,14 +1315,35 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
       vid.play().catch(() => {})
       document.addEventListener('click', unmute, { once: true })
     })
+    const onMeta = () => setVideoDuration(vid.duration || 0)
+    vid.addEventListener('loadedmetadata', onMeta)
     return () => {
       document.removeEventListener('click', unmute)
       vid.removeEventListener('play', onPlay)
       vid.removeEventListener('pause', onPause)
       vid.removeEventListener('ended', onEnded)
+      vid.removeEventListener('loadedmetadata', onMeta)
       vid.pause(); vid.removeAttribute('src'); vid.load()
     }
   }, [raw?.filename])
+
+  // 훅 비디오 로드 (useHook ON + download_filename 있을 때)
+  useEffect(() => {
+    const hookVid = hookVidRef.current
+    hookSegRef.current = raw?.hook_segment ?? null
+    if (!hookVid) return
+    if (useHook && raw?.download_filename) {
+      hookVid.src = `/api/media/downloads/${getSessionId()}/${encodeURIComponent(raw.download_filename)}`
+      hookVid.load()
+      hookReadyRef.current = false
+      const onMeta = () => { hookReadyRef.current = true }
+      hookVid.addEventListener('loadedmetadata', onMeta, { once: true })
+    } else {
+      hookVid.src = ''
+      hookReadyRef.current = false
+      setIsPlayingHook(false)
+    }
+  }, [useHook, raw?.download_filename, raw?.hook_segment])
 
   useEffect(() => {
     if (!raw || !canvasRef.current || !hidVidRef.current) return
@@ -978,10 +1363,12 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         ctx.fillStyle = colors.bg; ctx.fillRect(0, 0, CV_W, CV_H)
       }
 
-      if (vid.readyState >= 2) {
+      const srcVid = (isPlayingHook && hookVidRef.current && hookVidRef.current.readyState >= 2)
+        ? hookVidRef.current : vid
+      if (srcVid.readyState >= 2) {
         // 캡컷 스타일 색감 보정 미리보기 — 실제 렌더링은 서버에서 ffmpeg eq 필터로 적용된다
         ctx.filter = `brightness(${1 + brightness}) contrast(${contrast}) saturate(${saturation})`
-        ctx.drawImage(vid, 0, VID_Y_PX, CV_W, VID_H_PX)
+        ctx.drawImage(srcVid, 0, VID_Y_PX, CV_W, VID_H_PX)
         ctx.filter = 'none'
       }
       const lines = [{ t: title1, c: t1Color }, { t: title2, c: t2Color }].filter(l => l.t.trim())
@@ -1025,30 +1412,67 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         const sz = Math.round(subSize*SCALE)
         const lineH = Math.round(sz*1.35)
         const sY = VID_Y_PX+VID_H_PX-Math.round(subY*SCALE)-sz-4
-        // 나레이션 미리듣기 재생 중이면 현재 재생 위치에 맞는 실제 자막을 보여준다
-        let lines = ['자막 샘플']
+        let lines: string[] = []
         const narrAudio = narrAudioRef.current
         if (narrAudio && !narrAudio.paused && narrPreviewSubs.length) {
+          // 나레이션 미리듣기 재생 중
           const t = narrAudio.currentTime
           const active = narrPreviewSubs.find(s => t >= s.start && t <= s.end)
-          if (active) {
-            const activeLines = active.text.split('\n').map(l => l.trim()).filter(Boolean)
-            if (activeLines.length) lines = activeLines
-          } else {
-            lines = []
-          }
+          if (active) lines = active.text.split('\n').map(l => l.trim()).filter(Boolean)
+        } else if (subEntries.length > 0) {
+          // 실제 자막 — 현재 시간에 맞는 항목 표시 (12자 기준 줄바꿈)
+          const t = vid.currentTime
+          const active = subEntries.find(s => t >= s.start && t <= s.end)
+          if (active) lines = wrapSubtitle(active.text, 12)
+        } else {
+          // 자막 데이터 없을 때만 샘플 표시
+          lines = ['자막 샘플']
         }
-        ctx.textAlign = 'center'; ctx.textBaseline = 'top'
-        ctx.font = `bold ${sz}px '${toCssFontFamily(subFont)}','Malgun Gothic',sans-serif`
-        lines.forEach((line, i) => {
-          const y = sY - (lines.length - 1 - i) * lineH
-          if (subBgEnabled) {
-            const tw = ctx.measureText(line).width+8
-            ctx.fillStyle = _hexToRgba(subBgColor, subBgOpacity)
-            ctx.fillRect(CV_W/2-tw/2,y-2,tw,sz+4)
-          }
-          ctx.fillStyle = subColor; ctx.fillText(line, CV_W/2, y)
-        })
+        if (lines.length > 0) {
+          ctx.textAlign = 'center'; ctx.textBaseline = 'top'
+          ctx.font = `bold ${sz}px '${toCssFontFamily(subFont)}','Malgun Gothic',sans-serif`
+          lines.forEach((line, i) => {
+            const y = sY - (lines.length - 1 - i) * lineH
+            if (subBgEnabled) {
+              const tw = ctx.measureText(line).width+8
+              ctx.fillStyle = _hexToRgba(subBgColor, subBgOpacity)
+              ctx.fillRect(CV_W/2-tw/2,y-2,tw,sz+4)
+            }
+            ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 3
+            ctx.lineWidth = 4*SCALE; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.strokeText(line, CV_W/2, y)
+            ctx.fillStyle = subColor; ctx.fillText(line, CV_W/2, y)
+            ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
+          })
+        }
+      }
+
+      // 텍스트 오버레이 — 활성 항목을 캔버스에 표시 + 드래그 가능
+      {
+        const currentT = vid.currentTime
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        for (const ov of textOverlays) {
+          if (currentT < ov.time || currentT > ov.end || !ov.text.trim()) continue
+          const ovX = (ov.x_pct ?? 0.5) * CV_W
+          const ovY = VID_Y_PX + (ov.y_pct ?? 0.12) * VID_H_PX
+          const ovSz = Math.round(28 * SCALE * (ov.size ?? 1))
+          ctx.font = `bold ${ovSz}px '${toCssFontFamily(subFont)}','Malgun Gothic',sans-serif`
+          ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4
+          ctx.lineWidth = 3 * SCALE; ctx.strokeStyle = 'rgba(0,0,0,0.85)'
+          ctx.strokeText(ov.text, ovX, ovY)
+          ctx.fillStyle = ov.color || '#FFFFFF'
+          ctx.fillText(ov.text, ovX, ovY)
+          ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
+          // 항상 테두리 표시 (드래그 가능 힌트)
+          const tw = ctx.measureText(ov.text).width
+          const bx = ovX - tw / 2 - 5, by = ovY - ovSz / 2 - 3, bw = tw + 10, bh = ovSz + 6
+          ctx.save()
+          ctx.setLineDash([3, 2])
+          ctx.lineWidth = 1.5
+          ctx.strokeStyle = draggingOvId === ov.id ? '#f97316' : 'rgba(255,255,255,0.8)'
+          ctx.strokeRect(bx, by, bw, bh)
+          ctx.setLineDash([])
+          ctx.restore()
+        }
       }
       const channel = channelName.trim()
       if (channel) {
@@ -1091,7 +1515,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     }
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleFontSizeDelta, titleFont, title1BorderWidth, title2BorderWidth, title1BorderColor, title2BorderColor, title1BgEnabled, title1BgColor, title1BgOpacity, title2BgEnabled, title2BgColor, title2BgOpacity, subtitles, subSize, subColor, subFont, subY, subBgEnabled, subBgColor, subBgOpacity, channelName, channelColor, channelX, channelY, channelFontsize, channelImageUrl, channelTopLeftText, channelTopLeftColor, channelTopLeftFontsize, channelTopLeftX, channelTopLeftY, bgType, bgSolidColor, bgImageName, templateId, brightness, contrast, saturation, narrPreviewSubs])
+  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleFontSizeDelta, titleFont, title1BorderWidth, title2BorderWidth, title1BorderColor, title2BorderColor, title1BgEnabled, title1BgColor, title1BgOpacity, title2BgEnabled, title2BgColor, title2BgOpacity, subtitles, subSize, subColor, subFont, subY, subBgEnabled, subBgColor, subBgOpacity, channelName, channelColor, channelX, channelY, channelFontsize, channelImageUrl, channelTopLeftText, channelTopLeftColor, channelTopLeftFontsize, channelTopLeftX, channelTopLeftY, bgType, bgSolidColor, bgImageName, templateId, brightness, contrast, saturation, narrPreviewSubs, isPlayingHook, subEntries, textOverlays, draggingOvId])
 
   // 음량 조절 — 미리듣기 영상에 즉시 반영 (HTML 비디오는 0~1 범위만 지원하므로 100%까지만 미리듣기 가능, 그 이상은 렌더링 결과로 확인)
   useEffect(() => {
@@ -1135,6 +1559,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         narration, narrVoice, narrMode, narrSpeed,
         useHook, hookSfxId, hookSfxOffset, hookSfxVolume,
         customSfx,
+        textOverlays.map(({ time, end, text, color }) => ({ time, end, text, color })),
       )
       setRenderMsg(narration ? '✓ 나레이션 버전 렌더링 시작' : '✓ 렌더링 시작 — 완성 쇼츠 탭에서 확인')
       onStartPolling()
@@ -1202,12 +1627,54 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     }
   }
 
+  // 캔버스 텍스트 오버레이 드래그 핸들러 (모바일·데스크톱 공통)
+  const hookDurationCalc = (useHook && raw?.hook_segment)
+    ? raw.hook_segment.end - raw.hook_segment.start : 0
+
+  const handleCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current; const vid = hidVidRef.current
+    if (!canvas || !vid || textOverlays.length === 0) return
+    const rect = canvas.getBoundingClientRect()
+    const cx = (e.clientX - rect.left) * (CV_W / rect.width)
+    const cy = (e.clientY - rect.top) * (CV_H / rect.height)
+    const t = vid.currentTime
+    for (const ov of [...textOverlays].reverse()) {
+      if (t < ov.time || t > ov.end || !ov.text.trim()) continue
+      const ovX = (ov.x_pct ?? 0.5) * CV_W
+      const ovY = VID_Y_PX + (ov.y_pct ?? 0.12) * VID_H_PX
+      const hitW = 90 * (ov.size ?? 1)
+      const hitH = 32 * (ov.size ?? 1)
+      if (Math.abs(cx - ovX) < hitW && Math.abs(cy - ovY) < hitH) {
+        canvasDragRef.current = { id: ov.id, startX: e.clientX, startY: e.clientY, startXpct: ov.x_pct ?? 0.5, startYpct: ov.y_pct ?? 0.12 }
+        setDraggingOvId(ov.id)
+        return
+      }
+    }
+  }, [textOverlays])
+
+  const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const d = canvasDragRef.current; const canvas = canvasRef.current
+    if (!d || !canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const dx = (e.clientX - d.startX) / rect.width
+    const dy = (e.clientY - d.startY) / rect.height * (CV_H / VID_H_PX)
+    const newX = Math.max(0, Math.min(1, d.startXpct + dx))
+    const newY = Math.max(0, Math.min(1, d.startYpct + dy))
+    setTextOverlays(textOverlays.map(ov => ov.id === d.id ? { ...ov, x_pct: newX, y_pct: newY } : ov))
+  }, [textOverlays])
+
+  const handleCanvasMouseUp = useCallback(() => {
+    canvasDragRef.current = null
+    setDraggingOvId(null)
+  }, [])
+
   // 모바일: 세로 스택 (캔버스 → 컨트롤)
   // 데스크톱: 가로 분할 (280px 미리보기 | flex 컨트롤)
   if (isMobile) {
     return (
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface)' }}>
         <video ref={hidVidRef} style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }} playsInline />
+        <video ref={hookVidRef} style={{ display: 'none' }} playsInline preload="metadata" />
         <audio ref={narrAudioRef} style={{ display: 'none' }}
           onPlay={() => setIsNarrPreviewPlaying(true)}
           onPause={() => setIsNarrPreviewPlaying(false)}
@@ -1219,10 +1686,15 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
             </div>
           : <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
               {/* 캔버스 미리보기 — 전체 너비 */}
-              <div style={{ background: 'var(--surface2)', padding: 14, display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ position: 'relative', width: '60%', maxWidth: 200, borderRadius: 10, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+              <div style={{ background: 'var(--surface2)', padding: 10, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ position: 'relative', width: '55%', maxWidth: 180, borderRadius: 10, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
                   <canvas ref={canvasRef} width={CV_W} height={CV_H}
-                    style={{ display: 'block', width: '100%', aspectRatio: '9/16' }} />
+                    style={{ display: 'block', width: '100%', aspectRatio: '9/16', cursor: draggingOvId ? 'grabbing' : 'default' }}
+                    onMouseDown={handleCanvasMouseDown}
+                    onMouseMove={handleCanvasMouseMove}
+                    onMouseUp={handleCanvasMouseUp}
+                    onMouseLeave={handleCanvasMouseUp}
+                  />
                   <button onClick={togglePlay} aria-label={isPlaying ? '일시정지' : '재생'} style={{
                     position: 'absolute', bottom: 8, right: 8, width: 30, height: 30, borderRadius: '50%',
                     border: 'none', background: 'rgba(0,0,0,0.55)', color: 'white', fontSize: 15,
@@ -1230,7 +1702,28 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   }}>
                     {isPlaying ? '⏸' : '▶'}
                   </button>
+                  {isPlayingHook && (
+                    <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(147,52,230,0.85)', color: 'white', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>HOOK</div>
+                  )}
                 </div>
+
+                {/* 타임라인 — 캔버스 바로 아래 (모바일) */}
+                {videoDuration > 0 && (
+                  <div style={{ width: '100%' }}>
+                    <RenderTimeline
+                      videoRef={hidVidRef}
+                      duration={videoDuration}
+                      sfxList={sfxList}
+                      customSfx={customSfx}
+                      setCustomSfx={setCustomSfx}
+                      textOverlays={textOverlays}
+                      setTextOverlays={setTextOverlays}
+                      subEntries={subEntries}
+                      hookDuration={hookDurationCalc}
+                      hookEnabled={useHook}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* 컨트롤 */}
@@ -1336,6 +1829,17 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                       <input type="color" value={channelTopLeftColor} onChange={e => setChannelTopLeftColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
                     </div>
                   </div>
+                </div>
+
+                {/* 템플릿 */}
+                <div>
+                  <div className="section-label">레이아웃 템플릿</div>
+                  <select value={templateId} onChange={e => setTemplateId(+e.target.value)}
+                    className="input-field" style={{ cursor: 'pointer' }}>
+                    <option value={1}>다크 계열</option>
+                    <option value={2}>미니멀 흰배경</option>
+                    <option value={3}>네이비/포인트</option>
+                  </select>
                 </div>
 
                 {/* 배경 */}
@@ -1445,25 +1949,16 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   hookSfxOffset={hookSfxOffset} setHookSfxOffset={setHookSfxOffset}
                   hookSfxVolume={hookSfxVolume} setHookSfxVolume={setHookSfxVolume}
                   sfxList={sfxList}
-                  customSfx={customSfx} setCustomSfx={setCustomSfx}
                 />
 
-                {/* 템플릿 + 렌더 */}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <select value={templateId} onChange={e => setTemplateId(+e.target.value)}
-                    className="input-field" style={{ flex: 1, cursor: 'pointer' }}>
-                    <option value={1}>다크</option>
-                    <option value={2}>미니멀 흰배경</option>
-                    <option value={3}>네이비</option>
-                  </select>
-                  <button onClick={handleRender} disabled={isRendering} className="btn-primary"
-                    style={{ padding: '8px 16px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-                    {isRendering
-                      ? <><div className="spinner spinner-sm" style={{ borderTopColor: 'white' }} />처리 중</>
-                      : `▶ 렌더링${narration ? '(나레이션)' : ''}`
-                    }
-                  </button>
-                </div>
+                {/* 렌더 */}
+                <button onClick={handleRender} disabled={isRendering} className="btn-primary"
+                  style={{ padding: '10px 16px', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%' }}>
+                  {isRendering
+                    ? <><div className="spinner spinner-sm" style={{ borderTopColor: 'white' }} />처리 중</>
+                    : `▶ 렌더링${narration ? '(나레이션)' : ''}`
+                  }
+                </button>
                 {renderMsg && (
                   <div style={{ fontSize: 14, color: renderMsg.startsWith('✓') ? 'var(--success)' : 'var(--error)', padding: '6px 10px', background: renderMsg.startsWith('✓') ? '#e6f4ea' : '#fce8e6', borderRadius: 6, border: `1px solid ${renderMsg.startsWith('✓') ? '#81c995' : '#f28b82'}` }}>
                     {renderMsg}
@@ -1477,28 +1972,42 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     )
   }
 
-  // 데스크톱 레이아웃 (기존)
+  // 데스크톱 레이아웃
   return (
-    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', background: 'var(--surface)' }}>
+    <div style={{ flex: 1, display: 'flex', background: 'var(--surface)' }}>
       <video ref={hidVidRef} style={{ display: 'none' }} playsInline />
+      <video ref={hookVidRef} style={{ display: 'none' }} playsInline />
       <audio ref={narrAudioRef} style={{ display: 'none' }}
         onPlay={() => setIsNarrPreviewPlaying(true)}
         onPause={() => setIsNarrPreviewPlaying(false)}
         onEnded={() => setIsNarrPreviewPlaying(false)} />
 
-      {/* 왼쪽: 캔버스 미리보기 */}
-      <div style={{ width: 'clamp(220px, 28vw, 380px)', flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface2)' }}>
-        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)' }}>실시간 미리보기</span>
-          {raw && <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>{raw.category}</span>}
+      {/* 왼쪽: 캔버스 미리보기 + 타임라인 */}
+      <div style={{ width: 'clamp(360px, 40vw, 560px)', flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--surface2)' }}>
+        <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', background: 'white', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>실시간 미리보기</span>
+            {raw && <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600 }}>{raw.category}</span>}
+          </div>
+          {raw && (
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={raw.title || raw.filename}>
+              {raw.title || raw.filename}
+            </div>
+          )}
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+        {/* 캔버스 영역 */}
+        <div style={{ padding: '10px 10px 4px', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', flexShrink: 0 }}>
           {raw ? (
             <>
               <div style={{ position: 'relative', display: 'inline-block', borderRadius: 10, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
                 <canvas ref={canvasRef} width={CV_W} height={CV_H}
-                  style={{ display: 'block', height: 'min(60vh, 520px)', width: 'auto', aspectRatio: '9/16', imageRendering: 'auto' }} />
+                  style={{ display: 'block', height: 'min(82vh, 720px)', width: 'auto', aspectRatio: '9/16', imageRendering: 'auto', cursor: draggingOvId ? 'grabbing' : textOverlays.length > 0 ? 'default' : 'default' }}
+                  onMouseDown={handleCanvasMouseDown}
+                  onMouseMove={handleCanvasMouseMove}
+                  onMouseUp={handleCanvasMouseUp}
+                  onMouseLeave={handleCanvasMouseUp}
+                />
                 <button onClick={togglePlay} aria-label={isPlaying ? '일시정지' : '재생'} style={{
                   position: 'absolute', bottom: 10, right: 10, width: 34, height: 34, borderRadius: '50%',
                   border: 'none', background: 'rgba(0,0,0,0.55)', color: 'white', fontSize: 16,
@@ -1506,49 +2015,68 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                 }}>
                   {isPlaying ? '⏸' : '▶'}
                 </button>
+                {isPlayingHook && (
+                  <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(147,52,230,0.85)', color: 'white', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>HOOK</div>
+                )}
               </div>
-
-              <details style={{ width: '100%' }} open={false}>
-                <summary style={{ fontSize: 13, color: 'var(--text2)', cursor: 'pointer', padding: '4px 2px', userSelect: 'none' }}>▸ 원본 영상</summary>
-                <div style={{ marginTop: 6, borderRadius: 8, overflow: 'hidden', background: '#000' }}>
-                  <video key={raw.url} src={raw.url} controls style={{ width: '100%', maxHeight: 180, display: 'block' }} />
-                </div>
-              </details>
             </>
           ) : (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: 10, padding: 20, minHeight: 300 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: 10, padding: 20, minHeight: 200 }}>
               <div style={{ fontSize: 40, opacity: 0.15 }}>🎬</div>
               <p style={{ fontSize: 14, textAlign: 'center', lineHeight: 1.6, color: 'var(--text2)' }}>왼쪽 목록에서<br/>영상을 선택하세요</p>
             </div>
           )}
         </div>
+
+        {/* 타임라인 — 캔버스 하단 */}
+        <div style={{ padding: '0 10px 10px' }}>
+          {raw && videoDuration > 0 && (
+            <RenderTimeline
+              videoRef={hidVidRef}
+              duration={videoDuration}
+              sfxList={sfxList}
+              customSfx={customSfx}
+              setCustomSfx={setCustomSfx}
+              textOverlays={textOverlays}
+              setTextOverlays={setTextOverlays}
+              subEntries={subEntries}
+              hookDuration={hookDurationCalc}
+              hookEnabled={useHook}
+            />
+          )}
+          {raw && (
+            <details style={{ width: '100%', marginTop: 8 }} open={false}>
+              <summary style={{ fontSize: 12, color: 'var(--text2)', cursor: 'pointer', padding: '2px', userSelect: 'none' }}>▸ 원본 영상</summary>
+              <div style={{ marginTop: 4, borderRadius: 8, overflow: 'hidden', background: '#000' }}>
+                <video key={raw.url} src={raw.url} controls style={{ width: '100%', maxHeight: 160, display: 'block' }} />
+              </div>
+            </details>
+          )}
+        </div>
       </div>
 
       {/* 오른쪽: 편집 컨트롤 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+      <div style={{ flex: 1, padding: 20 }}>
         {!raw
           ? <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: 8 }}>
               <div style={{ fontSize: 32, opacity: 0.3 }}>✏️</div>
               <p style={{ fontSize: 15, color: 'var(--text2)' }}>영상을 선택하면 편집 옵션이 나타납니다</p>
             </div>
-          : <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 480 }}>
-              <p style={{ fontSize: 13, color: 'var(--text2)', background: 'var(--surface2)', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}>
-                {raw.filename}
-              </p>
+          : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
               {/* 제목 */}
               <div>
                 <div className="section-label">제목</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input type="color" value={t1Color} onChange={e => setT1Color(e.target.value)} style={{ width: 32, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="color" value={t1Color} onChange={e => setT1Color(e.target.value)} style={{ width: 28, height: 28, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2, flexShrink: 0 }} />
                     <input value={title1} onChange={e => setTitle1(e.target.value)} placeholder="1줄 — 노란색" className="input-field" style={{ flex: 1 }} />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input type="color" value={t2Color} onChange={e => setT2Color(e.target.value)} style={{ width: 32, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="color" value={t2Color} onChange={e => setT2Color(e.target.value)} style={{ width: 28, height: 28, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2, flexShrink: 0 }} />
                     <input value={title2} onChange={e => setTitle2(e.target.value)} placeholder="2줄 — 흰색" className="input-field" style={{ flex: 1 }} />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     <Slider label="Y 위치" value={titleY} display={`${titleY}px`} min={-150} max={150} step={5} onChange={setTitleY} />
                     <Slider label="글자 크기" value={titleFontSizeDelta} display={`${titleFontSizeDelta > 0 ? '+' : ''}${titleFontSizeDelta}px`} min={-40} max={40} step={2} onChange={setTitleFontSizeDelta} />
                   </div>
@@ -1570,11 +2098,11 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
 
               {/* 자막 */}
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                   <div className="section-label" style={{ margin: 0 }}>자막</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button onClick={() => setShowSrt(true)} className="btn-outlined" style={{ padding: '4px 10px', fontSize: 13 }}>✏️ 자막 편집</button>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 14, color: 'var(--text2)', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button onClick={() => setShowSrt(true)} className="btn-outlined" style={{ padding: '3px 8px', fontSize: 12 }}>✏️ 자막 편집</button>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text2)', cursor: 'pointer' }}>
                       <input type="checkbox" checked={subtitles} onChange={e => setSubtitles(e.target.checked)} style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
                       자동 삽입
                     </label>
@@ -1592,47 +2120,68 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
               </div>
 
               {/* 출처 채널명 */}
-              <div>
-                <div className="section-label">출처 채널명 (영상 하단)</div>
-                <input value={channelName} onChange={e => setChannelName(e.target.value)} placeholder="예: 채널명 / 출처: ○○뉴스" className="input-field" style={{ marginBottom: 8 }} />
-                {regChannels.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-                    {regChannels.map(ch => {
-                      const name = ch.url.match(/youtube\.com\/(@[^/?#]+)/i)?.[1] || ch.url
-                      return (
-                        <button key={ch.url} onClick={() => { setChannelName(name); setChannelImageUrl(ch.thumbnail_url || '') }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '2px 8px', borderRadius: 999, border: '1px solid var(--border)', background: 'var(--surface2)', cursor: 'pointer' }}>
-                          {ch.thumbnail_url && <img src={ch.thumbnail_url} alt="" style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover' }} />}
-                          {name}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
-                  <Slider label="X 위치" value={channelX} display={`${channelX}px`} min={-400} max={400} step={10} onChange={setChannelX} />
-                  <Slider label="Y 위치" value={channelY} display={`${channelY}px`} min={-200} max={200} step={5} onChange={setChannelY} />
-                  <Slider label="크기" value={channelFontsize} display={`${channelFontsize}px`} min={18} max={80} step={2} onChange={setChannelFontsize} />
-                  <div>
-                    <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
-                    <input type="color" value={channelColor} onChange={e => setChannelColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+              <details style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', background: 'var(--surface2)' }}>
+                <summary style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', cursor: 'pointer', userSelect: 'none', listStyle: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 10, color: 'var(--muted)' }}>▶</span>출처 채널명 (영상 하단)
+                  {channelName && <span style={{ fontSize: 11, color: 'var(--primary)', marginLeft: 'auto' }}>{channelName}</span>}
+                </summary>
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <input value={channelName} onChange={e => setChannelName(e.target.value)} placeholder="예: 채널명 / 출처: ○○뉴스" className="input-field" />
+                  {regChannels.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {regChannels.map(ch => {
+                        const name = ch.url.match(/youtube\.com\/(@[^/?#]+)/i)?.[1] || ch.url
+                        return (
+                          <button key={ch.url} onClick={() => { setChannelName(name); setChannelImageUrl(ch.thumbnail_url || '') }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '2px 8px', borderRadius: 999, border: '1px solid var(--border)', background: 'white', cursor: 'pointer' }}>
+                            {ch.thumbnail_url && <img src={ch.thumbnail_url} alt="" style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover' }} />}
+                            {name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
+                    <Slider label="X 위치" value={channelX} display={`${channelX}px`} min={-400} max={400} step={10} onChange={setChannelX} />
+                    <Slider label="Y 위치" value={channelY} display={`${channelY}px`} min={-200} max={200} step={5} onChange={setChannelY} />
+                    <Slider label="크기" value={channelFontsize} display={`${channelFontsize}px`} min={18} max={80} step={2} onChange={setChannelFontsize} />
+                    <div>
+                      <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
+                      <input type="color" value={channelColor} onChange={e => setChannelColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+                    </div>
                   </div>
                 </div>
-              </div>
+              </details>
 
               {/* 채널명 (영상 좌측상단) */}
-              <div>
-                <div className="section-label">채널명 (영상 좌측상단)</div>
-                <input value={channelTopLeftText} onChange={e => setChannelTopLeftText(e.target.value)} placeholder="예: @채널명" className="input-field" style={{ marginBottom: 8 }} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
-                  <Slider label="X 위치" value={channelTopLeftX} display={`${channelTopLeftX}px`} min={0} max={500} step={10} onChange={setChannelTopLeftX} />
-                  <Slider label="Y 위치" value={channelTopLeftY} display={`${channelTopLeftY}px`} min={0} max={300} step={5} onChange={setChannelTopLeftY} />
-                  <Slider label="크기" value={channelTopLeftFontsize} display={`${channelTopLeftFontsize}px`} min={16} max={72} step={2} onChange={setChannelTopLeftFontsize} />
-                  <div>
-                    <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
-                    <input type="color" value={channelTopLeftColor} onChange={e => setChannelTopLeftColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+              <details style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', background: 'var(--surface2)' }}>
+                <summary style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', cursor: 'pointer', userSelect: 'none', listStyle: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 10, color: 'var(--muted)' }}>▶</span>채널명 (영상 좌측상단)
+                  {channelTopLeftText && <span style={{ fontSize: 11, color: 'var(--primary)', marginLeft: 'auto' }}>{channelTopLeftText}</span>}
+                </summary>
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <input value={channelTopLeftText} onChange={e => setChannelTopLeftText(e.target.value)} placeholder="예: @채널명" className="input-field" />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
+                    <Slider label="X 위치" value={channelTopLeftX} display={`${channelTopLeftX}px`} min={0} max={500} step={10} onChange={setChannelTopLeftX} />
+                    <Slider label="Y 위치" value={channelTopLeftY} display={`${channelTopLeftY}px`} min={0} max={300} step={5} onChange={setChannelTopLeftY} />
+                    <Slider label="크기" value={channelTopLeftFontsize} display={`${channelTopLeftFontsize}px`} min={16} max={72} step={2} onChange={setChannelTopLeftFontsize} />
+                    <div>
+                      <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>색상</div>
+                      <input type="color" value={channelTopLeftColor} onChange={e => setChannelTopLeftColor(e.target.value)} style={{ width: 36, height: 32, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+                    </div>
                   </div>
                 </div>
+              </details>
+
+              {/* 레이아웃 템플릿 */}
+              <div>
+                <div className="section-label">레이아웃 템플릿</div>
+                <select value={templateId} onChange={e => setTemplateId(+e.target.value)}
+                  className="input-field" style={{ cursor: 'pointer' }}>
+                  <option value={1}>다크 계열</option>
+                  <option value={2}>미니멀 흰배경</option>
+                  <option value={3}>네이비/포인트</option>
+                </select>
               </div>
 
               {/* 배경 */}
@@ -1645,15 +2194,16 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                 bgFileInputRef={bgFileInputRef}
               />
 
-              {/* 색감 & 음량 */}
-              <ColorVolumeControls
-                brightness={brightness} setBrightness={setBrightness}
-                contrast={contrast} setContrast={setContrast}
-                saturation={saturation} setSaturation={setSaturation}
-                volume={volume} setVolume={setVolume}
+              {/* 훅 & SFX */}
+              <HookSfxPanel
+                useHook={useHook} setUseHook={setUseHook}
+                hookSfxId={hookSfxId} setHookSfxId={setHookSfxId}
+                hookSfxOffset={hookSfxOffset} setHookSfxOffset={setHookSfxOffset}
+                hookSfxVolume={hookSfxVolume} setHookSfxVolume={setHookSfxVolume}
+                sfxList={sfxList}
               />
 
-              {/* 나레이션 */}
+              {/* 나레이션 — 전체 너비 (펼쳤을 때 크기가 커서 full-width) */}
               <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, background: narration ? 'var(--primary-bg)' : 'var(--surface2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: narration ? 10 : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1735,32 +2285,14 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                 )}
               </div>
 
-              {/* 훅 & SFX */}
-              <HookSfxPanel
-                useHook={useHook} setUseHook={setUseHook}
-                hookSfxId={hookSfxId} setHookSfxId={setHookSfxId}
-                hookSfxOffset={hookSfxOffset} setHookSfxOffset={setHookSfxOffset}
-                hookSfxVolume={hookSfxVolume} setHookSfxVolume={setHookSfxVolume}
-                sfxList={sfxList}
-                customSfx={customSfx} setCustomSfx={setCustomSfx}
-              />
-
-              {/* 템플릿 + 렌더 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <select value={templateId} onChange={e => setTemplateId(+e.target.value)}
-                  className="input-field" style={{ flex: 1, cursor: 'pointer' }}>
-                  <option value={1}>다크 계열</option>
-                  <option value={2}>미니멀 흰배경</option>
-                  <option value={3}>네이비/포인트</option>
-                </select>
-                <button onClick={handleRender} disabled={isRendering} className="btn-primary"
-                  style={{ padding: '8px 20px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {isRendering
-                    ? <><div className="spinner spinner-sm" style={{ borderTopColor: 'white' }} />렌더링 중...</>
-                    : `▶ 렌더링${narration ? ' (나레이션)' : ''}`
-                  }
-                </button>
-              </div>
+              {/* 렌더 */}
+              <button onClick={handleRender} disabled={isRendering} className="btn-primary"
+                style={{ padding: '10px 20px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'center' }}>
+                {isRendering
+                  ? <><div className="spinner spinner-sm" style={{ borderTopColor: 'white' }} />렌더링 중...</>
+                  : `▶ 렌더링${narration ? ' (나레이션)' : ''}`
+                }
+              </button>
               {renderMsg && (
                 <div style={{ fontSize: 14, color: renderMsg.startsWith('✓') ? 'var(--success)' : 'var(--error)', padding: '6px 10px', background: renderMsg.startsWith('✓') ? '#e6f4ea' : '#fce8e6', borderRadius: 6, border: `1px solid ${renderMsg.startsWith('✓') ? '#81c995' : '#f28b82'}` }}>
                   {renderMsg}

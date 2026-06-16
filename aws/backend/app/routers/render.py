@@ -24,7 +24,8 @@ async def _run_render(session_id: str, filename: str, title: str, subtitles: boo
                       narration_mode: str = "title", narration_speed: float = 1.0,
                       use_hook: bool = False, hook_sfx_id: str = None,
                       hook_sfx_offset: float = 0.0, hook_sfx_volume: float = 0.8,
-                      custom_sfx_entries: list = None):
+                      custom_sfx_entries: list = None,
+                      text_overlays: list = None):
     s = make_session(session_id)
     try:
         raw_path = s.raw_dir / filename
@@ -58,6 +59,7 @@ async def _run_render(session_id: str, filename: str, title: str, subtitles: boo
             hook_sfx_offset=hook_sfx_offset,
             hook_sfx_volume=hook_sfx_volume,
             custom_sfx_entries=custom_sfx_entries or [],
+            text_overlays=text_overlays or [],
         )
         if shorts_path and os.path.exists(shorts_path):
             get_s3().upload_and_cleanup(shorts_path, s.s3_key("shorts", os.path.basename(shorts_path)))
@@ -94,6 +96,7 @@ async def render(req: RenderRequest, background_tasks: BackgroundTasks,
         req.narration_speed,
         req.use_hook, req.hook_sfx_id, req.hook_sfx_offset, req.hook_sfx_volume,
         [e.model_dump() for e in req.custom_sfx_entries],
+        [e.model_dump() for e in req.text_overlays],
     )
     return {"ok": True}
 

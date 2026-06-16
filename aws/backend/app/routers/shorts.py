@@ -117,6 +117,11 @@ async def list_raws(session: SessionDirs = Depends(get_session)):
         meta = {}
         if analysis_file.exists():
             meta = json.loads(analysis_file.read_text(encoding="utf-8"))
+        hook_seg = meta.get("hook_segment")
+        base_stem = re.sub(r'_t\d+(_v\d+)?$', '', stem)
+        dl_files = sorted(session.download_dir.glob(f"{base_stem}*.mp4"))
+        dl_filename = dl_files[0].name if dl_files else None
+
         ch = _lookup_channel(ch_map, stem)
         raws.append(RawInfo(
             filename=mp4.name,
@@ -127,6 +132,8 @@ async def list_raws(session: SessionDirs = Depends(get_session)):
             channel_name=ch.get("name", ""),
             channel_thumbnail_url=ch.get("thumbnail_url", ""),
             variant=_variant_of(stem),
+            hook_segment=hook_seg,
+            download_filename=dl_filename,
         ))
     return {"raws": raws}
 
@@ -277,6 +284,77 @@ async def delete_raw(filename: str, session: SessionDirs = Depends(get_session))
     path.unlink()
     get_s3().delete(session.s3_key("raw", filename))
     return {"ok": True}
+
+
+@router.get("/subtitle-entries/{stem}")
+async def get_subtitle_entries(stem: str, session: SessionDirs = Depends(get_session)):
+    """raw 영상의 자막 타이밍 목록을 반환. 캔버스 미리보기에서 실제 자막을 표시하는 데 사용."""
+    clean_stem = stem.replace("_raw.mp4", "").replace("_raw", "")
+    analysis_path = session.analysis_dir / f"{clean_stem}.json"
+    if not analysis_path.exists():
+        return {"entries": []}
+    try:
+        analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"entries": []}
+
+    raw_segments = analysis.get("raw_segments", [])
+    transcript_path = analysis.get("transcript_path", "")
+    if not transcript_path or not Path(transcript_path).exists():
+        return {"entries": []}
+
+    # raw_segments 없으면 candidates로 재구성 (구버전 호환)
+    if not raw_segments:
+        candidates = analysis.get("candidates", [])
+        if not candidates:
+            return {"entries": []}
+        raw_time = 0.0
+        BUFFER_SEC = 0.5
+        for c in sorted(candidates, key=lambda x: x.get("edit_order", 0)):
+            orig_s = float(c["start"])
+            orig_e = float(c["end"])
+            buf_s = max(0.0, orig_s - BUFFER_SEC)
+            buf_e = orig_e + BUFFER_SEC
+            dur = buf_e - buf_s
+            raw_segments.append({
+                "raw_start": round(raw_time, 3),
+                "raw_end": round(raw_time + dur, 3),
+                "orig_start": round(buf_s, 3),
+                "orig_end": round(buf_e, 3),
+            })
+            raw_time += dur
+
+    try:
+        transcript = json.loads(Path(transcript_path).read_text(encoding="utf-8"))
+    except Exception:
+        return {"entries": []}
+
+    seg_list = transcript.get("segments", [])
+    entries = []
+    for rs in raw_segments:
+        orig_start = rs["orig_start"]
+        orig_end = rs["orig_end"]
+        raw_start = rs["raw_start"]
+        raw_end = rs["raw_end"]
+        offset = raw_start - orig_start
+        for seg in seg_list:
+            # 세그먼트가 orig 구간과 겹치기만 하면 포함 (완전 포함 아니어도 됨)
+            if seg["end"] <= orig_start or seg["start"] >= orig_end:
+                continue
+            clipped_start = max(seg["start"], orig_start)
+            clipped_end = min(seg["end"], orig_end)
+            r_start = round(clipped_start + offset, 3)
+            r_end = round(clipped_end + offset, 3)
+            # raw 영상 범위 안으로 클리핑
+            r_start = max(0.0, r_start)
+            r_end = min(raw_end, r_end)
+            if r_end - r_start > 0.1:
+                entries.append({
+                    "start": r_start,
+                    "end": r_end,
+                    "text": seg["text"].strip(),
+                })
+    return {"entries": entries}
 
 
 @router.post("/update-title")
