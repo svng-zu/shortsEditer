@@ -651,6 +651,130 @@ export default function ShortsPanel({
 }
 
 // Raw 편집 영역
+interface HookSfxPanelProps {
+  useHook: boolean; setUseHook: (v: boolean) => void
+  hookSfxId: string | null; setHookSfxId: (v: string | null) => void
+  hookSfxOffset: number; setHookSfxOffset: (v: number) => void
+  hookSfxVolume: number; setHookSfxVolume: (v: number) => void
+  sfxList: {id: string; file: string; description: string}[]
+  customSfx: {time: number; sfx_id: string; volume: number}[]
+  setCustomSfx: (v: {time: number; sfx_id: string; volume: number}[]) => void
+}
+
+function HookSfxPanel({
+  useHook, setUseHook, hookSfxId, setHookSfxId,
+  hookSfxOffset, setHookSfxOffset, hookSfxVolume, setHookSfxVolume,
+  sfxList, customSfx, setCustomSfx,
+}: HookSfxPanelProps) {
+  const addSfx = () => {
+    const id = sfxList.length > 0 ? sfxList[0].id : ''
+    setCustomSfx([...customSfx, { time: 0, sfx_id: id, volume: 0.8 }])
+  }
+  const updateSfx = (i: number, patch: Partial<{time:number;sfx_id:string;volume:number}>) => {
+    const next = customSfx.map((e, j) => j === i ? { ...e, ...patch } : e)
+    setCustomSfx(next)
+  }
+  const removeSfx = (i: number) => setCustomSfx(customSfx.filter((_, j) => j !== i))
+
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, background: 'var(--surface2)' }}>
+      {/* 훅 토글 헤더 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 16 }}>🎬</span>
+          <span style={{ fontWeight: 600, fontSize: 15 }}>하이라이트 훅</span>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 14, color: 'var(--text2)', cursor: 'pointer' }}>
+          <input type="checkbox" checked={useHook} onChange={e => setUseHook(e.target.checked)}
+            style={{ cursor: 'pointer', accentColor: 'var(--primary)' }} />
+          삽입
+        </label>
+      </div>
+
+      {useHook && (
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ fontSize: 12, color: 'var(--text2)', margin: 0 }}>
+            영상 앞에 Gemini가 선택한 3~5초 하이라이트 클립을 삽입합니다. 분석을 먼저 실행하세요.
+          </p>
+          {sfxList.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--text2)', minWidth: 60 }}>전환 효과음</span>
+                <select value={hookSfxId ?? ''} onChange={e => setHookSfxId(e.target.value || null)}
+                  className="input-field" style={{ flex: 1, fontSize: 13, cursor: 'pointer' }}>
+                  <option value="">없음</option>
+                  {sfxList.map(s => <option key={s.id} value={s.id}>{s.id} — {s.description}</option>)}
+                </select>
+              </div>
+              {hookSfxId && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, color: 'var(--text2)', minWidth: 60 }}>타이밍</span>
+                    <input type="range" min={-1} max={1} step={0.1} value={hookSfxOffset}
+                      onChange={e => setHookSfxOffset(+e.target.value)} style={{ flex: 1, accentColor: 'var(--primary)' }} />
+                    <span style={{ fontSize: 13, color: 'var(--text2)', minWidth: 36, textAlign: 'right' }}>
+                      {hookSfxOffset >= 0 ? `+${hookSfxOffset.toFixed(1)}` : hookSfxOffset.toFixed(1)}s
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, color: 'var(--text2)', minWidth: 60 }}>음량</span>
+                    <input type="range" min={0} max={2} step={0.05} value={hookSfxVolume}
+                      onChange={e => setHookSfxVolume(+e.target.value)} style={{ flex: 1, accentColor: 'var(--primary)' }} />
+                    <span style={{ fontSize: 13, color: 'var(--text2)', minWidth: 36, textAlign: 'right' }}>
+                      {Math.round(hookSfxVolume * 100)}%
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SFX 타임라인 구분선 */}
+      <div style={{ borderTop: '1px solid var(--border)', margin: '12px 0 10px' }} />
+
+      {/* SFX 타임라인 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: customSfx.length > 0 ? 8 : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 15 }}>🔊</span>
+          <span style={{ fontWeight: 600, fontSize: 14 }}>효과음 타임라인</span>
+        </div>
+        {sfxList.length > 0 && (
+          <button onClick={addSfx} className="btn-outlined"
+            style={{ fontSize: 12, padding: '3px 9px', cursor: 'pointer' }}>+ 추가</button>
+        )}
+      </div>
+
+      {customSfx.length === 0 && sfxList.length === 0 && (
+        <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>SFX 목록을 불러오는 중...</p>
+      )}
+      {customSfx.length === 0 && sfxList.length > 0 && (
+        <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>원하는 시간대에 효과음을 배치하세요.</p>
+      )}
+
+      {customSfx.map((e, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          <input type="number" min={0} step={0.5} value={e.time}
+            onChange={ev => updateSfx(i, { time: Math.max(0, +ev.target.value) })}
+            className="input-field" style={{ width: 64, fontSize: 13, padding: '4px 6px' }} />
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>s</span>
+          <select value={e.sfx_id} onChange={ev => updateSfx(i, { sfx_id: ev.target.value })}
+            className="input-field" style={{ flex: 1, fontSize: 13, cursor: 'pointer' }}>
+            {sfxList.map(s => <option key={s.id} value={s.id}>{s.id}</option>)}
+          </select>
+          <input type="range" min={0} max={2} step={0.05} value={e.volume}
+            onChange={ev => updateSfx(i, { volume: +ev.target.value })}
+            style={{ width: 64, accentColor: 'var(--primary)' }} />
+          <span style={{ fontSize: 12, color: 'var(--text2)', minWidth: 30 }}>{Math.round(e.volume * 100)}%</span>
+          <button onClick={() => removeSfx(i)}
+            style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>✕</button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   raw: RawInfo | null
   onStartPolling: () => void
@@ -721,6 +845,13 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [isRendering, setIsRendering] = useState(false)
   const [renderMsg, setRenderMsg]   = useState('')
   const [showSrt, setShowSrt]       = useState(false)
+  // 훅 & SFX
+  const [useHook, setUseHook]             = useState(false)
+  const [hookSfxId, setHookSfxId]         = useState<string | null>(null)
+  const [hookSfxOffset, setHookSfxOffset] = useState(0.0)
+  const [hookSfxVolume, setHookSfxVolume] = useState(0.8)
+  const [sfxList, setSfxList]             = useState<{id:string; file:string; description:string}[]>([])
+  const [customSfx, setCustomSfx]         = useState<{time:number; sfx_id:string; volume:number}[]>([])
   const [isPreviewingNarration, setIsPreviewingNarration] = useState(false)
   const [isNarrPreviewPlaying, setIsNarrPreviewPlaying] = useState(false)
   const [narrPreviewMsg, setNarrPreviewMsg] = useState('')
@@ -762,6 +893,12 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
 
   useEffect(() => { api.getBackgrounds().then(r => { setBgOptions(r.backgrounds); r.backgrounds.forEach(loadBg) }).catch(() => {}) }, [])
   useEffect(() => { api.getChannels().then(r => setRegChannels(r.channels)).catch(() => {}) }, [])
+  useEffect(() => {
+    api.getSfxList().then(r => {
+      setSfxList(r.sfx || [])
+      if (r.sfx?.length > 0 && !hookSfxId) setHookSfxId(r.sfx[0].id)
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!raw) return
@@ -993,7 +1130,12 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     setIsRendering(true); setRenderMsg('')
     try {
       const { bgImage, bgSolidColor: bgSC } = getBgParams()
-      await api.render(raw.filename, getTitle(), subtitles, templateId, getStyle(), bgImage, bgSC, narration, narrVoice, narrMode, narrSpeed)
+      await api.render(
+        raw.filename, getTitle(), subtitles, templateId, getStyle(), bgImage, bgSC,
+        narration, narrVoice, narrMode, narrSpeed,
+        useHook, hookSfxId, hookSfxOffset, hookSfxVolume,
+        customSfx,
+      )
       setRenderMsg(narration ? '✓ 나레이션 버전 렌더링 시작' : '✓ 렌더링 시작 — 완성 쇼츠 탭에서 확인')
       onStartPolling()
     } catch (e: any) { setRenderMsg(e?.response?.data?.detail || '오류가 발생했습니다') }
@@ -1296,6 +1438,16 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   )}
                 </div>
 
+                {/* 훅 & SFX */}
+                <HookSfxPanel
+                  useHook={useHook} setUseHook={setUseHook}
+                  hookSfxId={hookSfxId} setHookSfxId={setHookSfxId}
+                  hookSfxOffset={hookSfxOffset} setHookSfxOffset={setHookSfxOffset}
+                  hookSfxVolume={hookSfxVolume} setHookSfxVolume={setHookSfxVolume}
+                  sfxList={sfxList}
+                  customSfx={customSfx} setCustomSfx={setCustomSfx}
+                />
+
                 {/* 템플릿 + 렌더 */}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <select value={templateId} onChange={e => setTemplateId(+e.target.value)}
@@ -1582,6 +1734,16 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   </div>
                 )}
               </div>
+
+              {/* 훅 & SFX */}
+              <HookSfxPanel
+                useHook={useHook} setUseHook={setUseHook}
+                hookSfxId={hookSfxId} setHookSfxId={setHookSfxId}
+                hookSfxOffset={hookSfxOffset} setHookSfxOffset={setHookSfxOffset}
+                hookSfxVolume={hookSfxVolume} setHookSfxVolume={setHookSfxVolume}
+                sfxList={sfxList}
+                customSfx={customSfx} setCustomSfx={setCustomSfx}
+              />
 
               {/* 템플릿 + 렌더 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

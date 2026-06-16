@@ -2,6 +2,7 @@
 """렌더링/미리보기 API"""
 
 import asyncio
+import json
 import os
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import FileResponse
@@ -11,6 +12,7 @@ from app.models.schemas import RenderRequest, PreviewRequest, EditRequest, Pipel
 from app.services.editor import Editor
 from app.services.s3_manager import get_s3
 from app.routers.pipeline import get_session_status, set_status
+from app.config import settings
 
 router = APIRouter()
 
@@ -19,7 +21,10 @@ async def _run_render(session_id: str, filename: str, title: str, subtitles: boo
                       template_id: int, style: dict = None, bg_image: str = None,
                       bg_solid_color: str = None,
                       narration: bool = False, narration_voice: str = "female",
-                      narration_mode: str = "title", narration_speed: float = 1.0):
+                      narration_mode: str = "title", narration_speed: float = 1.0,
+                      use_hook: bool = False, hook_sfx_id: str = None,
+                      hook_sfx_offset: float = 0.0, hook_sfx_volume: float = 0.8,
+                      custom_sfx_entries: list = None):
     s = make_session(session_id)
     try:
         raw_path = s.raw_dir / filename
@@ -48,12 +53,30 @@ async def _run_render(session_id: str, filename: str, title: str, subtitles: boo
             narration_voice=narration_voice,
             narration_mode=narration_mode,
             narration_speed=narration_speed,
+            use_hook=use_hook,
+            hook_sfx_id=hook_sfx_id,
+            hook_sfx_offset=hook_sfx_offset,
+            hook_sfx_volume=hook_sfx_volume,
+            custom_sfx_entries=custom_sfx_entries or [],
         )
         if shorts_path and os.path.exists(shorts_path):
             get_s3().upload_and_cleanup(shorts_path, s.s3_key("shorts", os.path.basename(shorts_path)))
         set_status(session_id, PipelineStep.DONE, f"렌더링 완료: {stem}_shorts.mp4", 100)
     except Exception as e:
         set_status(session_id, PipelineStep.ERROR, f"렌더링 오류: {e}", 0)
+
+
+@router.get("/sfx/list")
+async def get_sfx_list():
+    """사용 가능한 효과음 목록 반환"""
+    manifest_path = settings.SFX_DIR / "sfx_manifest.json"
+    if not manifest_path.exists():
+        return {"sfx": []}
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"sfx": []}
 
 
 @router.post("/render")
@@ -69,6 +92,8 @@ async def render(req: RenderRequest, background_tasks: BackgroundTasks,
         req.subtitles, req.template_id, req.style.model_dump(), req.bg_image,
         req.bg_solid_color, req.narration, req.narration_voice, req.narration_mode,
         req.narration_speed,
+        req.use_hook, req.hook_sfx_id, req.hook_sfx_offset, req.hook_sfx_volume,
+        [e.model_dump() for e in req.custom_sfx_entries],
     )
     return {"ok": True}
 

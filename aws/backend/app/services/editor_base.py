@@ -763,7 +763,12 @@ class EditorBase:
                       narration: bool = False,
                       narration_voice: str = "female",
                       narration_mode: str = "title",
-                      narration_speed: float = 1.0) -> str:
+                      narration_speed: float = 1.0,
+                      use_hook: bool = False,
+                      hook_sfx_id: str = None,
+                      hook_sfx_offset: float = 0.0,
+                      hook_sfx_volume: float = 0.8,
+                      custom_sfx_entries: list = None) -> str:
         # style의 font_name으로 폰트 갱신
         if style and style.get("font_name"):
             self.font = self._resolve_font(style["font_name"])
@@ -774,6 +779,36 @@ class EditorBase:
 
         title = title_override if title_override is not None else analysis.get("intro_text", "")
         category = analysis.get("category", "")
+
+        # ── 훅 클립 전처리 (use_hook=True 시) ──
+        hook_clip = None
+        hook_duration = 0.0
+        if use_hook:
+            hook_seg = analysis.get("hook_segment")
+            if hook_seg:
+                orig_video = self._find_video_path(analysis.get("transcript_path", ""))
+                if orig_video:
+                    h_start = float(hook_seg.get("start", 0))
+                    h_end   = float(hook_seg.get("end", 0))
+                    h_dur   = h_end - h_start
+                    try:
+                        orig_dur = self._get_video_duration(orig_video)
+                    except Exception:
+                        orig_dur = 0
+                    if 2.0 <= h_dur <= 8.0 and h_end <= orig_dur + 1.0:
+                        hook_clip = self._render_hook_clip(orig_video, h_start, h_dur)
+                        if hook_clip:
+                            hook_duration = h_dur
+                else:
+                    print("  [Hook] 원본 영상 없음 — 훅 건너뜀")
+            else:
+                print("  [Hook] 분석 결과에 hook_segment 없음 — 훅 건너뜀")
+
+        if hook_clip:
+            merged_raw = str(TEMP_DIR / f"hooked_{uuid.uuid4().hex[:8]}.mp4")
+            self._concat_raw([hook_clip, raw_path], merged_raw, fade_sec=0.3)
+            raw_path = merged_raw
+            print(f"  [Hook] 훅 클립 합산 완료 (총 {hook_duration:.1f}s 추가)")
 
         base_name = os.path.splitext(os.path.basename(raw_path))[0].replace("_raw", "")
         shorts_dir = self._sd.shorts_dir if self._sd else settings.SHORTS_DIR
@@ -954,22 +989,47 @@ class EditorBase:
             raise RuntimeError(f"FFmpeg 오버레이 실패 (code {result.returncode}): {stderr_tail}")
         print(f"  [Stage 2] 완료 → {os.path.basename(output_path)}")
 
-        # 나레이션 믹싱
+        # ── SFX 이벤트 수집 (훅SFX + 커스텀SFX + Gemini 추천SFX) ──
+        all_sfx_placements = []
+
+        if hook_sfx_id and hook_clip:
+            t = max(0.0, hook_duration + hook_sfx_offset)
+            all_sfx_placements.append({"time": t, "sfx_id": hook_sfx_id, "volume": hook_sfx_volume})
+
+        for e in (custom_sfx_entries or []):
+            all_sfx_placements.append({
+                "time": float(e.get("time", 0)) + hook_duration,
+                "sfx_id": e.get("sfx_id", ""),
+                "volume": float(e.get("volume", 0.8)),
+            })
+
+        if narration_mode == "script":
+            for e in analysis.get("sfx_placements", []):
+                all_sfx_placements.append({
+                    "time": float(e.get("raw_time", 0)) + hook_duration,
+                    "sfx_id": e.get("sfx_id", ""),
+                    "volume": 0.8,
+                })
+
+        resolved_sfx = self._resolve_sfx_events(all_sfx_placements)
+
+        # ── 나레이션 + SFX 믹싱 ──
+        narration_volume = (style or {}).get("narration_volume", 1.2)
+        narration_video_volume = (style or {}).get("narration_video_volume", 0.3)
+
         if narration and narration_text:
             print(f"  [TTS] 나레이션 생성 중: '{narration_text[:30]}'")
             from app.services.tts import generate_narration, mix_narration, mix_narration_and_sfx
             narr_path = output_path.replace("_shorts.mp4", "_narr.mp3")
             mixed_path = output_path.replace("_shorts.mp4", "_shorts_narr.mp4")
-            narration_volume = (style or {}).get("narration_volume", 1.2)
-            narration_video_volume = (style or {}).get("narration_video_volume", 0.3)
             if generate_narration(narration_text, narr_path, narration_voice, narration_speed):
-                if narration_mode == "script":
-                    sfx_events = self._resolve_sfx_events(analysis.get("sfx_placements", []))
-                    mixed_ok = mix_narration_and_sfx(output_path, narr_path, mixed_path, sfx_events=sfx_events,
-                                                      narration_volume=narration_volume, video_volume=narration_video_volume)
-                else:
-                    mixed_ok = mix_narration(output_path, narr_path, mixed_path,
-                                              narration_volume=narration_volume, video_volume=narration_video_volume)
+                mixed_ok = mix_narration_and_sfx(
+                    output_path, mixed_path,
+                    narration_path=narr_path,
+                    sfx_events=resolved_sfx,
+                    narration_volume=narration_volume,
+                    video_volume=narration_video_volume,
+                )
                 if mixed_ok:
                     import shutil
                     shutil.move(mixed_path, output_path)
@@ -980,11 +1040,36 @@ class EditorBase:
                     pass
             else:
                 print(f"  [TTS] 나레이션 생성 실패, 원본 유지")
+        elif resolved_sfx:
+            from app.services.tts import mix_narration_and_sfx
+            mixed_path = output_path.replace("_shorts.mp4", "_shorts_sfx.mp4")
+            mixed_ok = mix_narration_and_sfx(
+                output_path, mixed_path,
+                narration_path=None,
+                sfx_events=resolved_sfx,
+                video_volume=1.0,
+            )
+            if mixed_ok:
+                import shutil
+                shutil.move(mixed_path, output_path)
+                print(f"  [SFX] 효과음 믹싱 완료 ({len(resolved_sfx)}개) → {os.path.basename(output_path)}")
+
+        # 훅 클립 임시 파일 정리
+        if hook_clip and os.path.exists(hook_clip):
+            try:
+                Path(hook_clip).unlink()
+            except Exception:
+                pass
 
         return output_path
 
     def _resolve_sfx_events(self, sfx_placements: list[dict]) -> list[dict]:
-        """sfx_placements의 sfx_id를 sfx_manifest.json을 통해 실제 파일 경로로 변환."""
+        """sfx_placements의 sfx_id를 sfx_manifest.json을 통해 실제 파일 경로로 변환.
+
+        입력 형식: [{"time": float, "sfx_id": str, "volume": float(선택)}, ...]
+        또는 레거시: [{"raw_time": float, "sfx_id": str}, ...]
+        출력: [{"time": float, "file": str, "volume": float}, ...]
+        """
         if not sfx_placements:
             return []
         manifest_path = settings.SFX_DIR / "sfx_manifest.json"
@@ -1003,8 +1088,45 @@ class EditorBase:
             if not file_name:
                 continue
             file_path = settings.SFX_DIR / file_name
-            events.append({"time": p.get("raw_time", 0), "file": str(file_path)})
+            t = p.get("time") if p.get("time") is not None else p.get("raw_time", 0)
+            events.append({"time": float(t), "file": str(file_path), "volume": float(p.get("volume", 0.8))})
         return events
+
+    def _render_hook_clip(self, video_path: str, start: float, duration: float) -> str | None:
+        """원본 영상에서 hook 구간을 자른 뒤 페이드인/아웃을 입혀 임시 클립으로 반환."""
+        HOOK_FADE_IN  = 0.3
+        HOOK_FADE_OUT = 0.7
+        try:
+            src_w, src_h = self._get_video_info(video_path)
+            crop_x, crop_y, crop_w, crop_h = self._detect_face_crop(video_path, start, src_w, src_h)
+            base_vf = self._build_segment_vf(crop_w, crop_h, crop_x, crop_y)
+            fade_st = max(0.0, duration - HOOK_FADE_OUT)
+            hook_vf = (
+                f"{base_vf},"
+                f"fade=t=in:st=0:d={HOOK_FADE_IN},"
+                f"fade=t=out:st={fade_st:.3f}:d={HOOK_FADE_OUT}"
+            )
+            hook_af = (
+                f"afade=t=in:st=0:d={HOOK_FADE_IN},"
+                f"afade=t=out:st={fade_st:.3f}:d={HOOK_FADE_OUT}"
+            )
+            hook_tmp = str(TEMP_DIR / f"hook_{uuid.uuid4().hex[:8]}.mp4")
+            cmd = [
+                "ffmpeg", "-y", "-ss", str(start), "-i", video_path,
+                "-t", str(duration), "-vf", hook_vf, "-af", hook_af,
+                "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k",
+                hook_tmp
+            ]
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            if r.returncode == 0 and os.path.exists(hook_tmp):
+                print(f"  [Hook] {start:.1f}~{start+duration:.1f}s 훅 클립 렌더 완료")
+                return hook_tmp
+            print(f"  [Hook] 훅 클립 렌더 실패: {r.stderr[-200:]}")
+            return None
+        except Exception as e:
+            print(f"  [Hook] 훅 클립 생성 오류: {e}")
+            return None
 
     def _preview_sub_filters(self, analysis_path, seek, style=None):
         """정밀 미리보기용 — seek 시점에 가장 관련있는 자막 한 줄을 always-on으로 그린다."""

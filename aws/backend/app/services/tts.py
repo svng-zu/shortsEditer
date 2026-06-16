@@ -282,32 +282,46 @@ def mix_narration(video_path: str, narration_path: str, output_path: str,
     return True
 
 
-def mix_narration_and_sfx(video_path: str, narration_path: str, output_path: str,
+def mix_narration_and_sfx(video_path: str, output_path: str,
+                          narration_path: str | None = None,
                           sfx_events: list[dict] = None,
                           narration_delay: float = NARRATION_DELAY, narration_volume: float = 1.2,
                           video_volume: float = 0.3, sfx_volume: float = 0.8) -> bool:
-    """나레이션 음성 + 효과음(들)을 영상에 믹싱.
+    """나레이션(선택) + 효과음(들)을 영상에 믹싱.
 
-    sfx_events: [{"time": float, "file": "/path/to/sfx.mp3"}, ...]
-    sfx_events가 비어있으면 mix_narration과 동일하게 동작한다.
+    narration_path=None이면 나레이션 없이 SFX만 적용.
+    sfx_events: [{"time": float, "file": "/path/to/sfx.mp3", "volume": float(선택)}, ...]
+    각 SFX의 "volume" 키가 있으면 해당 값을, 없으면 sfx_volume을 사용한다.
     """
     sfx_events = [e for e in (sfx_events or []) if Path(e.get("file", "")).exists()]
+    has_narration = narration_path is not None
 
-    inputs = ["-i", video_path, "-i", narration_path]
+    inputs = ["-i", video_path]
+    if has_narration:
+        inputs += ["-i", narration_path]
     for e in sfx_events:
         inputs += ["-i", e["file"]]
 
     va = f"[0:a]volume={video_volume}[va]"
-    na = (
-        f"[1:a]volume={narration_volume},"
-        f"adelay={int(narration_delay*1000)}|{int(narration_delay*1000)}[na]"
-    )
-    filters = [va, na]
-    mix_labels = ["[va]", "[na]"]
+    filters = [va]
+    mix_labels = ["[va]"]
+
+    if has_narration:
+        na = (
+            f"[1:a]volume={narration_volume},"
+            f"adelay={int(narration_delay*1000)}|{int(narration_delay*1000)}[na]"
+        )
+        filters.append(na)
+        mix_labels.append("[na]")
+        sfx_start_idx = 2
+    else:
+        sfx_start_idx = 1
+
     for i, e in enumerate(sfx_events):
         delay_ms = max(0, int(e["time"] * 1000))
+        vol = e.get("volume", sfx_volume)
         label = f"[sfx{i}]"
-        filters.append(f"[{i+2}:a]volume={sfx_volume},adelay={delay_ms}|{delay_ms}{label}")
+        filters.append(f"[{sfx_start_idx + i}:a]volume={vol},adelay={delay_ms}|{delay_ms}{label}")
         mix_labels.append(label)
 
     filters.append(

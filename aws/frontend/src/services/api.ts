@@ -392,6 +392,12 @@ export const api = {
     await client.post('/api/process', { template_id: templateId })
   },
 
+  // SFX
+  async getSfxList(): Promise<{ sfx: { id: string; file: string; description: string }[] }> {
+    const { data } = await client.get('/api/sfx/list')
+    return data
+  },
+
   // Render
   async render(
     filename: string,
@@ -405,6 +411,11 @@ export const api = {
     narrationVoice?: string,
     narrationMode?: string,
     narrationSpeed?: number,
+    useHook?: boolean,
+    hookSfxId?: string | null,
+    hookSfxOffset?: number,
+    hookSfxVolume?: number,
+    customSfxEntries?: Array<{ time: number; sfx_id: string; volume: number }>,
   ): Promise<void> {
     await client.post('/api/render', {
       filename,
@@ -418,6 +429,11 @@ export const api = {
       narration_voice: narrationVoice ?? 'female',
       narration_mode: narrationMode ?? 'title',
       narration_speed: narrationSpeed ?? 1.0,
+      use_hook: useHook ?? false,
+      hook_sfx_id: hookSfxId ?? null,
+      hook_sfx_offset: hookSfxOffset ?? 0.0,
+      hook_sfx_volume: hookSfxVolume ?? 0.8,
+      custom_sfx_entries: customSfxEntries ?? [],
     })
   },
 

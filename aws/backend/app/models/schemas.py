@@ -74,6 +74,12 @@ class StyleParams(BaseModel):
     narration_video_volume: float = 0.3
 
 
+class SfxEntry(BaseModel):
+    time: float
+    sfx_id: str
+    volume: float = 0.8
+
+
 class RenderRequest(BaseModel):
     filename: str
     title: str = ""
@@ -86,6 +92,11 @@ class RenderRequest(BaseModel):
     narration_voice: str = "female"
     narration_mode: str = "title"  # "title" | "script"
     narration_speed: float = 1.0
+    use_hook: bool = False
+    hook_sfx_id: Optional[str] = None
+    hook_sfx_offset: float = 0.0
+    hook_sfx_volume: float = 0.8
+    custom_sfx_entries: List[SfxEntry] = []
 
 
 class PreviewRequest(BaseModel):

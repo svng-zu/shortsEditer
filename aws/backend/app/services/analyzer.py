@@ -137,6 +137,11 @@ SINGLE_TOPIC_PROMPT = """
 위 세그먼트를 분석하여 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요:
 {{
   "intro_text": "쇼츠 상단에 표시될 후킹 제목. 위 참고 예시의 후킹 패턴을 살려 첫줄은 호기심을 자극하는 문구(12자 이내), 둘째줄은 대결 팀명(예: A vs B) 또는 핵심 키워드·날짜 등 구체적 정보(12자 이내). 반드시 2줄. 예: 이 선수가 해냈다\\n손흥민 결승골 장면",
+  "hook_segment": {{
+    "start": 훅 시작(초),
+    "end": 훅 종료(초),
+    "reason": "첫 5초 안에 시청자를 붙잡을 수 있는 이유"
+  }},
   "candidates": [
     {{
       "start": 시작시간(초),
@@ -149,6 +154,12 @@ SINGLE_TOPIC_PROMPT = """
     }}
   ]
 }}
+
+hook_segment 조건:
+- 전체 영상 중 시청자를 첫 3~5초 안에 가장 강하게 끌어당길 수 있는 순간 선택
+- 반드시 3초 ≤ (end - start) ≤ 6초
+- candidates 구간과 시간이 겹쳐도 됨 (훅=예고편, 본편에서 맥락과 함께 재등장)
+- start/end는 세그먼트 경계와 일치하지 않아도 됨
 
 후보 구간 조건:
 - 반드시 하나의 일관된 주제/스토리에서만 구간을 선택하세요. 영상에 여러 주제가 있으면 가장 임팩트 있는 단일 주제에 집중하세요.
@@ -183,6 +194,11 @@ MULTI_TOPIC_PROMPT = """
   "topics": [
     {{
       "intro_text": "쇼츠 상단에 표시될 후킹 제목. 위 참고 예시의 후킹 패턴을 살려 첫줄은 호기심을 자극하는 문구(12자 이내), 둘째줄은 핵심 대상·수치·날짜 등 구체적 부제(12자 이내). 반드시 2줄. 예: 전문가도 예상 못했다\\n코스피 2400 붕괴",
+      "hook_segment": {{
+        "start": 훅 시작(초),
+        "end": 훅 종료(초),
+        "reason": "시청자를 첫 5초 안에 붙잡을 수 있는 이유"
+      }},
       "candidates": [
         {{
           "start": 시작시간(초),
@@ -196,6 +212,11 @@ MULTI_TOPIC_PROMPT = """
     }}
   ]
 }}
+
+각 topic의 hook_segment 조건:
+- 해당 topic 구간 내에서 시청자를 첫 3~5초 안에 가장 강하게 끌어당길 수 있는 순간 선택
+- 반드시 3초 ≤ (end - start) ≤ 6초
+- candidates 구간과 시간이 겹쳐도 됨 (훅=예고편, 본편에서 맥락과 함께 재등장)
 
 조건:
 - topics: 독립적인 주제별로 1~4개로 분리 (주제가 하나라면 1개만)
@@ -385,13 +406,16 @@ class Analyzer:
         candidates = result.get("candidates", [])
         candidates.sort(key=lambda x: x.get("edit_order", 99))
         save_path = analysis_dir / f"{base_name}.json"
+        data = {
+            "transcript_path": transcript_path,
+            "category": category,
+            "intro_text": result.get("intro_text", ""),
+            "candidates": candidates,
+        }
+        if result.get("hook_segment"):
+            data["hook_segment"] = result["hook_segment"]
         with open(save_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "transcript_path": transcript_path,
-                "category": category,
-                "intro_text": result.get("intro_text", ""),
-                "candidates": candidates,
-            }, f, ensure_ascii=False, indent=2)
+            json.dump(data, f, ensure_ascii=False, indent=2)
         print(f"[Analyzer] 저장 → {save_path.name}")
         return [str(save_path)]
 
@@ -407,13 +431,16 @@ class Analyzer:
             candidates.sort(key=lambda x: x.get("edit_order", 99))
             suffix = f"_t{i}" if len(topics) > 1 else ""
             save_path = analysis_dir / f"{base_name}{suffix}.json"
+            data = {
+                "transcript_path": transcript_path,
+                "category": category,
+                "intro_text": topic.get("intro_text", ""),
+                "candidates": candidates,
+            }
+            if topic.get("hook_segment"):
+                data["hook_segment"] = topic["hook_segment"]
             with open(save_path, "w", encoding="utf-8") as f:
-                json.dump({
-                    "transcript_path": transcript_path,
-                    "category": category,
-                    "intro_text": topic.get("intro_text", ""),
-                    "candidates": candidates,
-                }, f, ensure_ascii=False, indent=2)
+                json.dump(data, f, ensure_ascii=False, indent=2)
             print(f"[Analyzer] 토픽 {i} 저장 → {save_path.name}")
             saved.append(str(save_path))
         return saved
