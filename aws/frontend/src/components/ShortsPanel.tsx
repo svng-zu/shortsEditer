@@ -37,15 +37,38 @@ function _hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
+// FONT_MAP 키 → CSS font-family 이름 (Google Fonts 로드 이름과 맞춰야 캔버스 미리보기 정상)
+const FONT_CSS_NAME: Record<string, string> = {
+  BlackHanSans:    'Black Han Sans',
+  NotoSerifKRBold: 'Noto Serif KR',
+  NotoSansKRBold:  'Noto Sans KR',
+}
+const toCssFontFamily = (key: string) => FONT_CSS_NAME[key] ?? key
+
 // 자막 글꼴 — FFmpeg 렌더링에 쓰이는 FONT_MAP(editor_base.py)과 키를 맞춰야 한다
 const SUB_FONT_OPTIONS: { value: string; label: string }[] = [
-  { value: 'NanumSquareRoundEB',   label: '나눔스퀘어라운드 EB' },
-  { value: 'NanumSquareRoundB',    label: '나눔스퀘어라운드 B' },
-  { value: 'NanumSquareB',         label: '나눔스퀘어 B' },
-  { value: 'NanumGothicBold',      label: '나눔고딕 Bold' },
-  { value: 'NanumGothic',          label: '나눔고딕' },
-  { value: 'NanumBarunGothicBold', label: '나눔바른고딕 Bold' },
-  { value: 'NanumMyeongjoBold',    label: '나눔명조 Bold' },
+  // 나눔스퀘어라운드
+  { value: 'NanumSquareRoundEB',       label: '나눔스퀘어라운드 ExtraBold' },
+  { value: 'NanumSquareRoundB',        label: '나눔스퀘어라운드 Bold' },
+  { value: 'NanumSquareRoundR',        label: '나눔스퀘어라운드 Regular' },
+  // 나눔스퀘어
+  { value: 'NanumSquareEB',            label: '나눔스퀘어 ExtraBold' },
+  { value: 'NanumSquareB',             label: '나눔스퀘어 Bold' },
+  // 나눔고딕
+  { value: 'NanumGothicExtraBold',     label: '나눔고딕 ExtraBold' },
+  { value: 'NanumGothicBold',          label: '나눔고딕 Bold' },
+  { value: 'NanumGothic',              label: '나눔고딕' },
+  { value: 'NanumBarunGothicBold',     label: '나눔바른고딕 Bold' },
+  // 나눔명조
+  { value: 'NanumMyeongjoExtraBold',   label: '나눔명조 ExtraBold' },
+  { value: 'NanumMyeongjoBold',        label: '나눔명조 Bold' },
+  // 손글씨
+  { value: 'NanumBrush',               label: '나눔 붓체' },
+  { value: 'NanumPen',                 label: '나눔 펜체' },
+  // 외부 폰트
+  { value: 'BlackHanSans',             label: '검은고딕 (Black Han Sans)' },
+  { value: 'NotoSerifKRBold',          label: 'Noto Serif KR Bold' },
+  { value: 'NotoSansKRBold',           label: 'Noto Sans KR Bold' },
 ]
 
 // Google Cloud TTS 한국어(ko-KR) 음성 — SSML <mark> 타임포인트를 지원하는 타입만 포함
@@ -712,7 +735,15 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
 
   // 캔버스 미리보기가 실제 렌더링과 동일한 폰트로 보이도록 웹폰트를 미리 로드
   useEffect(() => {
-    for (const f of ['NanumSquareRoundEB', 'NanumSquareRoundB', 'NanumSquareB']) {
+    const fonts = [
+      'NanumSquareRoundEB', 'NanumSquareRoundB', 'NanumSquareRoundR',
+      'NanumSquareEB', 'NanumSquareB',
+      'NanumGothicExtraBold', 'NanumGothicBold', 'NanumGothic', 'NanumBarunGothicBold',
+      'NanumMyeongjoExtraBold', 'NanumMyeongjoBold',
+      'NanumBrush', 'NanumPen',
+      'Black Han Sans', 'Noto Serif KR', 'Noto Sans KR',
+    ]
+    for (const f of fonts) {
       document.fonts.load(`900 100px '${f}'`).catch(() => {})
       document.fonts.load(`bold 100px '${f}'`).catch(() => {})
     }
@@ -825,7 +856,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         const yCenter = Math.round((555/2+140+titleY)*SCALE)
         const startY = yCenter - (lines.length*lineH)/2
         ctx.textAlign = 'center'; ctx.textBaseline = 'top'
-        ctx.font = `900 ${sz}px '${titleFont}','Malgun Gothic','Apple SD Gothic Neo',sans-serif`
+        ctx.font = `900 ${sz}px '${toCssFontFamily(titleFont)}','Malgun Gothic','Apple SD Gothic Neo',sans-serif`
         const lineBg = [
           { enabled: title1BgEnabled, color: title1BgColor, opacity: title1BgOpacity },
           { enabled: title2BgEnabled, color: title2BgColor, opacity: title2BgOpacity },
@@ -871,7 +902,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
           }
         }
         ctx.textAlign = 'center'; ctx.textBaseline = 'top'
-        ctx.font = `bold ${sz}px '${subFont}','Malgun Gothic',sans-serif`
+        ctx.font = `bold ${sz}px '${toCssFontFamily(subFont)}','Malgun Gothic',sans-serif`
         lines.forEach((line, i) => {
           const y = sY - (lines.length - 1 - i) * lineH
           if (subBgEnabled) {
@@ -889,7 +920,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         const cY = VID_Y_PX + VID_H_PX + Math.round((bottomH - sz) / 2) + Math.round(channelY * SCALE)
         const cX = CV_W / 2 + Math.round(channelX * SCALE)
         ctx.textAlign = 'center'; ctx.textBaseline = 'top'
-        ctx.font = `bold ${sz}px '${subFont}','Malgun Gothic',sans-serif`
+        ctx.font = `bold ${sz}px '${toCssFontFamily(subFont)}','Malgun Gothic',sans-serif`
         ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2
         ctx.fillStyle = _hexToRgba(channelColor, 0.75)
         ctx.fillText(channel, cX, cY)
@@ -913,7 +944,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         const x = Math.round(channelTopLeftX * SCALE)
         const y = VID_Y_PX + Math.round(channelTopLeftY * SCALE)
         ctx.textAlign = 'left'; ctx.textBaseline = 'top'
-        ctx.font = `bold ${sz}px '${subFont}','Malgun Gothic',sans-serif`
+        ctx.font = `bold ${sz}px '${toCssFontFamily(subFont)}','Malgun Gothic',sans-serif`
         ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2
         ctx.fillStyle = channelTopLeftColor
         ctx.fillText(topLeftText, x, y)

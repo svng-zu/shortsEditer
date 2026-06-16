@@ -71,13 +71,28 @@ class EditorBase:
             raise RuntimeError("FFmpeg가 설치되어 있지 않습니다.")
 
     FONT_MAP = {
-        "NanumSquareRoundEB":   "/usr/share/fonts/truetype/nanum/NanumSquareRoundEB.ttf",
-        "NanumSquareRoundB":    "/usr/share/fonts/truetype/nanum/NanumSquareRoundB.ttf",
-        "NanumSquareB":         "/usr/share/fonts/truetype/nanum/NanumSquareB.ttf",
-        "NanumGothicBold":      "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
-        "NanumGothic":          "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
-        "NanumBarunGothicBold": "/usr/share/fonts/truetype/nanum/NanumBarunGothicBold.ttf",
-        "NanumMyeongjoBold":    "/usr/share/fonts/truetype/nanum/NanumMyeongjoBold.ttf",
+        # 나눔스퀘어라운드 계열
+        "NanumSquareRoundEB":        "/usr/share/fonts/truetype/nanum/NanumSquareRoundEB.ttf",
+        "NanumSquareRoundB":         "/usr/share/fonts/truetype/nanum/NanumSquareRoundB.ttf",
+        "NanumSquareRoundR":         "/usr/share/fonts/truetype/nanum/NanumSquareRoundR.ttf",
+        # 나눔스퀘어 계열
+        "NanumSquareEB":             "/usr/share/fonts/truetype/nanum/NanumSquareEB.ttf",
+        "NanumSquareB":              "/usr/share/fonts/truetype/nanum/NanumSquareB.ttf",
+        # 나눔고딕 계열
+        "NanumGothicExtraBold":      "/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf",
+        "NanumGothicBold":           "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+        "NanumGothic":               "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+        "NanumBarunGothicBold":      "/usr/share/fonts/truetype/nanum/NanumBarunGothicBold.ttf",
+        # 나눔명조 계열
+        "NanumMyeongjoExtraBold":    "/usr/share/fonts/truetype/nanum/NanumMyeongjoExtraBold.ttf",
+        "NanumMyeongjoBold":         "/usr/share/fonts/truetype/nanum/NanumMyeongjoBold.ttf",
+        # 손글씨 계열
+        "NanumBrush":                "/usr/share/fonts/truetype/nanum/NanumBrush.ttf",
+        "NanumPen":                  "/usr/share/fonts/truetype/nanum/NanumPen.ttf",
+        # 다운로드 폰트 (/app/static/fonts/ — Dockerfile에서 설치)
+        "BlackHanSans":              "/app/static/fonts/BlackHanSans-Regular.ttf",
+        "NotoSerifKRBold":           "/app/static/fonts/NotoSerifKR-Bold.otf",
+        "NotoSansKRBold":            "/app/static/fonts/NotoSansKR-Bold.otf",
     }
 
     def _resolve_font(self, font_name: str = None):

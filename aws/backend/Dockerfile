@@ -41,7 +41,16 @@ RUN mkdir -p /app/data/downloads \
     /app/data/raw \
     /app/data/temp \
     /app/static/backgrounds \
-    /app/static/logos
+    /app/static/logos \
+    /app/static/fonts
+
+# Google Fonts 다운로드 (FFmpeg drawtext 렌더링용)
+RUN curl -fL -o /app/static/fonts/BlackHanSans-Regular.ttf \
+      "https://fonts.gstatic.com/s/blackhansans/v17/ea8Aad44WunzF9a-dL6toA8r8nqVIXSkH-Hc.ttf" && \
+    curl -fL -o /app/static/fonts/NotoSerifKR-Bold.otf \
+      "https://fonts.gstatic.com/s/notoserifkr/v15/DtV4JwqzAL5hcRFDhCwEsJrY8E2tYEWxq-EMVCs.otf" && \
+    curl -fL -o /app/static/fonts/NotoSansKR-Bold.otf \
+      "https://fonts.gstatic.com/s/notosanskr/v36/PbyxFmXiEBPT4ITbgNA5Cgm20xz64px_1hVWr0wuPNGmlQNMEfD4.otf"
 
 EXPOSE 8000
 
