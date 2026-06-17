@@ -13,7 +13,8 @@ from sqlalchemy.exc import OperationalError
 from app.config import settings
 from app.db import Base, engine
 from app.models import user  # noqa: F401  (Base.metadata에 테이블 등록)
-from app.routers import auth, pipeline, shorts, render, youtube, admin
+from app.models import plan as _plan_model  # noqa: F401  (Payment 테이블 등록)
+from app.routers import auth, pipeline, shorts, render, youtube, admin, payment
 
 app = FastAPI(
     title="고릴라AI API",
@@ -33,6 +34,13 @@ def _migrate_db():
         ))
         conn.execute(text(
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires_at TIMESTAMP"
+        ))
+        # 요금제 + 결제 관련 컬럼
+        conn.execute(text(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR DEFAULT 'free'"
+        ))
+        conn.execute(text(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMP"
         ))
 
 
@@ -65,6 +73,7 @@ app.include_router(shorts.router, prefix="/api", tags=["Shorts"])
 app.include_router(render.router, prefix="/api", tags=["Render"])
 app.include_router(youtube.router, prefix="/api", tags=["YouTube"])
 app.include_router(admin.router, prefix="/api", tags=["Admin"])
+app.include_router(payment.router, prefix="/api", tags=["Payment"])
 
 # 정적 파일 서빙 (shorts/raw는 세션별 동적 서빙으로 대체)
 app.mount("/static", StaticFiles(directory=str(settings.STATIC_DIR)), name="static")

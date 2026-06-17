@@ -28,8 +28,9 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            echo "== Docker 재빌드 및 재시작 =="
+            echo "== Docker 재빌드 및 재시작 (v2 프론트엔드) =="
             cd aws
+            export FRONTEND_DIR=frontend-v2
             docker compose build
             docker compose up -d
 

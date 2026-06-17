@@ -73,7 +73,7 @@ services:
       start_period: 60s
   frontend:
     build:
-      context: ./frontend
+      context: ./${FRONTEND_DIR:-frontend}
       dockerfile: Dockerfile
     security_opt:
       - apparmor:unconfined

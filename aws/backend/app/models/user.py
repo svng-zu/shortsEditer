@@ -24,6 +24,8 @@ class User(Base):
     provider_id = Column(String, nullable=True)  # 소셜 제공자의 고유 ID (예: google sub)
     session_id = Column(String, nullable=False)  # 연결된 SessionDirs 키
     is_admin = Column(Boolean, nullable=False, default=False, server_default="false")
+    plan = Column(String, nullable=False, default="free", server_default="free")  # "free" | "starter" | "pro" | "business"
+    plan_expires_at = Column(DateTime, nullable=True)  # NULL = 만료 없음 (free 요금제)
     created_at = Column(DateTime, default=datetime.utcnow)
     reset_token = Column(String, nullable=True)
     reset_token_expires_at = Column(DateTime, nullable=True)

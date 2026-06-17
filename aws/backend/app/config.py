@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     FREE_ANON_VIDEO_LIMIT: int = 2
     FREE_MEMBER_VIDEO_LIMIT: int = 5
 
+    # PortOne (아임포트) 결제 연동
+    PORTONE_IMP_KEY: str = ""       # 가맹점 식별코드
+    PORTONE_IMP_SECRET: str = ""    # REST API Secret
+
     # 사용자 로그인용 Google OAuth2 (YouTube 업로드용과는 별도 클라이언트)
     GOOGLE_AUTH_CLIENT_ID: str = ""
     GOOGLE_AUTH_CLIENT_SECRET: str = ""

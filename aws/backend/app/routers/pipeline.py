@@ -33,24 +33,64 @@ from app.services.s3_manager import get_s3
 router = APIRouter()
 
 # ── 사용량 제한(쿼터) ──────────────────────────────────────────────
-# 결제 연동 전까지는 "수집된 영상 개수"로 무료 한도를 안내만 한다.
+
+from datetime import datetime as _dt
+from app.models.plan import PLANS, ANON_LIMIT
+
 
 def _quota_info(session: SessionDirs, user: User | None) -> dict:
     is_admin = bool(user and user.is_admin)
-    limit = None if is_admin else (settings.FREE_MEMBER_VIDEO_LIMIT if user else settings.FREE_ANON_VIDEO_LIMIT)
+
+    if is_admin:
+        return {"used": 0, "limit": None, "plan": "admin", "is_member": True, "is_admin": True}
+
     used = len(list(session.download_dir.glob("*.mp4")))
-    return {"used": used, "limit": limit, "is_member": user is not None, "is_admin": is_admin}
+
+    if not user:
+        return {"used": used, "limit": ANON_LIMIT, "plan": "anonymous", "is_member": False, "is_admin": False}
+
+    plan_name = user.plan or "free"
+
+    # 요금제 만료 체크
+    if user.plan_expires_at and user.plan_expires_at < _dt.utcnow():
+        plan_name = "free"
+
+    plan = PLANS.get(plan_name, PLANS["free"])
+    limit = plan["monthly_shorts"]
+
+    return {
+        "used": used,
+        "limit": limit,
+        "plan": plan_name,
+        "plan_display": plan["name"],
+        "price_krw": plan["price_krw"],
+        "max_video_minutes": plan["max_video_minutes"],
+        "storage_days": plan["storage_days"],
+        "is_member": True,
+        "is_admin": False,
+        "plan_expires_at": user.plan_expires_at.isoformat() if user.plan_expires_at else None,
+    }
 
 
 def check_collect_quota(session: SessionDirs, user: User | None) -> None:
     if user and user.is_admin:
         return
     info = _quota_info(session, user)
-    if info["used"] >= info["limit"]:
+
+    # 비로그인 사용자가 한도에 도달하면 로그인 유도
+    if not user and info["used"] >= info["limit"]:
+        raise HTTPException(403, detail={
+            "code": "login_required",
+            **info,
+            "message": f"체험 한도({info['limit']}개)에 도달했습니다. 로그인하면 더 사용할 수 있습니다.",
+        })
+
+    # 로그인 사용자 한도 체크 (limit이 None이면 무제한)
+    if info["limit"] is not None and info["used"] >= info["limit"]:
         raise HTTPException(403, detail={
             "code": "quota_exceeded",
             **info,
-            "message": f"무료 한도({info['limit']}개)에 도달했습니다.",
+            "message": f"{info.get('plan_display', info['plan'])} 요금제 한도({info['limit']}개)에 도달했습니다. 업그레이드하세요.",
         })
 
 
