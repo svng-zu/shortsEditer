@@ -36,7 +36,7 @@ export interface TitleState {
 
 /* ── Subtitle state ── */
 export interface SubtitleState {
-  enabled: boolean; size: number; color: string; y: number; font: string
+  enabled: boolean; size: number; color: string; x: number; y: number; font: string
   bgEnabled: boolean; bgColor: string; bgOpacity: number
 }
 
@@ -59,11 +59,6 @@ export interface NarrationState {
   enabled: boolean; volume: number; videoVolume: number
   voice: string; speed: number; mode: 'title' | 'script'
   script: string; scriptMode: 'summary' | 'style_convert'
-}
-
-/* ── Color correction ── */
-export interface ColorState {
-  brightness: number; contrast: number; saturation: number; volume: number
 }
 
 /* ── SFX & Hook ── */
@@ -134,7 +129,7 @@ export const NARRATION_VOICE_GROUPS = [
 ]
 
 // Canvas constants (9:16 at 270x480 preview)
-export const CV_W = 270, CV_H = 480
+export const CV_W = 360, CV_H = 640
 export const SCALE = CV_W / 1080
 export const VID_Y_PX = Math.round(555 * SCALE)
 export const VID_H_PX = Math.round(810 * SCALE)
@@ -166,8 +161,6 @@ interface EditorContextValue {
   bg: BgState; setBg: React.Dispatch<React.SetStateAction<BgState>>
   // Narration
   narr: NarrationState; setNarr: React.Dispatch<React.SetStateAction<NarrationState>>
-  // Color
-  color: ColorState; setColor: React.Dispatch<React.SetStateAction<ColorState>>
   // Hook/SFX
   hookSfx: HookSfxState; setHookSfx: React.Dispatch<React.SetStateAction<HookSfxState>>
   // Render
@@ -217,7 +210,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   })
 
   const [subtitle, setSubtitle] = useState<SubtitleState>({
-    enabled: false, size: 52, color: '#FFFFFF', y: 20, font: 'NanumSquareRoundEB',
+    enabled: true, size: 52, color: '#FFFFFF', x: 0, y: 20, font: 'NanumSquareRoundEB',
     bgEnabled: false, bgColor: '#000000', bgOpacity: 0.6,
   })
 
@@ -235,10 +228,6 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     enabled: false, volume: 1.2, videoVolume: 0.3,
     voice: 'ko-KR-Neural2-A', speed: 1.0, mode: 'title',
     script: '', scriptMode: 'summary',
-  })
-
-  const [color, setColor] = useState<ColorState>({
-    brightness: 0, contrast: 1, saturation: 1, volume: 1,
   })
 
   const [hookSfx, setHookSfx] = useState<HookSfxState>({
@@ -291,10 +280,11 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!selectedRaw) return
     const r = selectedRaw
+    const parts = (r.title || r.filename.replace(/_raw\.\w+$/, '')).split(' / ')
     setTitle(prev => ({
       ...prev,
-      title1: r.title || r.filename.replace(/_raw\.\w+$/, ''),
-      title2: '',
+      title1: parts[0] || '',
+      title2: parts[1] || '',
     }))
     // Load subtitle entries
     const stem = r.filename.replace(/_raw\.\w+$/, '')
@@ -318,7 +308,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       title1_bg_enabled: title.title1BgEnabled, title1_bg_color: title.title1BgColor, title1_bg_opacity: title.title1BgOpacity,
       title2_bg_enabled: title.title2BgEnabled, title2_bg_color: title.title2BgColor, title2_bg_opacity: title.title2BgOpacity,
       sub_fontsize: subtitle.size, sub_color: subtitle.color,
-      sub_margin_v: subtitle.y,
+      sub_margin_v: subtitle.y, sub_margin_h: subtitle.x,
       sub_bg_enabled: subtitle.bgEnabled, sub_bg_color: subtitle.bgColor, sub_bg_opacity: subtitle.bgOpacity,
       channel_name: channel.name, channel_color: channel.color,
       channel_x: channel.x, channel_y: channel.y, channel_fontsize: channel.fontsize,
@@ -327,11 +317,9 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       channel_topleft_fontsize: channel.topLeftFontsize,
       channel_topleft_x: channel.topLeftX, channel_topleft_y: channel.topLeftY,
       font_name: subtitle.font,
-      brightness: color.brightness, contrast: color.contrast,
-      saturation: color.saturation, volume: color.volume,
       narration_volume: narr.volume, narration_video_volume: narr.videoVolume,
     }
-  }, [title, subtitle, channel, color, narr])
+  }, [title, subtitle, channel, narr])
 
   const handleRender = useCallback(async () => {
     if (!selectedRaw) return
@@ -410,7 +398,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       activeTab, setActiveTab, raws, shorts,
       selectedRaw, selectedShort, setSelectedRaw, setSelectedShort, refreshLists,
       title, setTitle, subtitle, setSubtitle, channel, setChannel,
-      bg, setBg, narr, setNarr, color, setColor, hookSfx, setHookSfx,
+      bg, setBg, narr, setNarr, hookSfx, setHookSfx,
       render, setRender, textOverlays, setTextOverlays,
       subEntries, setSubEntries, showSrt, setShowSrt,
       canvasRef, hidVidRef, hookVidRef, narrAudioRef,

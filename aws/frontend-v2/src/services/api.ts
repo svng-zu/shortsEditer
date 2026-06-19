@@ -221,6 +221,7 @@ export interface StyleParams {
   sub_fontsize: number
   sub_color: string
   sub_margin_v: number
+  sub_margin_h?: number
   sub_bg_enabled?: boolean
   sub_bg_color?: string
   sub_bg_opacity?: number
@@ -236,10 +237,6 @@ export interface StyleParams {
   channel_topleft_x?: number
   channel_topleft_y?: number
   font_name?: string
-  brightness?: number
-  contrast?: number
-  saturation?: number
-  volume?: number
   narration_volume?: number
   narration_video_volume?: number
 }

@@ -407,14 +407,17 @@ class EditorBase:
             orig_start = rs["orig_start"]
             orig_end = rs["orig_end"]
             raw_start = rs["raw_start"]
+            raw_end = rs["raw_end"]
+            offset = raw_start - orig_start
             for seg in seg_list:
-                if seg["start"] >= orig_start and seg["end"] <= orig_end:
-                    offset = raw_start - orig_start
-                    entries.append((
-                        seg["start"] + offset,
-                        seg["end"] + offset,
-                        seg["text"].strip()
-                    ))
+                if seg["end"] <= orig_start or seg["start"] >= orig_end:
+                    continue
+                clipped_start = max(seg["start"], orig_start)
+                clipped_end = min(seg["end"], orig_end)
+                r_start = max(0.0, round(clipped_start + offset, 3))
+                r_end = min(raw_end, round(clipped_end + offset, 3))
+                if r_end - r_start > 0.1:
+                    entries.append((r_start, r_end, seg["text"].strip()))
         return entries
 
     @staticmethod
@@ -442,6 +445,7 @@ class EditorBase:
         s = style or {}
         fontsize = min(s.get("sub_fontsize", 68), 88)
         margin_v = s.get("sub_margin_v", 110)
+        margin_h = s.get("sub_margin_h", 0)
         font_opt = f":fontfile='{self.font}'" if self.font else ""
         line_h = int(fontsize * 1.35)
         base_y = VIDEO_Y + VIDEO_H - margin_v
@@ -481,7 +485,7 @@ class EditorBase:
                         f":borderw=4:bordercolor=black@0.95"
                         f":shadowx=3:shadowy=3:shadowcolor=black@0.7"
                         f"{box_opt}"
-                        f":x=(w-text_w)/2:y={y}"
+                        f":x=(w-text_w)/2+{margin_h}:y={y}"
                         f":enable='{enable}'"
                     )
                 cursor = frame_end

@@ -1127,11 +1127,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [bgUploadMsg,   setBgUploadMsg]   = useState('')
   const bgFileInputRef = useRef<HTMLInputElement>(null)
   const [templateId, setTemplateId] = useState(1)
-  // 캡컷 스타일 색감/음량 보정 — brightness: -1~1, contrast/saturation/volume: 0~3 (1=원본)
-  const [brightness, setBrightness] = useState(0)
-  const [contrast,   setContrast]   = useState(1)
-  const [saturation, setSaturation] = useState(1)
-  const [volume,     setVolume]     = useState(1)
+  const [subX,      setSubX]        = useState(0)
   const [narration, setNarration]   = useState(false)
   const [narrVolume, setNarrVolume] = useState(1.2)
   const [narrVideoVolume, setNarrVideoVolume] = useState(0.3)
@@ -1366,10 +1362,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
       const srcVid = (isPlayingHook && hookVidRef.current && hookVidRef.current.readyState >= 2)
         ? hookVidRef.current : vid
       if (srcVid.readyState >= 2) {
-        // 캡컷 스타일 색감 보정 미리보기 — 실제 렌더링은 서버에서 ffmpeg eq 필터로 적용된다
-        ctx.filter = `brightness(${1 + brightness}) contrast(${contrast}) saturate(${saturation})`
         ctx.drawImage(srcVid, 0, VID_Y_PX, CV_W, VID_H_PX)
-        ctx.filter = 'none'
       }
       const lines = [{ t: title1, c: t1Color }, { t: title2, c: t2Color }].filter(l => l.t.trim())
       if (lines.length) {
@@ -1431,16 +1424,17 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         if (lines.length > 0) {
           ctx.textAlign = 'center'; ctx.textBaseline = 'top'
           ctx.font = `bold ${sz}px '${toCssFontFamily(subFont)}','Malgun Gothic',sans-serif`
+          const centerX = CV_W/2 + Math.round(subX*SCALE)
           lines.forEach((line, i) => {
             const y = sY - (lines.length - 1 - i) * lineH
             if (subBgEnabled) {
               const tw = ctx.measureText(line).width+8
               ctx.fillStyle = _hexToRgba(subBgColor, subBgOpacity)
-              ctx.fillRect(CV_W/2-tw/2,y-2,tw,sz+4)
+              ctx.fillRect(centerX-tw/2,y-2,tw,sz+4)
             }
             ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 3
-            ctx.lineWidth = 4*SCALE; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.strokeText(line, CV_W/2, y)
-            ctx.fillStyle = subColor; ctx.fillText(line, CV_W/2, y)
+            ctx.lineWidth = 4*SCALE; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.strokeText(line, centerX, y)
+            ctx.fillStyle = subColor; ctx.fillText(line, centerX, y)
             ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
           })
         }
@@ -1515,13 +1509,9 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     }
     rafRef.current = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleFontSizeDelta, titleFont, title1BorderWidth, title2BorderWidth, title1BorderColor, title2BorderColor, title1BgEnabled, title1BgColor, title1BgOpacity, title2BgEnabled, title2BgColor, title2BgOpacity, subtitles, subSize, subColor, subFont, subY, subBgEnabled, subBgColor, subBgOpacity, channelName, channelColor, channelX, channelY, channelFontsize, channelImageUrl, channelTopLeftText, channelTopLeftColor, channelTopLeftFontsize, channelTopLeftX, channelTopLeftY, bgType, bgSolidColor, bgImageName, templateId, brightness, contrast, saturation, narrPreviewSubs, isPlayingHook, subEntries, textOverlays, draggingOvId])
+  }, [raw?.filename, title1, title2, t1Color, t2Color, titleY, titleFontSizeDelta, titleFont, title1BorderWidth, title2BorderWidth, title1BorderColor, title2BorderColor, title1BgEnabled, title1BgColor, title1BgOpacity, title2BgEnabled, title2BgColor, title2BgOpacity, subtitles, subSize, subColor, subFont, subX, subY, subBgEnabled, subBgColor, subBgOpacity, channelName, channelColor, channelX, channelY, channelFontsize, channelImageUrl, channelTopLeftText, channelTopLeftColor, channelTopLeftFontsize, channelTopLeftX, channelTopLeftY, bgType, bgSolidColor, bgImageName, templateId, narrPreviewSubs, isPlayingHook, subEntries, textOverlays, draggingOvId])
 
-  // 음량 조절 — 미리듣기 영상에 즉시 반영 (HTML 비디오는 0~1 범위만 지원하므로 100%까지만 미리듣기 가능, 그 이상은 렌더링 결과로 확인)
-  useEffect(() => {
-    const vid = hidVidRef.current
-    if (vid) vid.volume = Math.max(0, Math.min(1, volume))
-  }, [volume])
+
 
   const getStyle = (): StyleParams => ({
     title1_color: t1Color, title2_color: t2Color, title_y_extra: titleY,
@@ -1531,7 +1521,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     title1_border_color: title1BorderColor, title2_border_color: title2BorderColor,
     title1_bg_enabled: title1BgEnabled, title1_bg_color: title1BgColor, title1_bg_opacity: title1BgOpacity,
     title2_bg_enabled: title2BgEnabled, title2_bg_color: title2BgColor, title2_bg_opacity: title2BgOpacity,
-    sub_fontsize: subSize, sub_color: subColor, sub_margin_v: subY,
+    sub_fontsize: subSize, sub_color: subColor, sub_margin_v: subY, sub_margin_h: subX,
     sub_bg_enabled: subBgEnabled, sub_bg_color: subBgColor, sub_bg_opacity: subBgOpacity,
     channel_name: channelName.trim(), channel_color: channelColor,
     channel_x: channelX, channel_y: channelY, channel_fontsize: channelFontsize,
@@ -1539,7 +1529,6 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     channel_topleft_text: channelTopLeftText.trim(), channel_topleft_color: channelTopLeftColor,
     channel_topleft_fontsize: channelTopLeftFontsize, channel_topleft_x: channelTopLeftX, channel_topleft_y: channelTopLeftY,
     font_name: subFont,
-    brightness, contrast, saturation, volume,
     narration_volume: narrVolume, narration_video_volume: narrVideoVolume,
   })
   const getTitle = () => { const t1=title1.trim(),t2=title2.trim(); return t1&&t2?`${t1}\n${t2}`:(t1||t2||'') }
@@ -1779,6 +1768,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   {subtitles && <SubtitleStyleControls
                     subSize={subSize} setSubSize={setSubSize}
                     subColor={subColor} setSubColor={setSubColor}
+                    subX={subX} setSubX={setSubX}
                     subY={subY} setSubY={setSubY}
                     subFont={subFont} setSubFont={setSubFont}
                     subBgEnabled={subBgEnabled} setSubBgEnabled={setSubBgEnabled}
@@ -1850,14 +1840,6 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   bgOptions={bgOptions} setBgOptions={setBgOptions}
                   bgUploadMsg={bgUploadMsg} setBgUploadMsg={setBgUploadMsg}
                   bgFileInputRef={bgFileInputRef}
-                />
-
-                {/* 색감 & 음량 */}
-                <ColorVolumeControls
-                  brightness={brightness} setBrightness={setBrightness}
-                  contrast={contrast} setContrast={setContrast}
-                  saturation={saturation} setSaturation={setSaturation}
-                  volume={volume} setVolume={setVolume}
                 />
 
                 {/* 나레이션 */}
@@ -2111,6 +2093,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                 {subtitles && <SubtitleStyleControls
                   subSize={subSize} setSubSize={setSubSize}
                   subColor={subColor} setSubColor={setSubColor}
+                  subX={subX} setSubX={setSubX}
                   subY={subY} setSubY={setSubY}
                   subFont={subFont} setSubFont={setSubFont}
                   subBgEnabled={subBgEnabled} setSubBgEnabled={setSubBgEnabled}
@@ -2307,42 +2290,6 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   )
 }
 
-// 캡컷 스타일 색감/음량 보정 컨트롤 — 밝기·대비·채도·음량을 슬라이더로 조절하고
-// 미리보기(canvas filter) + 최종 렌더링(ffmpeg eq/volume 필터) 양쪽에 동일하게 반영된다
-function ColorVolumeControls({
-  brightness, setBrightness, contrast, setContrast, saturation, setSaturation, volume, setVolume,
-}: {
-  brightness: number; setBrightness: (v: number) => void
-  contrast: number; setContrast: (v: number) => void
-  saturation: number; setSaturation: (v: number) => void
-  volume: number; setVolume: (v: number) => void
-}) {
-  const isDefault = brightness === 0 && contrast === 1 && saturation === 1 && volume === 1
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div className="section-label" style={{ margin: 0 }}>색감 & 음량 보정</div>
-        {!isDefault && (
-          <button onClick={() => { setBrightness(0); setContrast(1); setSaturation(1); setVolume(1) }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
-            ↺ 초기화
-          </button>
-        )}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
-        <Slider label="밝기" value={brightness} display={brightness >= 0 ? `+${brightness.toFixed(2)}` : brightness.toFixed(2)}
-          min={-1} max={1} step={0.05} onChange={setBrightness} />
-        <Slider label="대비" value={contrast} display={`${Math.round(contrast * 100)}%`}
-          min={0} max={2} step={0.05} onChange={setContrast} />
-        <Slider label="채도" value={saturation} display={`${Math.round(saturation * 100)}%`}
-          min={0} max={2} step={0.05} onChange={setSaturation} />
-        <Slider label="음량" value={volume} display={`${Math.round(volume * 100)}%`}
-          min={0} max={2} step={0.05} onChange={setVolume} />
-      </div>
-    </div>
-  )
-}
-
 function TitleLineBgControls({
   label, bgEnabled, setBgEnabled, bgColor, setBgColor, bgOpacity, setBgOpacity,
 }: {
@@ -2428,11 +2375,12 @@ function TitleStyleControls({
 }
 
 function SubtitleStyleControls({
-  subSize, setSubSize, subColor, setSubColor, subY, setSubY, subFont, setSubFont,
+  subSize, setSubSize, subColor, setSubColor, subX, setSubX, subY, setSubY, subFont, setSubFont,
   subBgEnabled, setSubBgEnabled, subBgColor, setSubBgColor, subBgOpacity, setSubBgOpacity,
 }: {
   subSize: number; setSubSize: (v: number) => void
   subColor: string; setSubColor: (v: string) => void
+  subX: number; setSubX: (v: number) => void
   subY: number; setSubY: (v: number) => void
   subFont: string; setSubFont: (v: string) => void
   subBgEnabled: boolean; setSubBgEnabled: (v: boolean) => void
@@ -2449,9 +2397,7 @@ function SubtitleStyleControls({
         </div>
         <Slider label="Y 위치" value={subY} display={`${subY}px`} min={-500} max={1200} step={10} onChange={setSubY} />
       </div>
-      <p style={{ fontSize: 12, color: 'var(--text2)', margin: '-4px 0 0' }}>
-        음수: 영상 아래쪽 바깥 여백 / 큰 값: 영상 위쪽 바깥 여백으로 이동
-      </p>
+      <Slider label="X 위치" value={subX} display={`${subX}px`} min={-300} max={300} step={5} onChange={setSubX} />
       <div>
         <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 4 }}>글꼴</div>
         <select value={subFont} onChange={e => setSubFont(e.target.value)} className="input-field" style={{ fontSize: 14, padding: '7px 8px', width: '100%' }}>

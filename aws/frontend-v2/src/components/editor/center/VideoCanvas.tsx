@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useEditor, CV_W, CV_H, SCALE, VID_Y_PX, VID_H_PX, TMPL_COLORS } from '../../../contexts/EditorContext'
+import { useT } from '../../../i18n'
 
 const FONT_CSS_NAME: Record<string, string> = {
   BlackHanSans: 'Black Han Sans',
@@ -66,14 +67,15 @@ export default function VideoCanvas() {
   const {
     selectedRaw, canvasRef, hidVidRef, hookVidRef, narrAudioRef,
     isPlaying, togglePlay, setVideoDuration,
-    title, subtitle, channel, bg, color, textOverlays, subEntries,
+    title, subtitle, channel, bg, textOverlays, subEntries,
   } = useEditor()
+  const t = useT()
 
   const rafRef = useRef<number>(0)
 
   // Use refs so the RAF loop always reads fresh state without re-creating the function
-  const stateRef = useRef({ selectedRaw, title, subtitle, channel, bg, color, textOverlays, subEntries })
-  stateRef.current = { selectedRaw, title, subtitle, channel, bg, color, textOverlays, subEntries }
+  const stateRef = useRef({ selectedRaw, title, subtitle, channel, bg, textOverlays, subEntries })
+  stateRef.current = { selectedRaw, title, subtitle, channel, bg, textOverlays, subEntries }
 
   // Stable draw loop — never recreated
   useEffect(() => {
@@ -89,7 +91,7 @@ export default function VideoCanvas() {
   }, [])
 
   function drawFrame() {
-    const { selectedRaw: raw, title, subtitle, bg, color, textOverlays, subEntries } = stateRef.current
+    const { selectedRaw: raw, title, subtitle, bg, textOverlays, subEntries } = stateRef.current
     const canvas = canvasRef.current
     const vid = hidVidRef.current
     if (!canvas || !vid) return
@@ -194,15 +196,16 @@ export default function VideoCanvas() {
         ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
         const lines = wrapSubtitle(entry.text)
         const baseY = CV_H - Math.round(subtitle.y * SCALE)
+        const centerX = CV_W / 2 + Math.round((subtitle.x ?? 0) * SCALE)
         lines.forEach((line, i) => {
           const ly = baseY - (lines.length - 1 - i) * (subFsz + 4)
           if (subtitle.bgEnabled) {
             const tw = ctx.measureText(line).width + 12
             ctx.fillStyle = hexToRgba(subtitle.bgColor, subtitle.bgOpacity)
-            ctx.fillRect(CV_W / 2 - tw / 2, ly - subFsz - 2, tw, subFsz + 8)
+            ctx.fillRect(centerX - tw / 2, ly - subFsz - 2, tw, subFsz + 8)
           }
           ctx.fillStyle = subtitle.color
-          ctx.fillText(line, CV_W / 2, ly)
+          ctx.fillText(line, centerX, ly)
         })
       }
     }
@@ -259,7 +262,7 @@ export default function VideoCanvas() {
           <canvas
             ref={canvasRef as React.RefObject<HTMLCanvasElement>}
             width={CV_W} height={CV_H}
-            className="md:rounded-[1.5rem] md:border-4 md:border-outline-variant/40 shadow-2xl cursor-pointer max-h-[60vh] md:max-h-[65vh] w-auto"
+            className="md:rounded-[1.5rem] md:border-4 md:border-outline-variant/40 shadow-2xl cursor-pointer max-h-[75vh] md:max-h-[80vh] w-auto"
             style={{ aspectRatio: '9/16' }}
             onClick={togglePlay}
           />
@@ -282,7 +285,7 @@ export default function VideoCanvas() {
             <div className="absolute inset-0 flex items-center justify-center rounded-[1.5rem] bg-surface-container-lowest/80">
               <div className="text-center text-on-surface-variant">
                 <span className="material-symbols-outlined text-5xl mb-2 block opacity-30">movie</span>
-                <p className="text-label-md">Select a raw video to edit</p>
+                <p className="text-label-md">{t.selectVideoToEdit}</p>
               </div>
             </div>
           )}
@@ -294,7 +297,6 @@ export default function VideoCanvas() {
         ref={hidVidRef as React.RefObject<HTMLVideoElement>}
         src={videoUrl}
         className="hidden"
-        muted
         autoPlay
         playsInline
         loop

@@ -83,7 +83,7 @@ async def list_shorts(session: SessionDirs = Depends(get_session)):
         shorts.append(ShortInfo(
             filename=filename,
             url=f"/api/media/shorts/{session.session_id}/{quote(filename)}",
-            title=meta.get("intro_text", stem).replace("\n", " "),
+            title=meta.get("intro_text", stem).replace("\\n", "\n").replace("\n", " "),
             category=meta.get("category", ""),
             candidates=meta.get("candidates", []),
             channel_name=ch.get("name", ""),
@@ -126,7 +126,7 @@ async def list_raws(session: SessionDirs = Depends(get_session)):
         raws.append(RawInfo(
             filename=mp4.name,
             url=f"/api/media/raw/{session.session_id}/{quote(mp4.name)}",
-            title=meta.get("intro_text", stem).replace("\n", " / "),
+            title=meta.get("intro_text", stem).replace("\\n", "\n").replace("\n", " / "),
             category=meta.get("category", ""),
             duration=_get_video_duration(mp4),
             channel_name=ch.get("name", ""),
