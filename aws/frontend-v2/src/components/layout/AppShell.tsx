@@ -7,9 +7,8 @@ import AuthModal from '../auth/AuthModal'
 import LandingPage from '../landing/LandingPage'
 import AdminPage from '../admin/AdminPage'
 import DashboardPage from '../dashboard/DashboardPage'
-import ChannelsPage from '../channels/ChannelsPage'
+import ContentManagementPage from '../channels/ContentManagementPage'
 import EditorPage from '../editor/EditorPage'
-import MediaLibraryPage from '../media/MediaLibraryPage'
 import ProfilePage from '../profile/ProfilePage'
 import PricingPage from '../pricing/PricingPage'
 
@@ -22,10 +21,6 @@ function PlaceholderPage({ title }: { title: string }) {
       <p className="text-on-surface-variant mt-2">Coming soon...</p>
     </div>
   )
-}
-
-function MediaPage() {
-  return <MediaLibraryPage />
 }
 
 function PipelinePage() {
@@ -75,8 +70,7 @@ export default function AppShell() {
           <Routes>
             <Route path="/" element={<DefaultRedirect />} />
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/channels" element={<ChannelsPage />} />
-            <Route path="/media" element={<MediaPage />} />
+            <Route path="/channels" element={<ContentManagementPage />} />
             <Route path="/editor" element={<EditorPage />} />
             <Route path="/editor/:filename" element={<EditorPage />} />
             <Route path="/pipeline" element={<PipelinePage />} />

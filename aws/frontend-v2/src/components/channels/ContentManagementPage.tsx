@@ -848,11 +848,13 @@ export default function ContentManagementPage() {
   }
 
   const handleDownloadSelected = () => {
-    const items = shorts.filter(s => selected.has(s.filename))
-    items.forEach((s, i) => {
+    const list = activeTab === 'shorts' ? shorts.filter(s => selected.has(s.filename))
+      : activeTab === 'raws' ? raws.filter(r => selected.has(r.filename))
+      : []
+    list.forEach((item, i) => {
       setTimeout(() => {
         const a = document.createElement('a')
-        a.href = `${s.url}/download`; a.download = s.filename
+        a.href = item.url; a.download = item.filename; a.target = '_blank'
         document.body.appendChild(a); a.click(); document.body.removeChild(a)
       }, i * 400)
     })
@@ -942,7 +944,7 @@ export default function ContentManagementPage() {
                     <Icon name="auto_awesome" size={14} className="mr-1 inline" />{t.process}
                   </button>
                 )}
-                {activeTab === 'shorts' && (
+                {(activeTab === 'shorts' || activeTab === 'raws') && (
                   <button onClick={handleDownloadSelected}
                     className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-label-sm font-bold hover:bg-primary/20 transition-colors">
                     <Icon name="download" size={14} className="mr-1 inline" />{t.download}

@@ -10,12 +10,10 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
-  { label: 'YouTube Channels', icon: 'subscriptions', route: '/channels' },
-  { label: 'Media Library', icon: 'video_library', route: '/media', placeholder: true },
-  { label: 'Shorts Gallery', icon: 'movie', route: '/editor' },
-  { label: 'Pipeline Status', icon: 'analytics', route: '/pipeline', placeholder: true },
-  { label: 'Admin Console', icon: 'settings_applications', route: '/admin' },
+  { label: '대시보드', icon: 'dashboard', route: '/dashboard' },
+  { label: '채널 / 미디어', icon: 'subscriptions', route: '/channels' },
+  { label: '쇼츠 편집', icon: 'movie', route: '/editor' },
+  { label: '관리자 콘솔', icon: 'settings_applications', route: '/admin' },
 ]
 
 export default function Sidebar() {
@@ -79,14 +77,14 @@ export default function Sidebar() {
       <div className="border-t border-outline-variant/20 pt-6 px-4 flex flex-col gap-4">
         {/* Run All Button */}
         <button className="bg-primary text-on-primary w-full py-3 rounded-xl font-bold text-label-md hover:brightness-110 active:scale-[0.98] transition-all">
-          Run All
+          전체 실행
         </button>
 
         {/* Quota Display */}
         <div className="flex items-center gap-2 px-1">
           <Icon name="data_usage" size={18} className="text-on-surface-variant" />
           <span className="text-label-sm text-on-surface-variant">
-            Quota: 0/10
+            사용량: 0/10
           </span>
         </div>
 

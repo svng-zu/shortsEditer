@@ -8,13 +8,13 @@ interface MobileNavItem {
 }
 
 const LEFT_NAV_ITEMS: MobileNavItem[] = [
-  { label: 'Home', icon: 'dashboard', route: '/dashboard' },
-  { label: 'Shorts', icon: 'movie', route: '/editor' },
+  { label: '홈', icon: 'dashboard', route: '/dashboard' },
+  { label: '편집', icon: 'movie', route: '/editor' },
 ]
 
 const RIGHT_NAV_ITEMS: MobileNavItem[] = [
-  { label: 'Pipeline', icon: 'analytics', route: '/pipeline' },
-  { label: 'Profile', icon: 'person', route: '/profile' },
+  { label: '채널', icon: 'subscriptions', route: '/channels' },
+  { label: '프로필', icon: 'person', route: '/profile' },
 ]
 
 export default function MobileBottomNav() {
