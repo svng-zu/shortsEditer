@@ -2,7 +2,7 @@ import { useEditor, SUB_FONT_OPTIONS } from '../../../contexts/EditorContext'
 import { useT } from '../../../i18n'
 
 export default function StyleControls() {
-  const { title, setTitle, subtitle, setSubtitle, bg, setBg, selectedRaw } = useEditor()
+  const { title, setTitle, subtitle, setSubtitle, channel, setChannel, bg, setBg, selectedRaw } = useEditor()
   const t = useT()
 
   if (!selectedRaw) return null
@@ -161,6 +161,90 @@ export default function StyleControls() {
             <option value="">{t.selectBg}</option>
             {bg.options.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
+        )}
+      </div>
+
+      {/* Source Channel (bottom) */}
+      <div className="pt-2 border-t border-outline-variant/20 space-y-3">
+        <label className="text-label-sm text-on-surface-variant">{t.sourceChannel}</label>
+        <input
+          className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg p-2 text-label-md"
+          value={channel.name} placeholder="예: 채널명 / 출처: ○○뉴스"
+          onChange={e => setChannel(prev => ({ ...prev, name: e.target.value }))} />
+        {channel.name.trim() && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-label-sm text-on-surface-variant mb-1 block">X 위치</label>
+              <input type="range" min={-400} max={400} step={10}
+                className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
+                value={channel.x} onChange={e => setChannel(prev => ({ ...prev, x: Number(e.target.value) }))} />
+              <span className="text-code-sm font-mono text-primary">{channel.x}px</span>
+            </div>
+            <div>
+              <label className="text-label-sm text-on-surface-variant mb-1 block">Y 위치</label>
+              <input type="range" min={-200} max={200} step={5}
+                className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
+                value={channel.y} onChange={e => setChannel(prev => ({ ...prev, y: Number(e.target.value) }))} />
+              <span className="text-code-sm font-mono text-primary">{channel.y}px</span>
+            </div>
+            <div>
+              <label className="text-label-sm text-on-surface-variant mb-1 block">{t.size}</label>
+              <input type="range" min={18} max={80} step={2}
+                className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
+                value={channel.fontsize} onChange={e => setChannel(prev => ({ ...prev, fontsize: Number(e.target.value) }))} />
+              <span className="text-code-sm font-mono text-primary">{channel.fontsize}px</span>
+            </div>
+            <div>
+              <label className="text-label-sm text-on-surface-variant mb-1 block">{t.color}</label>
+              <div className="flex items-center gap-2 bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
+                <input type="color" className="w-6 h-6 rounded-full border-none bg-transparent cursor-pointer"
+                  value={channel.color} onChange={e => setChannel(prev => ({ ...prev, color: e.target.value }))} />
+                <span className="text-code-sm font-mono opacity-60">{channel.color}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* My Channel (top-left) */}
+      <div className="pt-2 border-t border-outline-variant/20 space-y-3">
+        <label className="text-label-sm text-on-surface-variant">{t.myChannel}</label>
+        <input
+          className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg p-2 text-label-md"
+          value={channel.topLeftText} placeholder="예: @내채널명"
+          onChange={e => setChannel(prev => ({ ...prev, topLeftText: e.target.value }))} />
+        {channel.topLeftText.trim() && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-label-sm text-on-surface-variant mb-1 block">X 위치</label>
+              <input type="range" min={0} max={500} step={10}
+                className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
+                value={channel.topLeftX} onChange={e => setChannel(prev => ({ ...prev, topLeftX: Number(e.target.value) }))} />
+              <span className="text-code-sm font-mono text-primary">{channel.topLeftX}px</span>
+            </div>
+            <div>
+              <label className="text-label-sm text-on-surface-variant mb-1 block">Y 위치</label>
+              <input type="range" min={0} max={300} step={5}
+                className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
+                value={channel.topLeftY} onChange={e => setChannel(prev => ({ ...prev, topLeftY: Number(e.target.value) }))} />
+              <span className="text-code-sm font-mono text-primary">{channel.topLeftY}px</span>
+            </div>
+            <div>
+              <label className="text-label-sm text-on-surface-variant mb-1 block">{t.size}</label>
+              <input type="range" min={16} max={72} step={2}
+                className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
+                value={channel.topLeftFontsize} onChange={e => setChannel(prev => ({ ...prev, topLeftFontsize: Number(e.target.value) }))} />
+              <span className="text-code-sm font-mono text-primary">{channel.topLeftFontsize}px</span>
+            </div>
+            <div>
+              <label className="text-label-sm text-on-surface-variant mb-1 block">{t.color}</label>
+              <div className="flex items-center gap-2 bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
+                <input type="color" className="w-6 h-6 rounded-full border-none bg-transparent cursor-pointer"
+                  value={channel.topLeftColor} onChange={e => setChannel(prev => ({ ...prev, topLeftColor: e.target.value }))} />
+                <span className="text-code-sm font-mono opacity-60">{channel.topLeftColor}</span>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 

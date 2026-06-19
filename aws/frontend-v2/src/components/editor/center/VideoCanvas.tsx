@@ -72,6 +72,14 @@ export default function VideoCanvas() {
   const t = useT()
 
   const rafRef = useRef<number>(0)
+  const avatarImgRef = useRef<HTMLImageElement | null>(null)
+
+  useEffect(() => {
+    if (!channel.imageUrl) { avatarImgRef.current = null; return }
+    const img = new Image(); img.crossOrigin = 'anonymous'
+    img.onload = () => { avatarImgRef.current = img }
+    img.src = channel.imageUrl
+  }, [channel.imageUrl])
 
   // Use refs so the RAF loop always reads fresh state without re-creating the function
   const stateRef = useRef({ selectedRaw, title, subtitle, channel, bg, textOverlays, subEntries })
@@ -91,7 +99,7 @@ export default function VideoCanvas() {
   }, [])
 
   function drawFrame() {
-    const { selectedRaw: raw, title, subtitle, bg, textOverlays, subEntries } = stateRef.current
+    const { selectedRaw: raw, title, subtitle, channel, bg, textOverlays, subEntries } = stateRef.current
     const canvas = canvasRef.current
     const vid = hidVidRef.current
     if (!canvas || !vid) return
@@ -132,57 +140,47 @@ export default function VideoCanvas() {
       }
     }
 
-    // Title 1 — auto wrap into multiple lines
-    const titleFsz = Math.round((72 + title.titleFontSizeDelta) * SCALE)
-    const fontFam = toCssFontFamily(title.titleFont)
-    const lineGap = Math.round(titleFsz * 1.25)
-    const maxTitleW = CV_W - 16
-
-    if (title.title1) {
-      const baseY = Math.round((160 + title.titleY) * SCALE)
-      ctx.font = `900 ${titleFsz}px '${fontFam}'`
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      const t1Lines = wrapText(ctx, title.title1, maxTitleW)
-      const t1TotalH = t1Lines.length * lineGap
-      t1Lines.forEach((line, i) => {
-        const ly = baseY - t1TotalH / 2 + lineGap / 2 + i * lineGap
-        if (title.title1BgEnabled) {
-          const tw = ctx.measureText(line).width + 16
-          ctx.fillStyle = hexToRgba(title.title1BgColor, title.title1BgOpacity)
-          ctx.fillRect(CV_W / 2 - tw / 2, ly - titleFsz / 2 - 4, tw, titleFsz + 8)
+    // Title — match backend _build_drawtext layout (y_center = TOP_H/2 + 140)
+    const lines = [
+      { t: title.title1.trim(), c: title.t1Color },
+      { t: title.title2.trim(), c: title.t2Color },
+    ].filter(l => l.t)
+    if (lines.length) {
+      const maxLen = Math.max(...lines.map(l => l.t.length))
+      let baseFsz = maxLen <= 7 ? 115 : maxLen <= 10 ? 101 : maxLen <= 13 ? 86 : maxLen <= 16 ? 72 : 62
+      const sz = Math.max(8, Math.round((baseFsz + title.titleFontSizeDelta) * SCALE))
+      const lineH = sz + Math.round(20 * SCALE)
+      const yCenter = Math.round((555 / 2 + 140 + title.titleY) * SCALE)
+      const startY = yCenter - (lines.length * lineH) / 2
+      const fontFam = toCssFontFamily(title.titleFont)
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top'
+      ctx.font = `900 ${sz}px '${fontFam}','Malgun Gothic',sans-serif`
+      const lineBg = [
+        { enabled: title.title1BgEnabled, color: title.title1BgColor, opacity: title.title1BgOpacity },
+        { enabled: title.title2BgEnabled, color: title.title2BgColor, opacity: title.title2BgOpacity },
+      ]
+      lines.forEach((line, i) => {
+        const bg = lineBg[i]
+        if (bg?.enabled) {
+          const tw = ctx.measureText(line.t).width + 8
+          ctx.fillStyle = hexToRgba(bg.color, bg.opacity)
+          ctx.fillRect(CV_W / 2 - tw / 2, startY + i * lineH - 2, tw, sz + 4)
         }
-        if (title.title1BorderWidth > 0) {
-          ctx.strokeStyle = title.title1BorderColor
-          ctx.lineWidth = title.title1BorderWidth * SCALE
-          ctx.strokeText(line, CV_W / 2, ly)
-        }
-        ctx.fillStyle = title.t1Color
-        ctx.fillText(line, CV_W / 2, ly)
       })
-    }
-
-    // Title 2 — same font size as Title 1, auto wrap
-    if (title.title2) {
-      const baseY2 = Math.round((260 + title.titleY) * SCALE)
-      ctx.font = `900 ${titleFsz}px '${fontFam}'`
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      const t2Lines = wrapText(ctx, title.title2, maxTitleW)
-      const t2TotalH = t2Lines.length * lineGap
-      t2Lines.forEach((line, i) => {
-        const ly = baseY2 - t2TotalH / 2 + lineGap / 2 + i * lineGap
-        if (title.title2BgEnabled) {
-          const tw = ctx.measureText(line).width + 12
-          ctx.fillStyle = hexToRgba(title.title2BgColor, title.title2BgOpacity)
-          ctx.fillRect(CV_W / 2 - tw / 2, ly - titleFsz / 2 - 3, tw, titleFsz + 6)
+      const lineBorderWidths = [title.title1BorderWidth, title.title2BorderWidth]
+      const lineBorderColors = [title.title1BorderColor, title.title2BorderColor]
+      lines.forEach((line, i) => {
+        ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 3
+        const bw = lineBorderWidths[i] ?? 3
+        if (bw > 0) {
+          ctx.lineWidth = bw * 2 * SCALE
+          ctx.lineJoin = 'round'
+          ctx.strokeStyle = hexToRgba(lineBorderColors[i] ?? '#000000', 0.85)
+          ctx.strokeText(line.t, CV_W / 2, startY + i * lineH)
         }
-        if (title.title2BorderWidth > 0) {
-          ctx.strokeStyle = title.title2BorderColor
-          ctx.lineWidth = title.title2BorderWidth * SCALE
-          ctx.strokeText(line, CV_W / 2, ly)
-        }
-        ctx.fillStyle = title.t2Color
-        ctx.fillText(line, CV_W / 2, ly)
+        ctx.fillStyle = line.c; ctx.fillText(line.t, CV_W / 2, startY + i * lineH)
       })
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
     }
 
     // Subtitles
@@ -195,10 +193,11 @@ export default function VideoCanvas() {
         ctx.font = `700 ${subFsz}px '${fontFam}'`
         ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
         const lines = wrapSubtitle(entry.text)
-        const baseY = CV_H - Math.round(subtitle.y * SCALE)
+        const baseY = VID_Y_PX + VID_H_PX - Math.round(subtitle.y * SCALE) - subFsz - 4
         const centerX = CV_W / 2 + Math.round((subtitle.x ?? 0) * SCALE)
         lines.forEach((line, i) => {
-          const ly = baseY - (lines.length - 1 - i) * (subFsz + 4)
+          const lineH = Math.round(subFsz * 1.35)
+          const ly = baseY - (lines.length - 1 - i) * lineH
           if (subtitle.bgEnabled) {
             const tw = ctx.measureText(line).width + 12
             ctx.fillStyle = hexToRgba(subtitle.bgColor, subtitle.bgOpacity)
@@ -233,6 +232,45 @@ export default function VideoCanvas() {
         ctx.fillStyle = ov.font_color
         ctx.fillText(ov.text, x, y)
       }
+    }
+
+    // Channel name (bottom)
+    const chName = channel.name.trim()
+    if (chName) {
+      const sz = Math.round(channel.fontsize * SCALE)
+      const bottomH = CV_H - (VID_Y_PX + VID_H_PX)
+      const cY = VID_Y_PX + VID_H_PX + Math.round((bottomH - sz) / 2) + Math.round(channel.y * SCALE)
+      const cX = CV_W / 2 + Math.round(channel.x * SCALE)
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top'
+      ctx.font = `bold ${sz}px '${toCssFontFamily(subtitle.font)}','Malgun Gothic',sans-serif`
+      ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2
+      ctx.fillStyle = hexToRgba(channel.color, 0.75)
+      ctx.fillText(chName, cX, cY)
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
+      if (avatarImgRef.current) {
+        const avSize = sz * 2
+        const tw = ctx.measureText(chName).width
+        const avX = cX - tw / 2 - avSize - Math.round(6 * SCALE)
+        const avY = cY + (sz - avSize) / 2
+        ctx.save()
+        ctx.beginPath(); ctx.arc(avX + avSize / 2, avY + avSize / 2, avSize / 2, 0, Math.PI * 2); ctx.clip()
+        ctx.drawImage(avatarImgRef.current, avX, avY, avSize, avSize)
+        ctx.restore()
+      }
+    }
+
+    // Channel name (top-left)
+    const topLeftText = channel.topLeftText.trim()
+    if (topLeftText) {
+      const sz = Math.round(channel.topLeftFontsize * SCALE)
+      const x = Math.round(channel.topLeftX * SCALE)
+      const y = VID_Y_PX + Math.round(channel.topLeftY * SCALE)
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top'
+      ctx.font = `bold ${sz}px '${toCssFontFamily(subtitle.font)}','Malgun Gothic',sans-serif`
+      ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2
+      ctx.fillStyle = channel.topLeftColor
+      ctx.fillText(topLeftText, x, y)
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
     }
 
   }

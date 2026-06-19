@@ -14,9 +14,13 @@ const CAT_COLORS: Record<string, string> = {
   politics: 'bg-error/10 text-error border-error/20',
 }
 
+const CB = "w-4 h-4 rounded cursor-pointer flex-shrink-0"
+const CB_STYLE = { accentColor: '#adc6ff' }
+
 export default function MediaList() {
   const { activeTab, setActiveTab, raws, shorts, setSelectedRaw, setSelectedShort, refreshLists } = useEditor()
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkMsg, setBulkMsg] = useState('')
 
   const items = activeTab === 'raws' ? raws : shorts
   const toggleItem = (fn: string) => setSelected(prev => {
@@ -29,10 +33,32 @@ export default function MediaList() {
   const handleDelete = async () => {
     if (selected.size === 0) return
     if (!confirm(`${selected.size}개 항목을 삭제하시겠습니까?`)) return
+    setBulkMsg('삭제 중...')
     const fn = activeTab === 'raws' ? api.deleteRaw : api.deleteShort
-    await Promise.all([...selected].map(f => fn(f)))
+    await Promise.all([...selected].map(f => fn(f).catch(() => {})))
     setSelected(new Set())
+    setBulkMsg('')
     refreshLists()
+  }
+
+  const handleDownload = async () => {
+    if (selected.size === 0) return
+    setBulkMsg(`${selected.size}개 다운로드 중...`)
+    for (const filename of selected) {
+      const item = items.find(i => i.filename === filename)
+      if (!item) continue
+      try {
+        const a = document.createElement('a')
+        a.href = item.url
+        a.download = filename
+        a.target = '_blank'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        await new Promise(r => setTimeout(r, 300))
+      } catch {}
+    }
+    setBulkMsg('')
   }
 
   const handleSelect = (item: typeof items[0]) => {
@@ -62,15 +88,21 @@ export default function MediaList() {
           <input type="checkbox"
             checked={selected.size === items.length && items.length > 0}
             onChange={toggleAll}
-            className="w-4 h-4 rounded accent-primary cursor-pointer" />
+            className={CB} style={CB_STYLE} />
           <span className="text-label-sm text-on-surface-variant flex-1">
-            {selected.size > 0 ? `${selected.size}개 선택` : '전체 선택'}
+            {bulkMsg || (selected.size > 0 ? `${selected.size}개 선택` : '전체 선택')}
           </span>
           {selected.size > 0 && (
-            <button onClick={handleDelete}
-              className="text-label-sm px-3 py-1 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors">
-              삭제
-            </button>
+            <div className="flex gap-1">
+              <button onClick={handleDownload}
+                className="text-label-sm px-3 py-1 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                다운로드
+              </button>
+              <button onClick={handleDelete}
+                className="text-label-sm px-3 py-1 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors">
+                삭제
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -87,13 +119,15 @@ export default function MediaList() {
         ) : (
           items.map(item => (
             <div key={item.filename}
-              className="flex items-center gap-3 px-4 py-3 border-b border-outline-variant/10 hover:bg-surface-bright/5 cursor-pointer transition-colors"
+              className={`flex items-center gap-3 px-4 py-3 border-b border-outline-variant/10 hover:bg-surface-bright/5 cursor-pointer transition-colors ${
+                selected.has(item.filename) ? 'bg-primary/5' : ''
+              }`}
               onClick={() => handleSelect(item)}>
               <input type="checkbox"
                 checked={selected.has(item.filename)}
                 onClick={e => e.stopPropagation()}
                 onChange={() => toggleItem(item.filename)}
-                className="w-4 h-4 rounded accent-primary cursor-pointer flex-shrink-0" />
+                className={CB} style={CB_STYLE} />
 
               <div className="w-10 h-10 rounded-lg bg-surface-container-highest overflow-hidden flex-shrink-0 flex items-center justify-center">
                 <video src={`${item.url}#t=1`} className="w-full h-full object-cover" muted />

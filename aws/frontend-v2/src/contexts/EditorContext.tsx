@@ -286,6 +286,11 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       title1: parts[0] || '',
       title2: parts[1] || '',
     }))
+    setChannel(prev => ({
+      ...prev,
+      name: r.channel_name || '',
+      imageUrl: r.channel_thumbnail_url || '',
+    }))
     // Load subtitle entries
     const stem = r.filename.replace(/_raw\.\w+$/, '')
     api.getSubtitleEntries(stem).then(res => setSubEntries(res.entries.map((e, i) => ({ ...e, index: i })))).catch(() => setSubEntries([]))
