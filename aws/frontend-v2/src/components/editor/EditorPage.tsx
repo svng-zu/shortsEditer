@@ -203,18 +203,20 @@ function MobileEditorLayout() {
 /* ── Desktop Editor Layout ────────────────────────────────── */
 
 function StatsBar() {
-  const { raws, shorts, downloadsCount } = useEditor()
+  const { raws, shorts, downloadsCount, channelsCount } = useEditor()
   const items = [
-    { label: '수집 영상', count: downloadsCount, color: 'text-blue-600' },
-    { label: '편집본', count: raws.length, color: 'text-green-600' },
-    { label: '쇼츠', count: shorts.length, color: 'text-red-500' },
+    { icon: 'subscriptions', label: '채널 관리', count: channelsCount },
+    { icon: 'download', label: '수집 영상', count: downloadsCount },
+    { icon: 'movie_edit', label: '편집본', count: raws.length },
+    { icon: 'auto_awesome', label: '쇼츠', count: shorts.length },
   ]
   return (
-    <div className="flex border-b border-outline-variant/20 shrink-0 bg-surface-container-lowest">
+    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-outline-variant/20 shrink-0 bg-surface-container-lowest overflow-x-auto">
       {items.map((item, i) => (
-        <div key={i} className={`flex-1 flex flex-col items-center py-2.5 ${i < 2 ? 'border-r border-outline-variant/20' : ''}`}>
-          <span className={`text-xl font-extrabold leading-tight ${item.color}`}>{item.count}</span>
-          <span className="text-[11px] text-on-surface-variant font-medium">{item.label}</span>
+        <div key={i} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-on-surface-variant border border-transparent bg-surface-bright/5">
+          <Icon name={item.icon} size={20} />
+          <span className="text-label-md font-semibold whitespace-nowrap">{item.label}</span>
+          <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-surface-variant text-on-surface-variant">{item.count}</span>
         </div>
       ))}
     </div>

@@ -583,9 +583,9 @@ class EditorBase:
         return True
 
     def _resolve_bg_path(self, category: str, bg_image: str = None) -> str | None:
-        if bg_image == "":
+        if not bg_image:
             return None
-        stem = bg_image if bg_image else category
+        stem = bg_image
         bg_dir = settings.STATIC_DIR / "backgrounds"
         for ext in (".png", ".jpg", ".jpeg", ".webp"):
             p = bg_dir / f"{stem}{ext}"

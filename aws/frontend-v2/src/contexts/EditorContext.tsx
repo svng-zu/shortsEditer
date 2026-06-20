@@ -145,7 +145,7 @@ interface EditorContextValue {
   // Selection
   activeTab: 'raws' | 'shorts'
   setActiveTab: (t: 'raws' | 'shorts') => void
-  raws: RawInfo[]; shorts: ShortInfo[]; downloadsCount: number
+  raws: RawInfo[]; shorts: ShortInfo[]; downloadsCount: number; channelsCount: number
   selectedRaw: RawInfo | null; selectedShort: ShortInfo | null
   setSelectedRaw: (r: RawInfo | null) => void
   setSelectedShort: (s: ShortInfo | null) => void
@@ -197,6 +197,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   const [raws, setRaws] = useState<RawInfo[]>([])
   const [shorts, setShorts] = useState<ShortInfo[]>([])
   const [downloadsCount, setDownloadsCount] = useState(0)
+  const [channelsCount, setChannelsCount] = useState(0)
   const [selectedRaw, setSelectedRaw] = useState<RawInfo | null>(null)
   const [selectedShort, setSelectedShort] = useState<ShortInfo | null>(null)
 
@@ -257,10 +258,11 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   // Fetch lists
   const refreshLists = useCallback(async () => {
     try {
-      const [rawRes, shortRes, dlRes] = await Promise.all([api.getRaws(), api.getShorts(), api.getDownloads()])
+      const [rawRes, shortRes, dlRes, chRes] = await Promise.all([api.getRaws(), api.getShorts(), api.getDownloads(), api.getChannels()])
       setRaws(rawRes.raws)
       setShorts(shortRes.shorts)
       setDownloadsCount(dlRes.downloads.length)
+      setChannelsCount(chRes.channels.length)
     } catch { /* ignore */ }
   }, [])
 
@@ -402,7 +404,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
 
   return (
     <EditorContext.Provider value={{
-      activeTab, setActiveTab, raws, shorts, downloadsCount,
+      activeTab, setActiveTab, raws, shorts, downloadsCount, channelsCount,
       selectedRaw, selectedShort, setSelectedRaw, setSelectedShort, refreshLists,
       title, setTitle, subtitle, setSubtitle, channel, setChannel,
       bg, setBg, narr, setNarr, hookSfx, setHookSfx,
