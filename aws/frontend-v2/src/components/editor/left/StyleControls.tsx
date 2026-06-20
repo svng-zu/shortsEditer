@@ -1,8 +1,9 @@
 import { useEditor, SUB_FONT_OPTIONS } from '../../../contexts/EditorContext'
+import Icon from '../../ui/Icon'
 import { useT } from '../../../i18n'
 
 export default function StyleControls() {
-  const { title, setTitle, subtitle, setSubtitle, channel, setChannel, bg, setBg, selectedRaw } = useEditor()
+  const { title, setTitle, subtitle, setSubtitle, channel, setChannel, bg, setBg, selectedRaw, registeredChannels } = useEditor()
   const t = useT()
 
   if (!selectedRaw) return null
@@ -171,6 +172,21 @@ export default function StyleControls() {
           className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg p-2 text-label-md"
           value={channel.name} placeholder="예: 채널명 / 출처: ○○뉴스"
           onChange={e => setChannel(prev => ({ ...prev, name: e.target.value }))} />
+        {registeredChannels.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {registeredChannels.map(ch => {
+              const name = ch.url.match(/youtube\.com\/(@[^/?#]+)/i)?.[1] || ch.url
+              return (
+                <button key={ch.url}
+                  onClick={() => setChannel(prev => ({ ...prev, name, imageUrl: ch.thumbnail_url || '' }))}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-outline-variant/40 bg-surface-container-lowest text-label-sm text-on-surface-variant hover:border-primary hover:text-primary transition-colors">
+                  {ch.thumbnail_url && <img src={ch.thumbnail_url} alt="" className="w-4 h-4 rounded-full object-cover" />}
+                  {name}
+                </button>
+              )
+            })}
+          </div>
+        )}
         {channel.name.trim() && (
           <div className="grid grid-cols-2 gap-3">
             <div>
