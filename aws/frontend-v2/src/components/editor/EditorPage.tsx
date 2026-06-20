@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { EditorProvider, useEditor } from '../../contexts/EditorContext'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 import TitleControls from './left/TitleControls'
@@ -204,20 +205,22 @@ function MobileEditorLayout() {
 
 function StatsBar() {
   const { raws, shorts, downloadsCount, channelsCount } = useEditor()
+  const navigate = useNavigate()
   const items = [
-    { icon: 'subscriptions', label: '채널 관리', count: channelsCount },
-    { icon: 'download', label: '수집 영상', count: downloadsCount },
-    { icon: 'movie_edit', label: '편집본', count: raws.length },
-    { icon: 'auto_awesome', label: '쇼츠', count: shorts.length },
+    { icon: 'subscriptions', label: '채널 관리', count: channelsCount, tab: 'manage' },
+    { icon: 'download', label: '수집 영상', count: downloadsCount, tab: 'downloads' },
+    { icon: 'movie_edit', label: '편집본', count: raws.length, tab: 'raws' },
+    { icon: 'auto_awesome', label: '쇼츠', count: shorts.length, tab: 'shorts' },
   ]
   return (
     <div className="flex items-center gap-2 px-4 py-2.5 border-b border-outline-variant/20 shrink-0 bg-surface-container-lowest overflow-x-auto">
-      {items.map((item, i) => (
-        <div key={i} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-on-surface-variant border border-transparent bg-surface-bright/5">
+      {items.map((item) => (
+        <button key={item.tab} onClick={() => navigate(`/channels?tab=${item.tab}`)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-on-surface-variant border border-transparent hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all cursor-pointer">
           <Icon name={item.icon} size={20} />
           <span className="text-label-md font-semibold whitespace-nowrap">{item.label}</span>
           <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-surface-variant text-on-surface-variant">{item.count}</span>
-        </div>
+        </button>
       ))}
     </div>
   )
