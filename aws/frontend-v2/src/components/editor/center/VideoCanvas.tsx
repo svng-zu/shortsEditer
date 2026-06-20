@@ -127,9 +127,13 @@ export default function VideoCanvas() {
       const vw = vid.videoWidth, vh = vid.videoHeight
       if (vw && vh) {
         if (bg.type === 'blur') {
-          ctx.filter = 'blur(8px) brightness(0.4)'
-          ctx.drawImage(vid, 0, 0, CV_W, CV_H)
+          ctx.save()
+          ctx.filter = 'blur(20px)'
+          const scale = Math.max(CV_W / vw, CV_H / vh)
+          const sw = vw * scale, sh = vh * scale
+          ctx.drawImage(vid, (CV_W - sw) / 2, (CV_H - sh) / 2, sw, sh)
           ctx.filter = 'none'
+          ctx.restore()
         }
         const targetW = CV_W, targetH = VID_H_PX
         const srcAsp = vw / vh, dstAsp = targetW / targetH

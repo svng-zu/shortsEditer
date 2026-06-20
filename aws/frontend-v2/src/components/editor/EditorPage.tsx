@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { EditorProvider, useEditor } from '../../contexts/EditorContext'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 import TitleControls from './left/TitleControls'
@@ -11,6 +12,7 @@ import Timeline from './center/Timeline'
 import YouTubeUploadPanel from './right/YouTubeUploadPanel'
 import CandidatesList from './right/CandidatesList'
 import MediaList from './right/MediaList'
+import SrtModal from './left/SrtModal'
 import Icon from '../ui/Icon'
 
 /* ── Mobile Overlay Panel ─────────────────────────────────── */
@@ -72,6 +74,7 @@ function MobileEditorLayout() {
   if (!selectedRaw) {
     return (
       <div className="flex flex-col h-[calc(100vh-64px-64px)] overflow-hidden -m-6">
+        <StatsBar />
         <div className="flex items-center gap-3 px-4 py-3 border-b border-outline-variant/20">
           <Icon name="movie" size={22} className="text-primary" />
           <span className="text-title-md font-bold text-on-surface">Shorts Gallery</span>
@@ -199,11 +202,31 @@ function MobileEditorLayout() {
 
 /* ── Desktop Editor Layout ────────────────────────────────── */
 
+function StatsBar() {
+  const { raws, shorts, downloadsCount } = useEditor()
+  const items = [
+    { label: '수집 영상', count: downloadsCount, color: 'text-blue-600' },
+    { label: '편집본', count: raws.length, color: 'text-green-600' },
+    { label: '쇼츠', count: shorts.length, color: 'text-red-500' },
+  ]
+  return (
+    <div className="flex border-b border-outline-variant/20 shrink-0 bg-surface-container-lowest">
+      {items.map((item, i) => (
+        <div key={i} className={`flex-1 flex flex-col items-center py-2.5 ${i < 2 ? 'border-r border-outline-variant/20' : ''}`}>
+          <span className={`text-xl font-extrabold leading-tight ${item.color}`}>{item.count}</span>
+          <span className="text-[11px] text-on-surface-variant font-medium">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function DesktopEditorLayout() {
   const { selectedRaw } = useEditor()
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px-48px)] overflow-hidden -m-6 lg:-m-8">
+      <StatsBar />
       <div className="flex-1 grid grid-cols-12 gap-4 p-4 overflow-hidden">
         {/* Left: Controls */}
         <div className="col-span-12 lg:col-span-3 flex flex-col gap-4 overflow-y-auto pr-1">
@@ -244,10 +267,17 @@ function EditorLayout() {
   return isDesktop ? <DesktopEditorLayout /> : <MobileEditorLayout />
 }
 
+function SrtModalPortal() {
+  const { showSrt } = useEditor()
+  if (!showSrt) return null
+  return createPortal(<SrtModal />, document.body)
+}
+
 export default function EditorPage() {
   return (
     <EditorProvider>
       <EditorLayout />
+      <SrtModalPortal />
     </EditorProvider>
   )
 }

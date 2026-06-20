@@ -87,6 +87,7 @@ function ShortsStudio({ onOpenAdmin }: { onOpenAdmin?: () => void }) {
     onSelectRaw:   (r: RawInfo | null)   => setSelectedRaw(r),
     onRefresh: handleRefresh, onStartPolling: startPolling,
     isMobile,
+    downloadsCount: downloads.length,
   }
 
   const progressBar = isRunning && (

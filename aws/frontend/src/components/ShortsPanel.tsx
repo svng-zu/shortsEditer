@@ -15,6 +15,7 @@ interface Props {
   onRefresh: () => void
   onStartPolling: () => void
   isMobile?: boolean
+  downloadsCount?: number
 }
 
 // Canvas 상수 — 고화질 (270×480 = 9:16)
@@ -266,6 +267,7 @@ export default function ShortsPanel({
   activeTab, onTabChange, raws, shorts,
   selectedRaw, selectedShort, onSelectRaw, onSelectShort,
   onRefresh, onStartPolling, isMobile = false,
+  downloadsCount = 0,
 }: Props) {
   const [uploadTarget, setUploadTarget] = useState<ShortInfo | null>(null)
   const [rawSelected, setRawSelected] = useState<Set<string>>(new Set())
@@ -378,8 +380,21 @@ export default function ShortsPanel({
 
         {/* 리스트 — 자연 스크롤 */}
         <div style={{ background: 'var(--bg)' }}>
+          {/* 상단 통계 바 */}
+          <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', background: 'white', position: 'sticky', top: 0, zIndex: 51 }}>
+            {[
+              { label: '수집 영상', count: downloadsCount, color: '#1a73e8' },
+              { label: '편집본', count: raws.length, color: '#34a853' },
+              { label: '쇼츠', count: shorts.length, color: '#ea4335' },
+            ].map((item, i) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0 6px', borderRight: i < 2 ? '1px solid var(--border)' : 'none' }}>
+                <span style={{ fontSize: 18, fontWeight: 800, color: item.color, lineHeight: 1.2 }}>{item.count}</span>
+                <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 500 }}>{item.label}</span>
+              </div>
+            ))}
+          </div>
           {/* 탭 */}
-          <div style={{ display: 'flex', background: 'white', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 50 }}>
+          <div style={{ display: 'flex', background: 'white', borderBottom: '1px solid var(--border)', position: 'sticky', top: 56, zIndex: 50 }}>
             {(['raws', 'shorts'] as const).map(tab => (
               <button key={tab} onClick={() => onTabChange(tab)} style={{
                 flex: 1, padding: '13px 0', border: 'none', background: 'none', cursor: 'pointer',
@@ -511,6 +526,20 @@ export default function ShortsPanel({
   return (
     <main className="card" style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       {uploadTarget && <YouTubeUploadModal filename={uploadTarget.filename} defaultTitle={uploadTarget.title} onClose={() => setUploadTarget(null)} />}
+
+      {/* 상단 통계 바 */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        {[
+          { label: '수집 영상', count: downloadsCount, color: '#1a73e8' },
+          { label: '편집본', count: raws.length, color: '#34a853' },
+          { label: '쇼츠', count: shorts.length, color: '#ea4335' },
+        ].map((item, i) => (
+          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 0 8px', borderRight: i < 2 ? '1px solid var(--border)' : 'none' }}>
+            <span style={{ fontSize: 22, fontWeight: 800, color: item.color, lineHeight: 1.2 }}>{item.count}</span>
+            <span style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 500 }}>{item.label}</span>
+          </div>
+        ))}
+      </div>
 
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', padding: '0 16px', flexShrink: 0 }}>
         {(['raws', 'shorts'] as const).map(tab => (
@@ -1362,6 +1391,16 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
       const srcVid = (isPlayingHook && hookVidRef.current && hookVidRef.current.readyState >= 2)
         ? hookVidRef.current : vid
       if (srcVid.readyState >= 2) {
+        if (bgType === 'blur') {
+          ctx.save()
+          ctx.filter = 'blur(20px)'
+          const vw = srcVid.videoWidth || CV_W, vh = srcVid.videoHeight || CV_H
+          const scale = Math.max(CV_W / vw, CV_H / vh)
+          const sw = vw * scale, sh = vh * scale
+          ctx.drawImage(srcVid, (CV_W - sw) / 2, (CV_H - sh) / 2, sw, sh)
+          ctx.filter = 'none'
+          ctx.restore()
+        }
         ctx.drawImage(srcVid, 0, VID_Y_PX, CV_W, VID_H_PX)
       }
       const lines = [{ t: title1, c: t1Color }, { t: title2, c: t2Color }].filter(l => l.t.trim())
@@ -1949,7 +1988,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
               </div>
             </div>
         }
-        {showSrt && raw && <SrtModal stem={raw.filename.replace('_raw.mp4', '')} onClose={() => setShowSrt(false)} />}
+        {showSrt && raw && createPortal(<SrtModal stem={raw.filename.replace('_raw.mp4', '')} onClose={() => setShowSrt(false)} />, document.body)}
       </div>
     )
   }
@@ -2038,7 +2077,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
       </div>
 
       {/* 오른쪽: 편집 컨트롤 */}
-      <div style={{ flex: 1, padding: 20 }}>
+      <div style={{ flex: 1, padding: 20, overflowY: 'auto', maxHeight: 'calc(100vh - 60px)' }}>
         {!raw
           ? <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: 8 }}>
               <div style={{ fontSize: 32, opacity: 0.3 }}>✏️</div>
@@ -2285,7 +2324,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         }
       </div>
 
-      {showSrt && raw && <SrtModal stem={raw.filename.replace('_raw.mp4', '')} onClose={() => setShowSrt(false)} />}
+      {showSrt && raw && createPortal(<SrtModal stem={raw.filename.replace('_raw.mp4', '')} onClose={() => setShowSrt(false)} />, document.body)}
     </div>
   )
 }

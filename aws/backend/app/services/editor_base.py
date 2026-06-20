@@ -42,6 +42,35 @@ def _srt_time(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
+def _parse_srt_time(ts: str) -> float:
+    ts = ts.strip().replace(",", ".")
+    parts = ts.split(":")
+    return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+
+
+def _load_srt_entries(srt_path: str) -> list:
+    """SRT 파일을 (start, end, text) 튜플 리스트로 파싱"""
+    if not os.path.exists(srt_path):
+        return []
+    with open(srt_path, "r", encoding="utf-8") as f:
+        content = f.read().strip()
+    if not content:
+        return []
+    entries = []
+    for block in content.split("\n\n"):
+        lines = block.strip().splitlines()
+        if len(lines) >= 3:
+            times = lines[1].strip()
+            arrow_pos = times.find("-->")
+            if arrow_pos < 0:
+                continue
+            start = _parse_srt_time(times[:arrow_pos])
+            end = _parse_srt_time(times[arrow_pos + 3:])
+            text = "\n".join(lines[2:])
+            entries.append((start, end, text))
+    return entries
+
+
 class EditorBase:
     """카테고리별 에디터가 상속하는 공통 클래스"""
 
@@ -874,7 +903,13 @@ class EditorBase:
                     for s in narration_subs
                 ]
             else:
-                sub_entries = self._generate_sub_entries(analysis_path)
+                raw_dir = self._sd.raw_dir if self._sd else settings.RAW_DIR
+                srt_path = str(raw_dir / f"{base_name}_raw.srt")
+                srt_entries = _load_srt_entries(srt_path)
+                if srt_entries:
+                    sub_entries = srt_entries
+                else:
+                    sub_entries = self._generate_sub_entries(analysis_path)
         sub_filters = self._build_sub_drawtext_filters(sub_entries, style)
         text_overlay_filters = self._build_text_overlay_filters(text_overlays or [])
         sub_str = ",".join(sub_filters + text_overlay_filters)
@@ -1174,7 +1209,12 @@ class EditorBase:
 
     def _preview_sub_filters(self, analysis_path, seek, style=None):
         """정밀 미리보기용 — seek 시점에 가장 관련있는 자막 한 줄을 always-on으로 그린다."""
-        entries = self._generate_sub_entries(analysis_path)
+        stem = os.path.splitext(os.path.basename(analysis_path))[0]
+        raw_dir = self._sd.raw_dir if self._sd else settings.RAW_DIR
+        srt_path = str(raw_dir / f"{stem}_raw.srt")
+        entries = _load_srt_entries(srt_path)
+        if not entries:
+            entries = self._generate_sub_entries(analysis_path)
         if not entries:
             return []
         active = next((e for e in entries if e[0] <= seek <= e[1]), None)
@@ -1240,17 +1280,33 @@ class EditorBase:
                 "-vf", vf, "-vframes", "1", "-update", "1", preview_path
             ]
         else:
-            vf = self._build_overlay_vf(title, style=style)
-            if sub_str:
-                vf = f"{vf},{sub_str}"
-            if color_f:
-                vf = f"{color_f},{vf}"
-            cmd = [
-                "ffmpeg", "-y", "-ss", str(seek), "-i", raw_path,
-                "-vf", vf,
-                "-vframes", "1", "-update", "1",
-                preview_path
-            ]
+            # 블러 배경 미리보기
+            text_filters = self._build_text_filters(title, style=style)
+            all_filters = text_filters + sub_filters
+            all_str = ",".join(all_filters) if all_filters else "null"
+            color_pre = f"{color_f}," if color_f else ""
+            mid = "prelogo" if has_logo else "out"
+            fc = (
+                f"[0:v]{color_pre}split=2[orig][blurin];"
+                f"[blurin]scale={CANVAS_W}:{CANVAS_H}:force_original_aspect_ratio=increase,"
+                f"crop={CANVAS_W}:{CANVAS_H},"
+                f"boxblur=luma_radius=25:luma_power=3[blurbg];"
+                f"[orig]setsar=1[fg];"
+                f"[blurbg][fg]overlay=0:{VIDEO_Y}[base];"
+                f"[base]{all_str}[{mid}]"
+            )
+            inputs = ["-ss", str(seek), "-i", raw_path]
+            if has_logo:
+                fc += (
+                    f";[1]scale=200:-1[logo]"
+                    f";[prelogo][logo]overlay=W-w-16:{VIDEO_Y+16}[out]"
+                )
+                inputs += ["-i", logo_path]
+            cmd = (
+                ["ffmpeg", "-y"] + inputs +
+                ["-filter_complex", fc, "-map", "[out]",
+                 "-vframes", "1", "-update", "1", preview_path]
+            )
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
