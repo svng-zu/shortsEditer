@@ -175,7 +175,12 @@ function loadBg(name: string) {
 
 // SRT 편집 모달
 type SrtEntry = { index: string; times: string; text: string }
-function SrtModal({ stem, onClose }: { stem: string; onClose: () => void }) {
+function parseSrtTime(ts: string): number {
+  const s = ts.trim().replace(',', '.')
+  const p = s.split(':')
+  return (+p[0]) * 3600 + (+p[1]) * 60 + parseFloat(p[2])
+}
+function SrtModal({ stem, onClose, onSave }: { stem: string; onClose: () => void; onSave?: (entries: SubEntry[]) => void }) {
   const [entries, setEntries] = useState<SrtEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
@@ -187,7 +192,17 @@ function SrtModal({ stem, onClose }: { stem: string; onClose: () => void }) {
 
   const save = async () => {
     setSaving(true); setMsg('')
-    try { await api.saveSrt(stem, entries); setMsg('✓ 저장 완료') }
+    try {
+      await api.saveSrt(stem, entries)
+      setMsg('✓ 저장 완료')
+      if (onSave) {
+        const parsed: SubEntry[] = entries.map(e => {
+          const [startStr, endStr] = e.times.split('-->').map(s => s.trim())
+          return { start: parseSrtTime(startStr), end: parseSrtTime(endStr), text: e.text }
+        })
+        onSave(parsed)
+      }
+    }
     catch { setMsg('저장 실패') }
     finally { setSaving(false) }
   }
@@ -1988,7 +2003,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
               </div>
             </div>
         }
-        {showSrt && raw && createPortal(<SrtModal stem={raw.filename.replace('_raw.mp4', '')} onClose={() => setShowSrt(false)} />, document.body)}
+        {showSrt && raw && createPortal(<SrtModal stem={raw.filename.replace('_raw.mp4', '')} onClose={() => setShowSrt(false)} onSave={setSubEntries} />, document.body)}
       </div>
     )
   }
@@ -2324,7 +2339,7 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         }
       </div>
 
-      {showSrt && raw && createPortal(<SrtModal stem={raw.filename.replace('_raw.mp4', '')} onClose={() => setShowSrt(false)} />, document.body)}
+      {showSrt && raw && createPortal(<SrtModal stem={raw.filename.replace('_raw.mp4', '')} onClose={() => setShowSrt(false)} onSave={setSubEntries} />, document.body)}
     </div>
   )
 }
