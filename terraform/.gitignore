@@ -1,0 +1,15 @@
+# Terraform 상태 파일 (민감 정보 포함 — 절대 커밋 금지)
+terraform.tfstate
+terraform.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# 실제 변수 파일 (API 키 등 포함)
+terraform.tfvars
+*.auto.tfvars
+
+# example 파일은 커밋 허용
+!*.tfvars.example
+
+# 크래시 로그
+crash.log
