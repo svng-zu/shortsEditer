@@ -98,6 +98,7 @@ function ProfilePopover({ onClose }: { onClose: () => void }) {
 
 export default function TopNav() {
   const { user, openAuthModal } = useAuth()
+  const navigate = useNavigate()
   const [showProfile, setShowProfile] = useState(false)
 
   return (
@@ -126,9 +127,12 @@ export default function TopNav() {
           <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
         </button>
 
-        <button className="hidden md:flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-2 text-label-md font-medium hover:bg-primary/20 transition-colors active:scale-95">
+        <button
+          onClick={() => navigate('/channels?tab=downloads')}
+          className="hidden md:flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-2 text-label-md font-medium hover:bg-primary/20 transition-colors active:scale-95"
+        >
           <Icon name="play_arrow" size={18} />
-          <span>Process</span>
+          <span>쇼츠로 변환하기</span>
         </button>
 
         <div className="hidden md:block h-6 w-px bg-outline-variant/30" />

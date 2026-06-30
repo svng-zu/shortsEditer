@@ -63,9 +63,9 @@ function AccessDenied() {
       <div className="w-20 h-20 rounded-full bg-error/10 flex items-center justify-center">
         <Icon name="shield" size={40} className="text-error" />
       </div>
-      <h2 className="text-headline-lg font-bold text-on-surface">Access Denied</h2>
+      <h2 className="text-headline-lg font-bold text-on-surface">접근 권한 없음</h2>
       <p className="text-on-surface-variant text-body-md max-w-md text-center">
-        You do not have administrator privileges. Contact an admin to request access.
+        관리자 권한이 없습니다. 관리자에게 문의하세요.
       </p>
     </div>
   )
@@ -110,22 +110,22 @@ function Toggle({
 
 function GlobalStats({ stats, loading }: { stats: AdminStats | null; loading: boolean }) {
   const cards = [
-    { label: 'Total Sessions', icon: 'bolt', value: stats?.total_sessions ?? 0 },
-    { label: 'Active Users', icon: 'group', value: stats?.total_users ?? 0 },
-    { label: 'Downloads', icon: 'download', value: stats?.downloads ?? 0 },
-    { label: 'Shorts Created', icon: 'auto_awesome', value: stats?.shorts ?? 0 },
+    { label: '전체 세션', icon: 'bolt', value: stats?.total_sessions ?? 0 },
+    { label: '활성 사용자', icon: 'group', value: stats?.total_users ?? 0 },
+    { label: '다운로드', icon: 'download', value: stats?.downloads ?? 0 },
+    { label: '생성된 쇼츠', icon: 'auto_awesome', value: stats?.shorts ?? 0 },
   ]
 
   return (
     <section>
       <div className="flex items-center justify-between mb-5">
-        <h2 className="text-headline-lg font-bold text-on-surface">Global Stats</h2>
+        <h2 className="text-headline-lg font-bold text-on-surface">전체 통계</h2>
         <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-tertiary/10 border border-tertiary/20">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-tertiary" />
           </span>
-          <span className="text-label-sm text-tertiary font-bold tracking-wide">LIVE: 14 Nodes</span>
+          <span className="text-label-sm text-tertiary font-bold tracking-wide">실시간</span>
         </span>
       </div>
 
@@ -173,10 +173,10 @@ function ActivePipelines({ pipelines, loading }: { pipelines: AdminPipelineInfo[
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
             <span className="relative inline-flex rounded-full h-3 w-3 bg-primary" />
           </span>
-          <h3 className="text-title-md text-on-surface">Active Pipelines</h3>
+          <h3 className="text-title-md text-on-surface">활성 파이프라인</h3>
         </div>
         <span className="text-label-sm text-on-surface-variant">
-          {activePipelines.length} Tasks Running
+          {activePipelines.length}개 작업 실행 중
         </span>
       </div>
 
@@ -187,7 +187,7 @@ function ActivePipelines({ pipelines, loading }: { pipelines: AdminPipelineInfo[
       ) : activePipelines.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 text-on-surface-variant">
           <Icon name="check_circle" size={40} className="opacity-30" />
-          <span className="text-label-sm">No active pipelines</span>
+          <span className="text-label-sm">활성 파이프라인 없음</span>
         </div>
       ) : (
         <div className="flex flex-col gap-3 overflow-y-auto flex-1">
@@ -218,14 +218,14 @@ function ActivePipelines({ pipelines, loading }: { pipelines: AdminPipelineInfo[
                     <button
                       className="w-7 h-7 rounded-lg flex items-center justify-center
                                  text-on-surface-variant hover:bg-surface-container-highest transition-colors"
-                      title={p.is_paused ? 'Resume' : 'Pause'}
+                      title={p.is_paused ? '재개' : '일시정지'}
                     >
                       <Icon name={p.is_paused ? 'play_arrow' : 'pause'} size={16} />
                     </button>
                     <button
                       className="w-7 h-7 rounded-lg flex items-center justify-center
                                  text-on-surface-variant hover:bg-error/10 hover:text-error transition-colors"
-                      title="Stop"
+                      title="중지"
                     >
                       <Icon name="stop" size={16} />
                     </button>
@@ -256,49 +256,49 @@ function ActivePipelines({ pipelines, loading }: { pipelines: AdminPipelineInfo[
 function SystemHealth() {
   return (
     <GlassPanel className="rounded-2xl p-6 flex flex-col gap-4 min-h-[340px]">
-      <h3 className="text-title-md text-on-surface">System Health</h3>
+      <h3 className="text-title-md text-on-surface">시스템 상태</h3>
 
       <div className="flex flex-col gap-3">
-        {/* API Status */}
+        {/* API 상태 */}
         <div className="flex items-center justify-between">
-          <span className="text-label-md text-on-surface-variant">API Status</span>
+          <span className="text-label-md text-on-surface-variant">API 상태</span>
           <span className="inline-flex items-center gap-1.5 text-label-sm font-bold text-tertiary">
             <span className="w-1.5 h-1.5 rounded-full bg-tertiary" />
-            ONLINE
+            정상
           </span>
         </div>
 
-        {/* Engine Version */}
+        {/* 엔진 버전 */}
         <div className="flex items-center justify-between">
-          <span className="text-label-md text-on-surface-variant">Engine Version</span>
+          <span className="text-label-md text-on-surface-variant">엔진 버전</span>
           <span className="text-label-sm text-on-surface font-mono">v2.4.1</span>
         </div>
 
-        {/* S3 Bucket */}
+        {/* S3 버킷 */}
         <div className="flex items-center justify-between">
-          <span className="text-label-md text-on-surface-variant">S3 Bucket</span>
+          <span className="text-label-md text-on-surface-variant">S3 버킷</span>
           <span className="inline-flex items-center gap-1.5 text-label-sm text-tertiary">
             <span className="w-1.5 h-1.5 rounded-full bg-tertiary" />
-            Connected
+            연결됨
           </span>
         </div>
 
-        {/* Database */}
+        {/* 데이터베이스 */}
         <div className="flex items-center justify-between">
-          <span className="text-label-md text-on-surface-variant">Database</span>
+          <span className="text-label-md text-on-surface-variant">데이터베이스</span>
           <span className="text-label-sm text-on-surface font-mono">~4ms</span>
         </div>
       </div>
 
-      {/* Resource Usage */}
+      {/* 리소스 사용량 */}
       <div className="border-t border-outline-variant/30 pt-4 mt-auto flex flex-col gap-3">
         <span className="text-label-sm uppercase tracking-widest text-on-surface-variant">
-          Resource Usage
+          리소스 사용량
         </span>
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-label-sm text-on-surface-variant">CPU Load</span>
+            <span className="text-label-sm text-on-surface-variant">CPU 부하</span>
             <span className="text-label-sm text-on-surface font-mono">23%</span>
           </div>
           <ProgressBar progress={23} color="primary" />
@@ -306,7 +306,7 @@ function SystemHealth() {
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-label-sm text-on-surface-variant">RAM</span>
+            <span className="text-label-sm text-on-surface-variant">메모리</span>
             <span className="text-label-sm text-on-surface font-mono">61%</span>
           </div>
           <ProgressBar progress={61} color="tertiary" />
@@ -357,15 +357,15 @@ function UserManagement({
     <GlassPanel className="rounded-2xl p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
-        <h3 className="text-title-md text-on-surface">User Management</h3>
+        <h3 className="text-title-md text-on-surface">사용자 관리</h3>
         <div className="flex items-center gap-2">
           <Button variant="ghost" className="!px-3 !py-1.5 text-label-sm">
             <Icon name="filter_list" size={16} />
-            Filter
+            필터
           </Button>
           <Button variant="primary" className="!px-3 !py-1.5 text-label-sm">
             <Icon name="person_add" size={16} />
-            Add User
+            사용자 추가
           </Button>
         </div>
       </div>
@@ -376,19 +376,19 @@ function UserManagement({
           <thead>
             <tr className="border-b border-outline-variant/30">
               <th className="text-label-sm uppercase tracking-widest text-on-surface-variant py-3 pr-4 font-semibold">
-                User
+                사용자
               </th>
               <th className="text-label-sm uppercase tracking-widest text-on-surface-variant py-3 pr-4 font-semibold">
-                Status
+                상태
               </th>
               <th className="text-label-sm uppercase tracking-widest text-on-surface-variant py-3 pr-4 font-semibold">
-                Quota Used
+                쿼터 사용량
               </th>
               <th className="text-label-sm uppercase tracking-widest text-on-surface-variant py-3 pr-4 font-semibold hidden lg:table-cell">
-                Joined
+                가입일
               </th>
               <th className="text-label-sm uppercase tracking-widest text-on-surface-variant py-3 pr-4 font-semibold">
-                Admin
+                관리자
               </th>
               <th className="text-label-sm uppercase tracking-widest text-on-surface-variant py-3 font-semibold w-10">
                 {/* Actions */}
@@ -408,7 +408,7 @@ function UserManagement({
             ) : pagedUsers.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-12 text-center text-on-surface-variant text-label-md">
-                  No users found
+                  사용자 없음
                 </td>
               </tr>
             ) : (
@@ -441,7 +441,7 @@ function UserManagement({
                     {/* Status */}
                     <td className="py-3 pr-4">
                       <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border bg-tertiary/10 text-tertiary border-tertiary/20">
-                        Active
+                        활성
                       </span>
                     </td>
 
@@ -482,7 +482,7 @@ function UserManagement({
                         className="w-7 h-7 rounded-lg flex items-center justify-center
                                    text-on-surface-variant opacity-0 group-hover:opacity-100
                                    hover:bg-surface-container-highest transition-all"
-                        title="More actions"
+                        title="더보기"
                       >
                         <Icon name="more_vert" size={18} />
                       </button>
@@ -527,7 +527,7 @@ function UserManagement({
               </div>
 
               {/* Status dot */}
-              <span className="w-2.5 h-2.5 rounded-full bg-tertiary flex-shrink-0" title="Active" />
+              <span className="w-2.5 h-2.5 rounded-full bg-tertiary flex-shrink-0" title="활성" />
 
               {/* Admin toggle */}
               <Toggle
@@ -544,8 +544,8 @@ function UserManagement({
       {!loading && users.length > 0 && (
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-outline-variant/20">
           <span className="text-label-sm text-on-surface-variant">
-            Showing {page * USERS_PER_PAGE + 1}&ndash;
-            {Math.min((page + 1) * USERS_PER_PAGE, users.length)} of {users.length} users
+            {page * USERS_PER_PAGE + 1}&ndash;
+            {Math.min((page + 1) * USERS_PER_PAGE, users.length)} / 총 {users.length}명
           </span>
           <div className="flex items-center gap-1">
             <button
@@ -678,7 +678,7 @@ export default function AdminPage() {
     <div className="flex flex-col gap-8 max-w-[1400px]">
       {/* Mobile admin header */}
       <div className="md:hidden">
-        <h1 className="text-xl font-bold text-on-surface">Admin Console</h1>
+        <h1 className="text-xl font-bold text-on-surface">관리자 콘솔</h1>
         <p className="text-label-sm text-on-surface-variant">V3.2 Engine &bull; Quota: {stats?.shorts ?? 0}/{stats?.total_sessions ?? 5}</p>
       </div>
 

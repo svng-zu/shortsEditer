@@ -204,9 +204,13 @@ function MediaCard({ item, type, selected, onToggle, onSelect, onDelete, viewMod
             </span>
           </div>
         )}
-        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <span className="bg-primary/90 text-on-primary p-3 rounded-full shadow-xl">
+        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+          <span className="bg-primary/90 text-on-primary p-3 rounded-full shadow-xl cursor-pointer hover:bg-primary transition-colors">
             <Icon name={type === 'raw' ? 'edit' : 'play_arrow'} size={24} />
+          </span>
+          <span onClick={e => { e.stopPropagation(); onDelete() }}
+            className="bg-error/90 text-on-error p-3 rounded-full shadow-xl cursor-pointer hover:bg-error transition-colors">
+            <Icon name="delete" size={24} />
           </span>
         </div>
       </div>
@@ -522,7 +526,7 @@ export default function MediaLibraryPage() {
                 {filteredRaws.map(r => (
                   <MediaCard key={r.filename} item={r} type="raw" selected={selected.has(r.filename)}
                     onToggle={() => toggle(r.filename)} viewMode={viewMode}
-                    onSelect={() => setPlayingVideo({ url: r.url, title: r.title || r.filename })}
+                    onSelect={() => navigate(`/editor/${encodeURIComponent(r.filename)}`)}
                     onDelete={async () => {
                       if (!confirm('삭제하시겠습니까?')) return
                       await api.deleteRaw(r.filename); loadData()

@@ -1,0 +1,104 @@
+{
+  "transcript_path": "/app/data/sessions/15f167d3-3472-4534-8dac-d34c949bac39/transcripts/이 대통령, 내일 '1천조 원' 규모 반도체 투자 공개 (2026.06.28⧸뉴스데스크⧸MBC).json",
+  "category": "sports",
+  "intro_text": "이재명 결국 밝혔다\n1천조 투자 이유",
+  "candidates": [
+    {
+      "start": 12.44,
+      "end": 26.44,
+      "title": "이재명-이재용-최태원 만남",
+      "reason": "대통령과 주요 기업 총수들이 함께 등장하여 대규모 투자 계획을 공개하는 장면으로, 인물과 규모 면에서 주목도가 높습니다.",
+      "score": 6,
+      "edit_order": 1,
+      "connection_note": "시작"
+    },
+    {
+      "start": 20.76,
+      "end": 26.44,
+      "title": "10년간 1천조원 투자",
+      "reason": "구체적인 투자 규모를 언급하며 영상의 핵심 내용을 전달합니다.",
+      "score": 7,
+      "edit_order": 2,
+      "connection_note": "이전 구간에서 언급된 주요 인물들이 발표할 투자 규모를 구체적으로 보여줍니다."
+    },
+    {
+      "start": 43.87,
+      "end": 49.87,
+      "title": "AI·첨단산업 투자 공개",
+      "reason": "투자 대상 산업을 명확히 제시하며 미래 성장 가능성을 보여줍니다.",
+      "score": 5,
+      "edit_order": 3,
+      "connection_note": "앞서 발표된 투자 규모가 어떤 산업에 집중되는지 설명합니다."
+    },
+    {
+      "start": 76.02,
+      "end": 87.18,
+      "title": "삼성·SK 대규모 투자",
+      "reason": "주요 기업들의 구체적인 투자 계획을 언급하며 계획의 실현 가능성을 높입니다.",
+      "score": 7,
+      "edit_order": 4,
+      "connection_note": "앞서 언급된 투자 규모가 삼성과 SK의 투자 계획과 연결됨을 보여줍니다."
+    },
+    {
+      "start": 113.26,
+      "end": 122.1,
+      "title": "국토균형발전 실천",
+      "reason": "이번 투자가 가지는 국가적 의미와 목표를 설명하며 정책의 중요성을 강조합니다.",
+      "score": 5,
+      "edit_order": 5,
+      "connection_note": "대규모 투자가 가지는 사회적, 국가적 의미를 설명합니다."
+    },
+    {
+      "start": 122.1,
+      "end": 132.14,
+      "title": "호남 특혜 의혹 반박",
+      "reason": "발표된 정책에 대한 논란과 이에 대한 대통령의 직접적인 반박을 보여주며 흥미를 유발합니다.",
+      "score": 8,
+      "edit_order": 6,
+      "connection_note": "정책 발표 이후 제기된 논란과 이에 대한 대통령의 입장을 보여주며 영상의 갈등 구조를 부각합니다."
+    }
+  ],
+  "hook_segment": {
+    "start": 5.94,
+    "end": 12.4,
+    "reason": "사상 최대 규모의 비수도권 투자 계획 발표를 예고하며 시청자의 궁금증을 유발합니다."
+  },
+  "raw_segments": [
+    {
+      "raw_start": 0.0,
+      "raw_end": 14.0,
+      "orig_start": 12.44,
+      "orig_end": 26.44
+    },
+    {
+      "raw_start": 14.0,
+      "raw_end": 19.68,
+      "orig_start": 20.76,
+      "orig_end": 26.44
+    },
+    {
+      "raw_start": 19.68,
+      "raw_end": 25.68,
+      "orig_start": 43.87,
+      "orig_end": 49.87
+    },
+    {
+      "raw_start": 25.68,
+      "raw_end": 36.84,
+      "orig_start": 76.02,
+      "orig_end": 87.18
+    },
+    {
+      "raw_start": 36.84,
+      "raw_end": 45.68,
+      "orig_start": 113.26,
+      "orig_end": 122.1
+    },
+    {
+      "raw_start": 45.68,
+      "raw_end": 55.72,
+      "orig_start": 122.1,
+      "orig_end": 132.14
+    }
+  ]
+}

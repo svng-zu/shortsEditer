@@ -30,16 +30,25 @@ const TMPL_COLORS: Record<string, Record<number, { bg: string }>> = {
   politics: { 1: { bg: '#0d0505' }, 2: { bg: '#f5f5f5' }, 3: { bg: '#111111' } },
 }
 
-function wrapSubtitle(text: string, maxChars = 12): string[] {
-  const words = text.split('')
+function wrapSubtitle(text: string, maxChars = 20): string[] {
+  const words = text.split(/\s+/).filter(Boolean)
+  if (!words.length) return []
   const lines: string[] = []
   let cur = ''
-  for (const ch of words) {
-    if ((cur + ch).length > maxChars) { if (cur) lines.push(cur); cur = ch }
-    else cur += ch
+  let curLen = 0
+  for (const w of words) {
+    const added = curLen === 0 ? w.length : curLen + 1 + w.length
+    if (cur && added > maxChars) {
+      lines.push(cur)
+      cur = w
+      curLen = w.length
+    } else {
+      cur = cur ? cur + ' ' + w : w
+      curLen = added
+    }
   }
   if (cur) lines.push(cur)
-  return lines.slice(0, 2)
+  return lines
 }
 
 function _hexToRgba(hex: string, alpha: number): string {
@@ -1185,7 +1194,13 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   const [isGeneratingNarrSubs, setIsGeneratingNarrSubs] = useState(false)
   const [genNarrSubsMsg, setGenNarrSubsMsg] = useState('')
   const [isRendering, setIsRendering] = useState(false)
-  const [renderMsg, setRenderMsg]   = useState('')
+  const [renderModal, setRenderModal] = useState<'hidden' | 'rendering' | 'done' | 'error'>('hidden')
+  const [renderProgress, setRenderProgress] = useState(0)
+  const [renderError, setRenderError] = useState('')
+  const [renderedFilename, setRenderedFilename] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [toastMsg, setToastMsg] = useState('')
+  const renderPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [showSrt, setShowSrt]       = useState(false)
   // 훅 & SFX
   const [useHook, setUseHook]             = useState(false)
@@ -1301,9 +1316,19 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
   }, [])
 
   useEffect(() => {
+    return () => { if (renderPollRef.current) clearInterval(renderPollRef.current) }
+  }, [])
+
+  useEffect(() => {
+    if (!toastMsg) return
+    const t = setTimeout(() => setToastMsg(''), 3000)
+    return () => clearTimeout(t)
+  }, [toastMsg])
+
+  useEffect(() => {
     if (!raw) return
     const parts = raw.title.split(' / ')
-    setTitle1(parts[0] || ''); setTitle2(parts[1] || ''); setRenderMsg('')
+    setTitle1(parts[0] || ''); setTitle2(parts[1] || '')
     setChannelName(raw.channel_name || '')
     setChannelX(0); setChannelY(0); setChannelFontsize(36); setChannelColor('#FFFFFF')
     setChannelImageUrl(raw.channel_thumbnail_url || '')
@@ -1467,10 +1492,9 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
           const active = narrPreviewSubs.find(s => t >= s.start && t <= s.end)
           if (active) lines = active.text.split('\n').map(l => l.trim()).filter(Boolean)
         } else if (subEntries.length > 0) {
-          // 실제 자막 — 현재 시간에 맞는 항목 표시 (12자 기준 줄바꿈)
           const t = vid.currentTime
           const active = subEntries.find(s => t >= s.start && t <= s.end)
-          if (active) lines = wrapSubtitle(active.text, 12)
+          if (active) lines = wrapSubtitle(active.text, 20).slice(0, 1)
         } else {
           // 자막 데이터 없을 때만 샘플 표시
           lines = ['자막 샘플']
@@ -1594,7 +1618,11 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
 
   const handleRender = async () => {
     if (!raw || isRendering) return
-    setIsRendering(true); setRenderMsg('')
+    setIsRendering(true)
+    setRenderModal('rendering'); setRenderProgress(0); setRenderError('')
+    const shortsFilename = raw.filename.replace('_raw.mp4', '_shorts.mp4')
+    setRenderedFilename(shortsFilename)
+
     try {
       const { bgImage, bgSolidColor: bgSC } = getBgParams()
       await api.render(
@@ -1604,10 +1632,70 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
         customSfx,
         textOverlays.map(({ time, end, text, color }) => ({ time, end, text, color })),
       )
-      setRenderMsg(narration ? '✓ 나레이션 버전 렌더링 시작' : '✓ 렌더링 시작 — 완성 쇼츠 탭에서 확인')
       onStartPolling()
-    } catch (e: any) { setRenderMsg(e?.response?.data?.detail || '오류가 발생했습니다') }
-    finally { setIsRendering(false) }
+
+      if (renderPollRef.current) clearInterval(renderPollRef.current)
+      const poll = setInterval(async () => {
+        try {
+          const st = await api.getStatus()
+          if (st.step === 'editing') {
+            setRenderProgress(st.progress)
+          } else if (st.step === 'done') {
+            clearInterval(poll); renderPollRef.current = null
+            setRenderProgress(100)
+            setTimeout(() => { setIsRendering(false); setRenderModal('done') }, 600)
+          } else if (st.step === 'error') {
+            clearInterval(poll); renderPollRef.current = null
+            setIsRendering(false); setRenderError(st.message); setRenderModal('error')
+          }
+        } catch {}
+      }, 1500)
+      renderPollRef.current = poll
+    } catch (e: any) {
+      setIsRendering(false)
+      setRenderError(e?.response?.data?.detail || '렌더링 요청 실패')
+      setRenderModal('error')
+    }
+  }
+
+  const triggerDownload = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = filename
+    document.body.appendChild(a); a.click()
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url) }, 100)
+  }
+
+  const handleSaveToAlbum = async () => {
+    setIsSaving(true)
+    try {
+      const url = `/api/media/shorts/${getSessionId()}/${renderedFilename}/download`
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const file = new File([blob], renderedFilename, { type: 'video/mp4' })
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file] })
+        setToastMsg('앨범에 저장되었습니다.')
+      } else {
+        triggerDownload(blob, renderedFilename)
+        setToastMsg('영상이 다운로드되었습니다.')
+      }
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') setToastMsg('저장에 실패했습니다.')
+    } finally { setIsSaving(false); setRenderModal('hidden') }
+  }
+
+  const handleSaveToFile = async () => {
+    setIsSaving(true)
+    try {
+      const url = `/api/media/shorts/${getSessionId()}/${renderedFilename}/download`
+      const res = await fetch(url)
+      const blob = await res.blob()
+      triggerDownload(blob, renderedFilename)
+      setToastMsg('파일이 저장되었습니다.')
+    } catch {
+      setToastMsg('저장에 실패했습니다.')
+    } finally { setIsSaving(false); setRenderModal('hidden') }
   }
 
   const handleGenerateScript = async () => {
@@ -1710,6 +1798,91 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
     canvasDragRef.current = null
     setDraggingOvId(null)
   }, [])
+
+  const renderModalPortal = renderModal !== 'hidden' && createPortal(
+    <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.55)', padding: 24 }}>
+      <div style={{ background: 'white', borderRadius: 20, padding: '36px 28px 28px', width: 'min(92vw, 340px)', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+
+        {renderModal === 'rendering' && (<>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🎬</div>
+          <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>영상 렌더링 중</h3>
+
+          {/* Circular Progress */}
+          <div style={{ display: 'inline-block', position: 'relative', width: 96, height: 96 }}>
+            <svg width={96} height={96} style={renderProgress <= 0 ? { animation: 'spin 1.5s linear infinite' } : undefined}>
+              <circle cx={48} cy={48} r={42} fill="none" stroke="#e8eaed" strokeWidth={6} />
+              <circle cx={48} cy={48} r={42} fill="none" stroke="var(--primary, #4285f4)" strokeWidth={6}
+                strokeLinecap="round"
+                strokeDasharray={2 * Math.PI * 42}
+                strokeDashoffset={renderProgress > 0 ? (2 * Math.PI * 42) * (1 - renderProgress / 100) : (2 * Math.PI * 42) * 0.75}
+                transform="rotate(-90 48 48)"
+                style={{ transition: renderProgress > 0 ? 'stroke-dashoffset 0.8s ease' : undefined }} />
+            </svg>
+            {renderProgress > 0 && (
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: 'var(--primary, #4285f4)' }}>
+                {renderProgress}%
+              </div>
+            )}
+          </div>
+
+          <p style={{ fontSize: 14, color: '#888', margin: '16px 0 0', lineHeight: 1.6 }}>
+            영상을 저장하고 있습니다.<br />잠시만 기다려주세요.
+          </p>
+        </>)}
+
+        {renderModal === 'done' && (<>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>✅</div>
+          <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>렌더링 완료</h3>
+          <p style={{ fontSize: 14, color: '#888', margin: '0 0 24px' }}>
+            영상을 어디에 저장하시겠습니까?
+          </p>
+          <button onClick={handleSaveToAlbum} disabled={isSaving}
+            style={{ width: '100%', padding: '13px 16px', marginBottom: 10, borderRadius: 12, border: '1.5px solid var(--primary, #4285f4)', background: 'var(--primary, #4285f4)', color: 'white', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            {isSaving ? <div className="spinner spinner-sm" style={{ borderTopColor: 'white' }} /> : '📷'} 앨범에 저장
+          </button>
+          <button onClick={handleSaveToFile} disabled={isSaving}
+            style={{ width: '100%', padding: '13px 16px', marginBottom: 10, borderRadius: 12, border: '1.5px solid var(--border, #ddd)', background: 'white', color: '#333', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            {isSaving ? <div className="spinner spinner-sm" /> : '📁'} 파일에 저장
+          </button>
+          <button onClick={() => setRenderModal('hidden')} disabled={isSaving}
+            style={{ width: '100%', padding: '11px 16px', borderRadius: 12, border: 'none', background: 'transparent', color: '#999', fontSize: 14, cursor: 'pointer' }}>
+            취소
+          </button>
+        </>)}
+
+        {renderModal === 'error' && (<>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>❌</div>
+          <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>렌더링 실패</h3>
+          <p style={{ fontSize: 13, color: '#888', margin: '0 0 24px', wordBreak: 'break-word' }}>
+            {renderError || '오류가 발생했습니다.'}
+          </p>
+          <button onClick={() => { setRenderModal('hidden'); handleRender() }}
+            style={{ width: '100%', padding: '13px 16px', marginBottom: 10, borderRadius: 12, border: 'none', background: 'var(--primary, #4285f4)', color: 'white', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            🔄 다시 시도
+          </button>
+          <button onClick={() => setRenderModal('hidden')}
+            style={{ width: '100%', padding: '11px 16px', borderRadius: 12, border: 'none', background: 'transparent', color: '#999', fontSize: 14, cursor: 'pointer' }}>
+            닫기
+          </button>
+        </>)}
+
+      </div>
+    </div>,
+    document.body
+  )
+
+  const toastPortal = toastMsg && createPortal(
+    <div style={{
+      position: 'fixed', bottom: 40, left: '50%', transform: 'translateX(-50%)',
+      background: '#333', color: 'white', padding: '12px 24px', borderRadius: 12,
+      fontSize: 14, fontWeight: 500, zIndex: 10001, boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+      animation: 'fadeInUp 0.3s ease',
+    }}>
+      {toastMsg}
+      <style>{`@keyframes fadeInUp { from { opacity:0; transform:translateX(-50%) translateY(12px) } to { opacity:1; transform:translateX(-50%) translateY(0) } }`}</style>
+    </div>,
+    document.body
+  )
 
   // 모바일: 세로 스택 (캔버스 → 컨트롤)
   // 데스크톱: 가로 분할 (280px 미리보기 | flex 컨트롤)
@@ -1995,15 +2168,12 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                     : `▶ 렌더링${narration ? '(나레이션)' : ''}`
                   }
                 </button>
-                {renderMsg && (
-                  <div style={{ fontSize: 14, color: renderMsg.startsWith('✓') ? 'var(--success)' : 'var(--error)', padding: '6px 10px', background: renderMsg.startsWith('✓') ? '#e6f4ea' : '#fce8e6', borderRadius: 6, border: `1px solid ${renderMsg.startsWith('✓') ? '#81c995' : '#f28b82'}` }}>
-                    {renderMsg}
-                  </div>
-                )}
               </div>
             </div>
         }
         {showSrt && raw && createPortal(<SrtModal stem={raw.filename.replace('_raw.mp4', '')} onClose={() => setShowSrt(false)} onSave={setSubEntries} />, document.body)}
+        {renderModalPortal}
+        {toastPortal}
       </div>
     )
   }
@@ -2330,16 +2500,13 @@ function RawEditArea({ raw, onStartPolling, isMobile = false }: {
                   : `▶ 렌더링${narration ? ' (나레이션)' : ''}`
                 }
               </button>
-              {renderMsg && (
-                <div style={{ fontSize: 14, color: renderMsg.startsWith('✓') ? 'var(--success)' : 'var(--error)', padding: '6px 10px', background: renderMsg.startsWith('✓') ? '#e6f4ea' : '#fce8e6', borderRadius: 6, border: `1px solid ${renderMsg.startsWith('✓') ? '#81c995' : '#f28b82'}` }}>
-                  {renderMsg}
-                </div>
-              )}
             </div>
         }
       </div>
 
       {showSrt && raw && createPortal(<SrtModal stem={raw.filename.replace('_raw.mp4', '')} onClose={() => setShowSrt(false)} onSave={setSubEntries} />, document.body)}
+      {renderModalPortal}
+      {toastPortal}
     </div>
   )
 }

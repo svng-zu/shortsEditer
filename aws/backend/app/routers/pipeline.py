@@ -127,7 +127,7 @@ async def add_channel(item: ChannelItem, session: SessionDirs = Depends(get_sess
         raise HTTPException(400, "이미 등록된 채널입니다.")
     collector = YoutubeCollector(session)
     ch_info = await asyncio.to_thread(collector.get_channel_info, item.url)
-    channels.append({"url": item.url, "category": item.category, "thumbnail_url": ch_info.get("thumbnail_url", "")})
+    channels.append({"url": item.url, "category": item.category, "thumbnail_url": ch_info.get("thumbnail_url", ""), "name": ch_info.get("name", "")})
     _save_channels(session, channels)
     return {"ok": True, "channels": channels}
 
@@ -270,7 +270,7 @@ async def _run_url_download(session_id: str, url: str, category: str):
         }
 
     base_opts = {
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+        "format": "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
         "outtmpl": outtmpl,
         "merge_output_format": "mp4",
         "noplaylist": True,
@@ -414,7 +414,7 @@ async def _run_collect(session_id: str, clear_existing: bool, limit_per_channel:
                 fname = os.path.basename(v["filepath"])
                 s3.upload(v["filepath"], s.s3_key("downloads", fname))
 
-        set_status(session_id, PipelineStep.IDLE, f"수집 완료 — 영상 {len(results)}개", 100)
+        set_status(session_id, PipelineStep.DONE, f"수집 완료 — 영상 {len(results)}개", 100)
     except Exception as e:
         set_status(session_id, PipelineStep.ERROR, f"수집 오류: {e}", 0)
 
@@ -690,12 +690,27 @@ async def list_downloads(session: SessionDirs = Depends(get_session)):
     cat_map = load_category_map(session)
     ch_map = load_channel_map(session)
 
+    registered_channels = _load_channels(session)
+
+    def _infer_channel(stem: str) -> dict:
+        """channel_map에 없을 때 등록 채널 이름으로 폴백 추론."""
+        stem_lower = stem.lower()
+        for c in registered_channels:
+            name = c.get("name", "")
+            if not name:
+                continue
+            # 전체 이름 또는 첫 단어(영문 채널명 단축형)로 매칭
+            tokens = [name.lower()] + [t.lower() for t in name.split() if len(t) >= 3]
+            if any(tok in stem_lower for tok in tokens):
+                return {"name": name, "thumbnail_url": c.get("thumbnail_url", "")}
+        return {}
+
     def _build():
         result = []
         seen = set()
         for f in sorted(session.download_dir.glob("*.mp4")):
             thumbnail_url = f"/api/media/downloads/{session.session_id}/{quote(f.name)}/thumbnail"
-            ch = ch_map.get(f.stem, {})
+            ch = ch_map.get(f.stem) or _infer_channel(f.stem)
             result.append(DownloadInfo(
                 filename=f.name,
                 stem=f.stem,
@@ -715,7 +730,7 @@ async def list_downloads(session: SessionDirs = Depends(get_session)):
                 continue
             stem = Path(filename).stem
             thumbnail_url = f"/api/media/downloads/{session.session_id}/{quote(filename)}/thumbnail"
-            ch = ch_map.get(stem, {})
+            ch = ch_map.get(stem) or _infer_channel(stem)
             result.append(DownloadInfo(
                 filename=filename,
                 stem=stem,
@@ -755,7 +770,7 @@ async def delete_download(filename: str, session: SessionDirs = Depends(get_sess
 
 # ── 선택 영상 편집 (자막→분석→편집 순차 처리) ────────────────────
 
-async def _run_process_selected(session_id: str, items: list[ProcessSelectedItem], template_id: int):
+async def _run_process_selected(session_id: str, items: list[ProcessSelectedItem], template_id: int, max_duration: int | None = None):
     s = make_session(session_id)
     total = len(items)
     s3 = get_s3()
@@ -820,6 +835,8 @@ async def _run_process_selected(session_id: str, items: list[ProcessSelectedItem
 
         # ── Step 3: 영상 편집 ──────────────────────────────────────
         editor = Editor(template_id=template_id, session_dirs=s)
+        if max_duration:
+            editor.MAX_TOTAL_SEC = max_duration
         for i, item in enumerate(items):
             stem = Path(item.filename).stem
             analyses = list(s.analysis_dir.glob(f"{glob.escape(stem)}*.json"))
@@ -855,5 +872,5 @@ async def process_selected(req: ProcessSelectedRequest, session: SessionDirs = D
         raise HTTPException(400, "파이프라인이 실행 중입니다.")
     if not req.items:
         raise HTTPException(400, "처리할 영상을 선택하세요.")
-    _spawn(session.session_id, _run_process_selected(session.session_id, req.items, req.template_id))
+    _spawn(session.session_id, _run_process_selected(session.session_id, req.items, req.template_id, req.max_duration))
     return {"ok": True}

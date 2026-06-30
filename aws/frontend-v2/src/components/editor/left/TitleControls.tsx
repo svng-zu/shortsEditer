@@ -9,11 +9,11 @@ export default function TitleControls() {
     <section className="glass-panel p-5 rounded-xl space-y-4">
       <div className="flex items-center gap-2 text-primary border-b border-outline-variant/20 pb-2 mb-2">
         <span className="material-symbols-outlined">title</span>
-        <h2 className="text-title-md font-semibold">Title/Intro</h2>
+        <h2 className="text-title-md font-semibold">제목</h2>
       </div>
       <div className="space-y-3">
         <div>
-          <label className="text-label-sm text-on-surface-variant mb-1 block">Title 1</label>
+          <label className="text-[16.5px] text-on-surface-variant mb-1 block">제목1</label>
           <textarea
             className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg focus:border-primary focus:ring-1 focus:ring-primary p-3 text-body-md resize-none"
             rows={2}
@@ -22,7 +22,7 @@ export default function TitleControls() {
           />
         </div>
         <div>
-          <label className="text-label-sm text-on-surface-variant mb-1 block">Intro Text (Title 2)</label>
+          <label className="text-[16.5px] text-on-surface-variant mb-1 block">두번째 줄 제목</label>
           <textarea
             className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg focus:border-primary focus:ring-1 focus:ring-primary p-3 text-body-md resize-none"
             rows={2}
@@ -32,7 +32,7 @@ export default function TitleControls() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-label-sm text-on-surface-variant mb-1 block">Title 1 Color</label>
+            <label className="text-[16.5px] text-on-surface-variant mb-1 block">제목1 색상</label>
             <div className="flex items-center gap-2 bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
               <input type="color" className="w-7 h-7 rounded-full border-none bg-transparent cursor-pointer"
                 value={title.t1Color}
@@ -41,7 +41,7 @@ export default function TitleControls() {
             </div>
           </div>
           <div>
-            <label className="text-label-sm text-on-surface-variant mb-1 block">Title 2 Color</label>
+            <label className="text-[16.5px] text-on-surface-variant mb-1 block">제목2 색상</label>
             <div className="flex items-center gap-2 bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
               <input type="color" className="w-7 h-7 rounded-full border-none bg-transparent cursor-pointer"
                 value={title.t2Color}
@@ -52,7 +52,7 @@ export default function TitleControls() {
         </div>
         <div>
           <div className="flex justify-between items-center mb-1">
-            <label className="text-label-sm text-on-surface-variant">Title Y Offset</label>
+            <label className="text-[16.5px] text-on-surface-variant">세로 위치</label>
             <span className="text-code-sm font-mono text-primary">{title.titleY}px</span>
           </div>
           <input type="range" min={-500} max={500} step={1}
@@ -62,13 +62,23 @@ export default function TitleControls() {
         </div>
         <div>
           <div className="flex justify-between items-center mb-1">
-            <label className="text-label-sm text-on-surface-variant">Font Size Delta</label>
+            <label className="text-[16.5px] text-on-surface-variant">폰트 크기 조절</label>
             <span className="text-code-sm font-mono text-primary">{title.titleFontSizeDelta > 0 ? '+' : ''}{title.titleFontSizeDelta}px</span>
           </div>
           <input type="range" min={-50} max={50} step={1}
             className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
             value={title.titleFontSizeDelta}
             onChange={e => setTitle(prev => ({ ...prev, titleFontSizeDelta: Number(e.target.value) }))} />
+        </div>
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <label className="text-[16.5px] text-on-surface-variant">자간</label>
+            <span className="text-code-sm font-mono text-primary">{(title.titleLetterSpacing ?? -0.5) > 0 ? '+' : ''}{(title.titleLetterSpacing ?? -0.5)}px</span>
+          </div>
+          <input type="range" min={-10} max={10} step={0.5}
+            className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
+            value={title.titleLetterSpacing ?? -0.5}
+            onChange={e => setTitle(prev => ({ ...prev, titleLetterSpacing: Number(e.target.value) }))} />
         </div>
 
         {/* Title backgrounds */}
@@ -83,7 +93,7 @@ export default function TitleControls() {
                 <input type="checkbox" className="accent-primary cursor-pointer"
                   checked={enabled}
                   onChange={e => setTitle(prev => ({ ...prev, [`${key}BgEnabled`]: e.target.checked }))} />
-                <span className="text-label-sm text-on-surface-variant">{label}</span>
+                <span className="text-[16.5px] text-on-surface-variant">{label}</span>
               </label>
               {enabled && (
                 <div className="flex items-center gap-3">

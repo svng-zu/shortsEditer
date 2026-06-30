@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { EditorProvider, useEditor } from '../../contexts/EditorContext'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 import TitleControls from './left/TitleControls'
@@ -10,9 +9,8 @@ import SfxHookPanel from './left/SfxHookPanel'
 import RenderButton from './left/RenderButton'
 import VideoCanvas from './center/VideoCanvas'
 import Timeline from './center/Timeline'
-import YouTubeUploadPanel from './right/YouTubeUploadPanel'
-import CandidatesList from './right/CandidatesList'
 import MediaList from './right/MediaList'
+import SrtPanel from './left/SrtPanel'
 import SrtModal from './left/SrtModal'
 import Icon from '../ui/Icon'
 
@@ -100,8 +98,8 @@ function MobileEditorLayout() {
       </div>
 
       {/* Video Canvas — full-screen centered */}
-      <div className="flex-1 flex items-center justify-center relative px-2 py-2 overflow-hidden bg-surface-container-lowest">
-        <div className="relative w-full max-w-[280px]">
+      <div className="flex-1 flex items-center justify-center relative px-2 py-2 overflow-hidden bg-surface-container-lowest min-h-0">
+        <div className="relative w-full max-w-[280px] h-full flex items-center justify-center">
           {/* PREVIEW badge */}
           <div className="absolute top-2 left-2 z-20">
             <span className="bg-black/60 backdrop-blur-md text-primary text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border border-primary/20">
@@ -146,22 +144,10 @@ function MobileEditorLayout() {
         </div>
       </div>
 
-      {/* Bottom drawer: Candidates + Render */}
+      {/* Bottom drawer: Render */}
       <div className="shrink-0 bg-surface-container/90 backdrop-blur-xl border-t border-outline-variant/30 px-4 py-3">
         {selectedRaw ? (
-          <div className="space-y-3">
-            {/* Horizontal scroll candidates */}
-            <div>
-              <span className="text-label-sm text-on-surface-variant uppercase tracking-widest mb-2 block">
-                Generation Candidates
-              </span>
-              <div className="overflow-x-auto -mx-1 px-1">
-                <CandidatesList />
-              </div>
-            </div>
-            {/* Render button */}
-            <RenderButton />
-          </div>
+          <RenderButton />
         ) : (
           <MediaList />
         )}
@@ -197,6 +183,8 @@ function MobileEditorLayout() {
       >
         <TitleControls />
       </MobileOverlayPanel>
+
+      <SrtModal />
     </div>
   )
 }
@@ -227,7 +215,7 @@ function StatsBar() {
 }
 
 function DesktopEditorLayout() {
-  const { selectedRaw } = useEditor()
+  const { selectedRaw, showSrt } = useEditor()
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px-48px)] overflow-hidden -m-6 lg:-m-8">
@@ -243,18 +231,15 @@ function DesktopEditorLayout() {
         </div>
 
         {/* Center: Canvas + Timeline */}
-        <div className="col-span-12 lg:col-span-6 flex flex-col items-center justify-center gap-4 overflow-hidden">
+        <div className={`col-span-12 flex flex-col items-center justify-center gap-4 overflow-hidden ${showSrt ? 'lg:col-span-5' : 'lg:col-span-6'}`}>
           <VideoCanvas />
           <Timeline />
         </div>
 
-        {/* Right: Upload + Lists */}
-        <div className="col-span-12 lg:col-span-3 flex flex-col gap-4 overflow-y-auto">
-          {selectedRaw ? (
-            <>
-              <YouTubeUploadPanel />
-              <CandidatesList />
-            </>
+        {/* Right: SrtPanel (자막 편집 모드) or Media List */}
+        <div className={`col-span-12 flex flex-col gap-4 overflow-hidden ${showSrt ? 'lg:col-span-4' : 'lg:col-span-3 overflow-y-auto'}`}>
+          {showSrt ? (
+            <SrtPanel />
           ) : (
             <MediaList />
           )}
@@ -272,17 +257,12 @@ function EditorLayout() {
   return isDesktop ? <DesktopEditorLayout /> : <MobileEditorLayout />
 }
 
-function SrtModalPortal() {
-  const { showSrt } = useEditor()
-  if (!showSrt) return null
-  return createPortal(<SrtModal />, document.body)
-}
-
 export default function EditorPage() {
+  const { filename } = useParams<{ filename: string }>()
+
   return (
-    <EditorProvider>
+    <EditorProvider initialFilename={filename}>
       <EditorLayout />
-      <SrtModalPortal />
     </EditorProvider>
   )
 }

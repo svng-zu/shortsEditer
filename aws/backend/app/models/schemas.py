@@ -199,6 +199,7 @@ class ProcessSelectedItem(BaseModel):
 class ProcessSelectedRequest(BaseModel):
     items: List[ProcessSelectedItem]
     template_id: int = 1
+    max_duration: Optional[int] = None
 
 
 class Candidate(BaseModel):

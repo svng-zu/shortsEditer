@@ -17,7 +17,7 @@ export default function StyleControls() {
 
       {/* Font Selection */}
       <div>
-        <label className="text-label-sm text-on-surface-variant mb-1 block">{t.titleFont}</label>
+        <label className="text-[16.5px] text-on-surface-variant mb-1 block">{t.titleFont}</label>
         <select
           className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg focus:border-primary p-2.5 text-label-md appearance-none"
           value={title.titleFont}
@@ -29,7 +29,7 @@ export default function StyleControls() {
 
       {/* Border Controls */}
       <div className="space-y-2">
-        <label className="text-label-sm text-on-surface-variant">{t.titleBorder}</label>
+        <label className="text-[16.5px] text-on-surface-variant">{t.titleBorder}</label>
         <div className="grid grid-cols-2 gap-3">
           <div className="flex items-center gap-2 bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
             <input type="color" className="w-6 h-6 rounded-full border-none bg-transparent cursor-pointer"
@@ -64,7 +64,7 @@ export default function StyleControls() {
           <>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-label-sm text-on-surface-variant mb-1 block">{t.color}</label>
+                <label className="text-[16.5px] text-on-surface-variant mb-1 block">{t.color}</label>
                 <div className="flex items-center gap-2 bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
                   <input type="color" className="w-6 h-6 rounded-full border-none bg-transparent cursor-pointer"
                     value={subtitle.color} onChange={e => setSubtitle(prev => ({ ...prev, color: e.target.value }))} />
@@ -72,14 +72,14 @@ export default function StyleControls() {
                 </div>
               </div>
               <div>
-                <label className="text-label-sm text-on-surface-variant mb-1 block">{t.size}</label>
+                <label className="text-[16.5px] text-on-surface-variant mb-1 block">{t.size}</label>
                 <input type="number" min={20} max={80}
                   className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg p-2 text-label-md"
                   value={subtitle.size} onChange={e => setSubtitle(prev => ({ ...prev, size: Number(e.target.value) }))} />
               </div>
             </div>
             <div>
-              <label className="text-label-sm text-on-surface-variant mb-1 block">{t.subtitleFont}</label>
+              <label className="text-[16.5px] text-on-surface-variant mb-1 block">{t.subtitleFont}</label>
               <select
                 className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg focus:border-primary p-2 text-label-md appearance-none"
                 value={subtitle.font} onChange={e => setSubtitle(prev => ({ ...prev, font: e.target.value }))}>
@@ -88,14 +88,14 @@ export default function StyleControls() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-label-sm text-on-surface-variant mb-1 block">{t.subXPos}</label>
+                <label className="text-[16.5px] text-on-surface-variant mb-1 block">{t.subXPos}</label>
                 <input type="range" min={-300} max={300} step={5}
                   className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
                   value={subtitle.x} onChange={e => setSubtitle(prev => ({ ...prev, x: Number(e.target.value) }))} />
                 <span className="text-code-sm font-mono text-primary">{subtitle.x}px</span>
               </div>
               <div>
-                <label className="text-label-sm text-on-surface-variant mb-1 block">{t.subYPos}</label>
+                <label className="text-[16.5px] text-on-surface-variant mb-1 block">{t.subYPos}</label>
                 <input type="range" min={-500} max={1200} step={10}
                   className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
                   value={subtitle.y} onChange={e => setSubtitle(prev => ({ ...prev, y: Number(e.target.value) }))} />
@@ -103,7 +103,7 @@ export default function StyleControls() {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-label-sm text-on-surface-variant cursor-pointer">
+              <label className="flex items-center gap-2 text-[16.5px] text-on-surface-variant cursor-pointer">
                 <input type="checkbox" checked={subtitle.bgEnabled}
                   className="w-4 h-4 rounded bg-surface-container-highest text-primary border-outline-variant cursor-pointer accent-primary"
                   onChange={e => setSubtitle(prev => ({ ...prev, bgEnabled: e.target.checked }))} />
@@ -112,7 +112,7 @@ export default function StyleControls() {
               {subtitle.bgEnabled && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-label-sm text-on-surface-variant mb-1 block">{t.subBgColor}</label>
+                    <label className="text-[16.5px] text-on-surface-variant mb-1 block">{t.subBgColor}</label>
                     <div className="flex items-center gap-2 bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
                       <input type="color" className="w-6 h-6 rounded-full border-none bg-transparent cursor-pointer"
                         value={subtitle.bgColor} onChange={e => setSubtitle(prev => ({ ...prev, bgColor: e.target.value }))} />
@@ -120,7 +120,7 @@ export default function StyleControls() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-label-sm text-on-surface-variant mb-1 block">{t.subBgOpacity}</label>
+                    <label className="text-[16.5px] text-on-surface-variant mb-1 block">{t.subBgOpacity}</label>
                     <input type="range" min={0} max={1} step={0.05}
                       className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
                       value={subtitle.bgOpacity} onChange={e => setSubtitle(prev => ({ ...prev, bgOpacity: Number(e.target.value) }))} />
@@ -135,11 +135,11 @@ export default function StyleControls() {
 
       {/* Background */}
       <div className="pt-2 border-t border-outline-variant/20 space-y-3">
-        <label className="text-label-sm text-on-surface-variant">{t.bgType}</label>
+        <label className="text-[16.5px] text-on-surface-variant">{t.bgType}</label>
         <div className="grid grid-cols-3 gap-2">
           {(['blur', 'solid', 'image'] as const).map(bgOpt => (
             <button key={bgOpt} onClick={() => setBg(prev => ({ ...prev, type: bgOpt }))}
-              className={`p-2 border rounded-lg text-label-sm font-semibold transition-colors ${
+              className={`p-2 border rounded-lg text-[16.5px] font-semibold transition-colors ${
                 bg.type === bgOpt
                   ? 'border-primary bg-primary/10 text-primary'
                   : 'border-outline-variant text-on-surface-variant hover:bg-surface-bright/10'
@@ -167,7 +167,7 @@ export default function StyleControls() {
 
       {/* Source Channel (bottom) */}
       <div className="pt-2 border-t border-outline-variant/20 space-y-3">
-        <label className="text-label-sm text-on-surface-variant">{t.sourceChannel}</label>
+        <label className="text-[16.5px] text-on-surface-variant">{t.sourceChannel}</label>
         <input
           className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg p-2 text-label-md"
           value={channel.name} placeholder="예: 채널명 / 출처: ○○뉴스"
@@ -179,7 +179,7 @@ export default function StyleControls() {
               return (
                 <button key={ch.url}
                   onClick={() => setChannel(prev => ({ ...prev, name, imageUrl: ch.thumbnail_url || '' }))}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-outline-variant/40 bg-surface-container-lowest text-label-sm text-on-surface-variant hover:border-primary hover:text-primary transition-colors">
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-outline-variant/40 bg-surface-container-lowest text-[16.5px] text-on-surface-variant hover:border-primary hover:text-primary transition-colors">
                   {ch.thumbnail_url && <img src={ch.thumbnail_url} alt="" className="w-4 h-4 rounded-full object-cover" />}
                   {name}
                 </button>
@@ -190,28 +190,28 @@ export default function StyleControls() {
         {channel.name.trim() && (
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-label-sm text-on-surface-variant mb-1 block">X 위치</label>
+              <label className="text-[16.5px] text-on-surface-variant mb-1 block">X 위치</label>
               <input type="range" min={-400} max={400} step={10}
                 className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
                 value={channel.x} onChange={e => setChannel(prev => ({ ...prev, x: Number(e.target.value) }))} />
               <span className="text-code-sm font-mono text-primary">{channel.x}px</span>
             </div>
             <div>
-              <label className="text-label-sm text-on-surface-variant mb-1 block">Y 위치</label>
+              <label className="text-[16.5px] text-on-surface-variant mb-1 block">Y 위치</label>
               <input type="range" min={-200} max={200} step={5}
                 className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
                 value={channel.y} onChange={e => setChannel(prev => ({ ...prev, y: Number(e.target.value) }))} />
               <span className="text-code-sm font-mono text-primary">{channel.y}px</span>
             </div>
             <div>
-              <label className="text-label-sm text-on-surface-variant mb-1 block">{t.size}</label>
+              <label className="text-[16.5px] text-on-surface-variant mb-1 block">{t.size}</label>
               <input type="range" min={18} max={80} step={2}
                 className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
                 value={channel.fontsize} onChange={e => setChannel(prev => ({ ...prev, fontsize: Number(e.target.value) }))} />
               <span className="text-code-sm font-mono text-primary">{channel.fontsize}px</span>
             </div>
             <div>
-              <label className="text-label-sm text-on-surface-variant mb-1 block">{t.color}</label>
+              <label className="text-[16.5px] text-on-surface-variant mb-1 block">{t.color}</label>
               <div className="flex items-center gap-2 bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
                 <input type="color" className="w-6 h-6 rounded-full border-none bg-transparent cursor-pointer"
                   value={channel.color} onChange={e => setChannel(prev => ({ ...prev, color: e.target.value }))} />
@@ -224,7 +224,7 @@ export default function StyleControls() {
 
       {/* My Channel (top-left) */}
       <div className="pt-2 border-t border-outline-variant/20 space-y-3">
-        <label className="text-label-sm text-on-surface-variant">{t.myChannel}</label>
+        <label className="text-[16.5px] text-on-surface-variant">{t.myChannel}</label>
         <input
           className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg p-2 text-label-md"
           value={channel.topLeftText} placeholder="예: @내채널명"
@@ -232,28 +232,28 @@ export default function StyleControls() {
         {channel.topLeftText.trim() && (
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-label-sm text-on-surface-variant mb-1 block">X 위치</label>
+              <label className="text-[16.5px] text-on-surface-variant mb-1 block">X 위치</label>
               <input type="range" min={0} max={500} step={10}
                 className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
                 value={channel.topLeftX} onChange={e => setChannel(prev => ({ ...prev, topLeftX: Number(e.target.value) }))} />
               <span className="text-code-sm font-mono text-primary">{channel.topLeftX}px</span>
             </div>
             <div>
-              <label className="text-label-sm text-on-surface-variant mb-1 block">Y 위치</label>
+              <label className="text-[16.5px] text-on-surface-variant mb-1 block">Y 위치</label>
               <input type="range" min={0} max={300} step={5}
                 className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
                 value={channel.topLeftY} onChange={e => setChannel(prev => ({ ...prev, topLeftY: Number(e.target.value) }))} />
               <span className="text-code-sm font-mono text-primary">{channel.topLeftY}px</span>
             </div>
             <div>
-              <label className="text-label-sm text-on-surface-variant mb-1 block">{t.size}</label>
+              <label className="text-[16.5px] text-on-surface-variant mb-1 block">{t.size}</label>
               <input type="range" min={16} max={72} step={2}
                 className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
                 value={channel.topLeftFontsize} onChange={e => setChannel(prev => ({ ...prev, topLeftFontsize: Number(e.target.value) }))} />
               <span className="text-code-sm font-mono text-primary">{channel.topLeftFontsize}px</span>
             </div>
             <div>
-              <label className="text-label-sm text-on-surface-variant mb-1 block">{t.color}</label>
+              <label className="text-[16.5px] text-on-surface-variant mb-1 block">{t.color}</label>
               <div className="flex items-center gap-2 bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
                 <input type="color" className="w-6 h-6 rounded-full border-none bg-transparent cursor-pointer"
                   value={channel.topLeftColor} onChange={e => setChannel(prev => ({ ...prev, topLeftColor: e.target.value }))} />

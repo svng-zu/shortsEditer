@@ -42,6 +42,10 @@ async def _run_render(session_id: str, filename: str, title: str, subtitles: boo
 
         set_status(session_id, PipelineStep.EDITING, f"렌더링 중: {filename}", 10)
         editor = Editor(template_id=template_id, session_dirs=s)
+
+        def progress_cb(pct, msg):
+            set_status(session_id, PipelineStep.EDITING, msg or f"렌더링 중: {filename}", pct)
+
         shorts_path = await asyncio.to_thread(
             editor.apply_overlay,
             str(raw_path), str(analysis_path),
@@ -60,8 +64,10 @@ async def _run_render(session_id: str, filename: str, title: str, subtitles: boo
             hook_sfx_volume=hook_sfx_volume,
             custom_sfx_entries=custom_sfx_entries or [],
             text_overlays=text_overlays or [],
+            progress_callback=progress_cb,
         )
         if shorts_path and os.path.exists(shorts_path):
+            set_status(session_id, PipelineStep.EDITING, "S3 업로드 중", 85)
             get_s3().upload_and_cleanup(shorts_path, s.s3_key("shorts", os.path.basename(shorts_path)))
         set_status(session_id, PipelineStep.DONE, f"렌더링 완료: {stem}_shorts.mp4", 100)
     except Exception as e:

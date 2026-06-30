@@ -307,11 +307,11 @@ export const api = {
   },
 
   async deleteShort(filename: string): Promise<void> {
-    await client.delete(`/api/shorts/${filename}`)
+    await client.delete(`/api/shorts/${encodeURIComponent(filename)}`)
   },
 
   async deleteRaw(filename: string): Promise<void> {
-    await client.delete(`/api/raws/${filename}`)
+    await client.delete(`/api/raws/${encodeURIComponent(filename)}`)
   },
 
   async deleteDownload(filename: string): Promise<void> {
@@ -499,9 +499,10 @@ export const api = {
 
   async processSelected(
     items: { filename: string; category: string }[],
-    templateId: number = 1
+    templateId: number = 1,
+    maxDuration?: number
   ): Promise<void> {
-    await client.post('/api/process-selected', { items, template_id: templateId })
+    await client.post('/api/process-selected', { items, template_id: templateId, max_duration: maxDuration })
   },
 
   async pause(): Promise<void> {
@@ -566,7 +567,7 @@ export const api = {
 
   // SRT
   async getSrt(stem: string): Promise<{ entries: { index: string; times: string; text: string }[] }> {
-    const { data } = await client.get(`/api/srt/${stem}`)
+    const { data } = await client.get(`/api/srt/${encodeURIComponent(stem)}`)
     return data
   },
 

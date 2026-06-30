@@ -80,37 +80,35 @@ def _bgutil_alive() -> bool:
 
 
 def _auth_opts() -> dict:
-    """OAuth2 > 쿠키 순으로 인증 옵션 반환"""
+    """OAuth2 > 쿠키 순으로 인증 옵션 반환. bgutil POT은 모든 경로에서 사용."""
+    bgutil_alive = _bgutil_alive()
+
     if _has_oauth():
         print("[Auth] OAuth2 토큰 사용")
-        opts: dict = {
-            "username": "oauth2",
-            "password": "",
-            # js_runtimes 미지정 시 yt-dlp가 기본 활성화된 deno를 사용 (Dockerfile에 설치됨)
-        }
-        # bgutil POT 서버가 살아있으면 extractor_args에 추가
         ea: dict = {"youtube": {"lang": ["ko"]}}
-        if _bgutil_alive():
+        # bgutil + OAuth2 조합 (ios 클라이언트와는 충돌하므로 여기서만 사용)
+        if bgutil_alive:
             print(f"[Auth] bgutil POT 서버 사용: {BGUTIL_URL}")
             ea["youtubepot-bgutilhttp"] = {"base_url": [BGUTIL_URL]}
-        opts["extractor_args"] = ea
+        opts: dict = {"username": "oauth2", "password": "", "extractor_args": ea}
         if YTDLP_PROXY:
             opts["proxy"] = YTDLP_PROXY
         return opts
+
     cookies = _prepare_cookies()
+    ea = {"youtube": {"player_client": ["web"], "lang": ["ko"]}}
+    if bgutil_alive:
+        print(f"[Auth] bgutil POT 서버 사용: {BGUTIL_URL}")
+        ea["youtubepot-bgutilhttp"] = {"base_url": [BGUTIL_URL]}
     if cookies:
         print("[Auth] 쿠키 파일 사용")
-        opts = {
-            "cookiefile": cookies,
-            "extractor_args": {"youtube": {"player_client": ["web"], "lang": ["ko"]}},
-        }
-        if YTDLP_PROXY:
-            opts["proxy"] = YTDLP_PROXY
-        return opts
-    print("[Auth] 인증 수단 없음 — 차단될 수 있음")
+        opts = {"cookiefile": cookies, "extractor_args": ea}
+    else:
+        print("[Auth] 인증 수단 없음 — 차단될 수 있음")
+        opts = {"extractor_args": ea}
     if YTDLP_PROXY:
-        return {"proxy": YTDLP_PROXY}
-    return {}
+        opts["proxy"] = YTDLP_PROXY
+    return opts
 
 
 # ---------------------------------------------------------------------------
@@ -264,10 +262,14 @@ class YoutubeCollector:
                 thumbnail_url = next(
                     (t["url"] for t in reversed(thumbnails) if t.get("url")), None
                 )
-                return {"thumbnail_url": thumbnail_url or info.get("thumbnail") or ""}
+                name = info.get("channel") or info.get("uploader") or ""
+                return {
+                    "thumbnail_url": thumbnail_url or info.get("thumbnail") or "",
+                    "name": name,
+                }
             except Exception:
                 continue
-        return {"thumbnail_url": ""}
+        return {"thumbnail_url": "", "name": ""}
 
     def download_video(self, video_url: str, on_progress: callable = None) -> dict:
         """영상 다운로드 (yt-dlp + 인증)"""
@@ -280,9 +282,8 @@ class YoutubeCollector:
                     on_progress(pct_str, speed)
             hooks.append(_hook)
 
-        ydl_opts = {
-            **_auth_opts(),
-            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+        base_opts = {
+            "format": "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
             "outtmpl": f"{self.download_dir}/%(title)s.%(ext)s",
             "merge_output_format": "mp4",
             "noplaylist": True,
@@ -291,16 +292,58 @@ class YoutubeCollector:
             "progress_hooks": hooks,
         }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=True)
+        # 1차 시도: 기본 auth (bgutil POT 포함)
+        ydl_opts = {**_auth_opts(), **base_opts}
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(video_url, download=True)
+        except Exception as first_err:
+            err_str = str(first_err)
+            _is_blocked = ("403" in err_str or "Forbidden" in err_str
+                           or "No video formats found" in err_str)
+            if not _is_blocked:
+                raise
+            # 403/포맷 없음 시 ios 클라이언트로 재시도 (bgutil·OAuth2 제외 — ios와 충돌)
+            print(f"[Download] 차단 감지, ios 클라이언트로 재시도: {video_url}")
+            ios_ea = {"youtube": {"lang": ["ko"], "player_client": ["ios"]}}
+            # OAuth2가 실패한 상황이므로 iOS 재시도에서는 OAuth2 제외, 쿠키만 사용
+            cookies = _prepare_cookies()
+            if cookies:
+                ios_opts: dict = {"cookiefile": cookies, "extractor_args": ios_ea}
+            else:
+                ios_opts = {"extractor_args": ios_ea}
+            if YTDLP_PROXY:
+                ios_opts["proxy"] = YTDLP_PROXY
+            ydl_opts = {**ios_opts, **base_opts}
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(video_url, download=True)
+        if info is None:
+            # yt-dlp가 None을 반환하는 경우 (ffmpeg merge 후 발생하는 알려진 케이스):
+            # outtmpl 패턴으로 디스크에서 직접 최신 mp4 파일을 찾아 반환한다.
+            mp4s = sorted(Path(self.download_dir).glob("*.mp4"), key=lambda p: p.stat().st_mtime)
+            if not mp4s:
+                raise RuntimeError(f"yt-dlp returned None and no mp4 found in {self.download_dir}")
+            filepath = str(mp4s[-1])
+            print(f"[Download] info=None 복구: {filepath}")
             return {
-                "title":    info.get("title"),
-                "filepath": ydl.prepare_filename(info),
-                "duration": info.get("duration"),
-                "channel":  info.get("channel"),
-                "channel_url": info.get("channel_url") or info.get("uploader_url") or "",
-                "video_id": info.get("id"),
+                "title":    mp4s[-1].stem,
+                "filepath": filepath,
+                "duration": None,
+                "channel":  "",
+                "channel_url": "",
+                "video_id": "",
             }
+        filepath = ydl.prepare_filename(info)
+        if not filepath.endswith(".mp4"):
+            filepath = os.path.splitext(filepath)[0] + ".mp4"
+        return {
+            "title":    info.get("title"),
+            "filepath": filepath,
+            "duration": info.get("duration"),
+            "channel":  info.get("channel"),
+            "channel_url": info.get("channel_url") or info.get("uploader_url") or "",
+            "video_id": info.get("id"),
+        }
 
     def run(self, limit_per_channel: int = None, custom_channels: list[dict] = None,
             on_progress: callable = None) -> list:
@@ -373,11 +416,14 @@ class YoutubeCollector:
                                     _bp,
                                 )
 
-                        result = self.download_video(video["video_url"], on_progress=_dl_hook)
-                        video["filepath"] = result["filepath"]
-                        all_results.append(video)
-                        channel_count += 1
-                        completed += 1
+                        try:
+                            result = self.download_video(video["video_url"], on_progress=_dl_hook)
+                            video["filepath"] = result["filepath"]
+                            all_results.append(video)
+                            channel_count += 1
+                            completed += 1
+                        except Exception as dl_err:
+                            print(f"  [SKIP] 다운로드 실패, 다음 영상으로 계속: {dl_err}")
 
                 except Exception as e:
                     print(f"ERROR: {e}")

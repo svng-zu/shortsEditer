@@ -15,7 +15,12 @@
       "Bash(timeout 20 chromium-browser --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --remote-debugging-port=9333 --user-data-dir=/home/ubuntu/chromedata about:blank)",
       "Bash(curl -s http://localhost:9333/json/version)",
       "Bash(kill %1)",
-      "Bash(wait)"
+      "Bash(wait)",
+      "Bash(docker-compose up *)",
+      "Bash(docker compose *)",
+      "Bash(npm run *)",
+      "Bash(docker exec *)",
+      "Bash(grep *)"
     ]
   }
 }

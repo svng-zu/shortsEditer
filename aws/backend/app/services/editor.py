@@ -45,7 +45,7 @@ class Editor:
                       bg_solid_color=None, narration=False, narration_voice="female",
                       narration_mode="title", narration_speed=1.0,
                       use_hook=False, hook_sfx_id=None, hook_sfx_offset=0.0, hook_sfx_volume=0.8,
-                      custom_sfx_entries=None, text_overlays=None):
+                      custom_sfx_entries=None, text_overlays=None, progress_callback=None):
         return self._get_editor(analysis_path).apply_overlay(
             raw_path, analysis_path,
             title_override=title_override, subtitles=subtitles, style=style, bg_image=bg_image,
@@ -54,6 +54,7 @@ class Editor:
             use_hook=use_hook, hook_sfx_id=hook_sfx_id, hook_sfx_offset=hook_sfx_offset,
             hook_sfx_volume=hook_sfx_volume, custom_sfx_entries=custom_sfx_entries or [],
             text_overlays=text_overlays or [],
+            progress_callback=progress_callback,
         )
 
     def rerender(self, analysis_path: str, title_override=None, subtitles=False, style=None, bg_image=None, bg_solid_color=None):

@@ -35,12 +35,12 @@ export default function YouTubeUploadPanel() {
     <section className="glass-panel p-5 rounded-xl space-y-4">
       <div className="flex items-center gap-2 text-secondary-container border-b border-outline-variant/20 pb-2 mb-2">
         <span className="material-symbols-outlined">upload</span>
-        <h2 className="text-title-md font-semibold">YouTube Upload</h2>
+        <h2 className="text-title-md font-semibold">YouTube 업로드</h2>
       </div>
 
       <div className="space-y-3">
         <div>
-          <label className="text-label-sm text-on-surface-variant mb-1 block">Shorts Title</label>
+          <label className="text-label-sm text-on-surface-variant mb-1 block">쇼츠 제목</label>
           <input type="text"
             className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg focus:border-primary p-2 text-label-md"
             value={ytTitle} onChange={e => setYtTitle(e.target.value)}
@@ -48,7 +48,7 @@ export default function YouTubeUploadPanel() {
         </div>
 
         <div>
-          <label className="text-label-sm text-on-surface-variant mb-1 block">Description</label>
+          <label className="text-label-sm text-on-surface-variant mb-1 block">설명</label>
           <textarea
             className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg focus:border-primary p-2 text-body-md text-sm resize-none"
             rows={3} value={ytDesc} onChange={e => setYtDesc(e.target.value)}
@@ -56,7 +56,7 @@ export default function YouTubeUploadPanel() {
         </div>
 
         <div>
-          <label className="text-label-sm text-on-surface-variant mb-1 block">Privacy</label>
+          <label className="text-label-sm text-on-surface-variant mb-1 block">공개 범위</label>
           <div className="flex gap-2">
             {(['private', 'unlisted', 'public'] as const).map(p => (
               <button key={p} onClick={() => setPrivacy(p)}
@@ -65,7 +65,7 @@ export default function YouTubeUploadPanel() {
                     ? 'bg-primary/10 border-primary text-primary'
                     : 'bg-surface-container-lowest border-outline-variant text-on-surface-variant hover:bg-surface-bright/10'
                 }`}>
-                {p === 'private' ? 'Private' : p === 'unlisted' ? 'Unlisted' : 'Public'}
+                {p === 'private' ? '비공개' : p === 'unlisted' ? '일부 공개' : '공개'}
               </button>
             ))}
           </div>

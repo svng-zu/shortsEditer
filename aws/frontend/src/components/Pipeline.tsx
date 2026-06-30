@@ -536,9 +536,17 @@ export default function Pipeline({ status, isRunning, onStartPolling, onRefresh,
                       <img src={d.thumbnail_url ?? `/api/media/downloads/default/${d.filename}/thumbnail`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
                     <div style={{ flex: '0 1 35%', minWidth: 0 }}>
-                      <div style={{ fontSize: isMobile ? 13 : 16, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 6, wordBreak: 'break-word' }}>
+                      <div style={{ fontSize: isMobile ? 13 : 16, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4, marginBottom: 4, wordBreak: 'break-word' }}>
                         {d.stem}
                       </div>
+                      {d.channel_name && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+                          {d.channel_thumbnail_url && (
+                            <img src={d.channel_thumbnail_url} alt="" style={{ width: 14, height: 14, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                          )}
+                          <span style={{ fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.channel_name}</span>
+                        </div>
+                      )}
                       {d.duration != null && (
                         <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
                           {fmtDuration(Math.round(d.duration))}

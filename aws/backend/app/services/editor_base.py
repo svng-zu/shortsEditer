@@ -23,6 +23,7 @@ VIDEO_Y = TOP_H
 
 BUFFER_SEC = 0
 MIN_SEGMENT_SEC = 5
+MIN_TOTAL_SEC = 30
 MAX_TOTAL_SEC = 90
 FACE_SAMPLE_FRAMES = 10
 MIN_KEEP_SEC = 0.3
@@ -450,7 +451,7 @@ class EditorBase:
         return entries
 
     @staticmethod
-    def _wrap_subtitle_lines(text, max_chars=12):
+    def _wrap_subtitle_lines(text, max_chars=20):
         """단어 단위 그리디 줄바꿈. 모든 줄을 max_chars 이하로 유지한다."""
         words = text.split()
         if not words:
@@ -491,12 +492,12 @@ class EditorBase:
             raw_lines = [l for l in text.replace("\\n", "\n").split("\n") if l.strip()]
             wrapped = []
             for l in raw_lines:
-                wrapped.extend(self._wrap_subtitle_lines(l, max_chars=12))
+                wrapped.extend(self._wrap_subtitle_lines(l, max_chars=20))
             if not wrapped:
                 continue
 
             # 줄이 2개를 넘으면 여러 프레임으로 나눠, 구간을 글자수 비례로 분배한다
-            frames = ["\n".join(wrapped[i:i + 2]) for i in range(0, len(wrapped), 2)]
+            frames = wrapped
             total_chars = sum(len(f) for f in frames) or 1
             duration = max(0.0, t_end - t_start)
             cursor = t_start
@@ -760,6 +761,30 @@ class EditorBase:
             print("[Stage 1] 편집할 구간 없음")
             return None
 
+        if total_sec < MIN_TOTAL_SEC and selected_candidates:
+            needed = MIN_TOTAL_SEC - total_sec
+            last_cand = selected_candidates[-1]
+            extend_start = min(video_duration, last_cand["end"])
+            extend_end = min(video_duration, extend_start + needed)
+            extend_dur = extend_end - extend_start
+            if extend_dur > 0.5:
+                print(f"  [MinDur] 최소 {MIN_TOTAL_SEC}초 미달 ({total_sec:.1f}s) → {extend_dur:.1f}s 연장")
+                cx, cy, cw, ch = self._detect_face_crop(video_path, extend_start, src_w, src_h)
+                vf = self._build_segment_vf(cw, ch, cx, cy)
+                ext_path = str(job_temp / f"seg_ext.mp4")
+                self._render_clip(video_path, extend_start, extend_dur, vf, ext_path)
+                parts.append(ext_path)
+                raw_segments.append({
+                    "raw_start": round(raw_time, 3),
+                    "raw_end": round(raw_time + extend_dur, 3),
+                    "orig_start": round(extend_start, 3),
+                    "orig_end": round(extend_end, 3),
+                })
+                raw_time += extend_dur
+                total_sec += extend_dur
+            if total_sec < MIN_TOTAL_SEC:
+                print(f"  [MinDur] ⚠ 원본 영상 길이 부족으로 {MIN_TOTAL_SEC}초 미달: {total_sec:.1f}s")
+
         base_name = os.path.splitext(os.path.basename(analysis_path))[0]
         raw_dir = self._sd.raw_dir if self._sd else settings.RAW_DIR
         out_name = base_name if variant == 1 else f"{base_name}_v{variant}"
@@ -837,7 +862,13 @@ class EditorBase:
                       hook_sfx_offset: float = 0.0,
                       hook_sfx_volume: float = 0.8,
                       custom_sfx_entries: list = None,
-                      text_overlays: list = None) -> str:
+                      text_overlays: list = None,
+                      progress_callback=None) -> str:
+        def _progress(pct, msg=""):
+            if progress_callback:
+                progress_callback(pct, msg)
+
+        _progress(10, "렌더링 준비 중")
         # style의 font_name으로 폰트 갱신
         if style and style.get("font_name"):
             self.font = self._resolve_font(style["font_name"])
@@ -877,6 +908,7 @@ class EditorBase:
                 print("  [Hook] 분석 결과에 hook_segment 없음 — 훅 건너뜀")
 
         if hook_clip:
+            _progress(20, "훅 클립 합성 중")
             merged_raw = str(TEMP_DIR / f"hooked_{uuid.uuid4().hex[:8]}.mp4")
             self._concat_raw([hook_clip, raw_path], merged_raw, fade_sec=0.3)
             raw_path = merged_raw
@@ -914,6 +946,7 @@ class EditorBase:
         text_overlay_filters = self._build_text_overlay_filters(text_overlays or [])
         sub_str = ",".join(sub_filters + text_overlay_filters)
 
+        _progress(30, "오버레이 렌더링 중")
         print(f"  [Stage 2] '{title[:20]}' | 자막={'O' if sub_entries else 'X'} | 텍스트오버레이={len(text_overlays or [])}개")
 
         bg_path = self._resolve_bg_path(category, bg_image) if not bg_solid_color else None
@@ -1066,6 +1099,7 @@ class EditorBase:
         if result.returncode != 0 or not os.path.exists(output_path):
             stderr_tail = result.stderr.decode("utf-8", "ignore")[-1000:]
             raise RuntimeError(f"FFmpeg 오버레이 실패 (code {result.returncode}): {stderr_tail}")
+        _progress(60, "오버레이 완료")
         print(f"  [Stage 2] 완료 → {os.path.basename(output_path)}")
 
         # ── SFX 이벤트 수집 (훅SFX + 커스텀SFX + Gemini 추천SFX) ──
@@ -1097,11 +1131,13 @@ class EditorBase:
         narration_video_volume = (style or {}).get("narration_video_volume", 0.3)
 
         if narration and narration_text:
+            _progress(65, "나레이션 생성 중")
             print(f"  [TTS] 나레이션 생성 중: '{narration_text[:30]}'")
             from app.services.tts import generate_narration, mix_narration, mix_narration_and_sfx
             narr_path = output_path.replace("_shorts.mp4", "_narr.mp3")
             mixed_path = output_path.replace("_shorts.mp4", "_shorts_narr.mp4")
             if generate_narration(narration_text, narr_path, narration_voice, narration_speed):
+                _progress(75, "오디오 믹싱 중")
                 mixed_ok = mix_narration_and_sfx(
                     output_path, mixed_path,
                     narration_path=narr_path,
@@ -1120,6 +1156,7 @@ class EditorBase:
             else:
                 print(f"  [TTS] 나레이션 생성 실패, 원본 유지")
         elif resolved_sfx:
+            _progress(70, "효과음 믹싱 중")
             from app.services.tts import mix_narration_and_sfx
             mixed_path = output_path.replace("_shorts.mp4", "_shorts_sfx.mp4")
             mixed_ok = mix_narration_and_sfx(

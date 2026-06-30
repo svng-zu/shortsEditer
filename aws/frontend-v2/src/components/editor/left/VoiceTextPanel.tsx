@@ -9,13 +9,13 @@ export default function VoiceTextPanel() {
     <section className="glass-panel p-5 rounded-xl space-y-4">
       <div className="flex items-center gap-2 text-primary border-b border-outline-variant/20 pb-2 mb-2">
         <span className="material-symbols-outlined">keyboard_voice</span>
-        <h2 className="text-title-md font-semibold">Voice &amp; Text</h2>
+        <h2 className="text-title-md font-semibold">음성 & 자막</h2>
       </div>
 
       <div className="space-y-4">
         {/* Show Subtitles */}
         <div className="flex items-center justify-between">
-          <label className="text-label-md text-on-surface">Show Subtitles</label>
+          <label className="text-label-md text-on-surface">자막 표시</label>
           <input type="checkbox" checked={subtitle.enabled}
             className="w-10 h-5 rounded-full bg-surface-container-highest text-primary border-none focus:ring-0 cursor-pointer"
             onChange={e => setSubtitle(prev => ({ ...prev, enabled: e.target.checked }))} />
@@ -23,7 +23,7 @@ export default function VoiceTextPanel() {
 
         {/* Narration Toggle */}
         <div className="flex items-center justify-between">
-          <label className="text-label-md text-on-surface">Add Narration</label>
+          <label className="text-label-md text-on-surface">나레이션 추가</label>
           <input type="checkbox" checked={narr.enabled}
             className="w-10 h-5 rounded-full bg-surface-container-highest text-primary border-none focus:ring-0 cursor-pointer"
             onChange={e => setNarr(prev => ({ ...prev, enabled: e.target.checked }))} />
@@ -33,7 +33,7 @@ export default function VoiceTextPanel() {
           <>
             {/* Voice Selection */}
             <div>
-              <label className="text-label-sm text-on-surface-variant mb-1 block">Voice Selection</label>
+              <label className="text-label-sm text-on-surface-variant mb-1 block">음성 선택</label>
               <select
                 className="w-full bg-surface-container-lowest border border-outline-variant text-on-surface rounded-lg focus:border-primary p-2 text-label-md appearance-none"
                 value={narr.voice}
@@ -49,16 +49,16 @@ export default function VoiceTextPanel() {
 
             {/* Narration Mode */}
             <div>
-              <label className="text-label-sm text-on-surface-variant mb-1 block">Narration Mode</label>
+              <label className="text-label-sm text-on-surface-variant mb-1 block">나레이션 모드</label>
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={() => setNarr(prev => ({ ...prev, mode: 'title' }))}
                   className={`p-2 border rounded-lg text-label-sm font-semibold ${
                     narr.mode === 'title' ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant text-on-surface-variant hover:bg-surface-bright/10'
-                  }`}>Title</button>
+                  }`}>제목</button>
                 <button onClick={() => setNarr(prev => ({ ...prev, mode: 'script' }))}
                   className={`p-2 border rounded-lg text-label-sm font-semibold ${
                     narr.mode === 'script' ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant text-on-surface-variant hover:bg-surface-bright/10'
-                  }`}>Script</button>
+                  }`}>스크립트</button>
               </div>
             </div>
 
@@ -66,22 +66,22 @@ export default function VoiceTextPanel() {
               <>
                 <div>
                   <div className="flex justify-between items-center mb-1">
-                    <label className="text-label-sm text-on-surface-variant">Script Mode</label>
+                    <label className="text-label-sm text-on-surface-variant">스크립트 모드</label>
                     <button onClick={handleGenerateScript}
                       disabled={render.isGeneratingScript}
                       className="text-label-sm text-primary hover:text-primary-fixed-dim disabled:opacity-50">
-                      {render.isGeneratingScript ? 'Generating...' : 'Auto Generate'}
+                      {render.isGeneratingScript ? '생성 중...' : '자동 생성'}
                     </button>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mb-2">
                     <button onClick={() => setNarr(prev => ({ ...prev, scriptMode: 'summary' }))}
                       className={`p-1.5 border rounded-lg text-label-sm ${
                         narr.scriptMode === 'summary' ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant text-on-surface-variant'
-                      }`}>Summary</button>
+                      }`}>요약</button>
                     <button onClick={() => setNarr(prev => ({ ...prev, scriptMode: 'style_convert' }))}
                       className={`p-1.5 border rounded-lg text-label-sm ${
                         narr.scriptMode === 'style_convert' ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant text-on-surface-variant'
-                      }`}>Style Convert</button>
+                      }`}>스타일 변환</button>
                   </div>
                   {render.genScriptMsg && (
                     <div className={`text-label-sm mb-2 ${render.genScriptMsg.includes('실패') ? 'text-error' : 'text-tertiary'}`}>
@@ -111,7 +111,7 @@ export default function VoiceTextPanel() {
             <div className="space-y-2">
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-code-sm text-on-surface-variant">Narration Vol</span>
+                  <span className="text-code-sm text-on-surface-variant">나레이션 볼륨</span>
                   <span className="text-code-sm font-mono text-primary">{narr.volume.toFixed(1)}</span>
                 </div>
                 <input type="range" min={0} max={3} step={0.1}
@@ -121,7 +121,7 @@ export default function VoiceTextPanel() {
               </div>
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-code-sm text-on-surface-variant">Video Vol (w/ narr)</span>
+                  <span className="text-code-sm text-on-surface-variant">영상 볼륨 (나레이션 시)</span>
                   <span className="text-code-sm font-mono text-primary">{narr.videoVolume.toFixed(1)}</span>
                 </div>
                 <input type="range" min={0} max={1} step={0.05}
@@ -131,7 +131,7 @@ export default function VoiceTextPanel() {
               </div>
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-code-sm text-on-surface-variant">Speed</span>
+                  <span className="text-code-sm text-on-surface-variant">재생 속도</span>
                   <span className="text-code-sm font-mono text-primary">{narr.speed.toFixed(1)}x</span>
                 </div>
                 <input type="range" min={0.5} max={2} step={0.1}
@@ -145,7 +145,7 @@ export default function VoiceTextPanel() {
             <button onClick={handleNarrationPreview}
               className="w-full border border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary/50 py-2 rounded-xl text-label-sm font-bold transition-all flex items-center justify-center gap-2">
               <span className="material-symbols-outlined text-[18px]">play_circle</span>
-              Preview Voice
+              음성 미리듣기
             </button>
           </>
         )}

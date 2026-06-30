@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import { api, RawInfo, ShortInfo, StyleParams, getSessionId } from '../services/api'
 
 /* ── Types ── */
@@ -32,12 +33,14 @@ export interface TitleState {
   title1BorderColor: string; title2BorderColor: string
   title1BgEnabled: boolean; title1BgColor: string; title1BgOpacity: number
   title2BgEnabled: boolean; title2BgColor: string; title2BgOpacity: number
+  titleLetterSpacing: number
 }
 
 /* ── Subtitle state ── */
 export interface SubtitleState {
   enabled: boolean; size: number; color: string; x: number; y: number; font: string
   bgEnabled: boolean; bgColor: string; bgOpacity: number
+  maxLines: 1 | 2
 }
 
 /* ── Channel overlay ── */
@@ -70,7 +73,7 @@ export interface HookSfxState {
 
 /* ── Render state ── */
 export interface RenderState {
-  isRendering: boolean; message: string
+  isRendering: boolean; message: string; progress: number; error: string | null
   isGeneratingScript: boolean; genScriptMsg: string
   isGeneratingNarrSubs: boolean; genNarrSubsMsg: string
 }
@@ -192,7 +195,9 @@ interface EditorContextValue {
 const EditorContext = createContext<EditorContextValue | null>(null)
 
 /* ── Provider ── */
-export function EditorProvider({ children }: { children: ReactNode }) {
+export function EditorProvider({ children, initialFilename }: { children: ReactNode; initialFilename?: string }) {
+  const location = useLocation()
+
   // Selection
   const [activeTab, setActiveTab] = useState<'raws' | 'shorts'>('raws')
   const [raws, setRaws] = useState<RawInfo[]>([])
@@ -200,7 +205,8 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   const [downloadsCount, setDownloadsCount] = useState(0)
   const [channelsCount, setChannelsCount] = useState(0)
   const [registeredChannels, setRegisteredChannels] = useState<{ url: string; category: string; thumbnail_url?: string }[]>([])
-  const [selectedRaw, setSelectedRaw] = useState<RawInfo | null>(null)
+  // location.state?.raw: ContentManagementPage에서 "편집하기" 클릭 시 직접 전달된 RawInfo
+  const [selectedRaw, setSelectedRaw] = useState<RawInfo | null>((location.state as any)?.raw ?? null)
   const [selectedShort, setSelectedShort] = useState<ShortInfo | null>(null)
 
   // Grouped states
@@ -209,13 +215,15 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     titleY: 0, titleFontSizeDelta: 0, titleFont: 'NanumSquareRoundEB',
     title1BorderWidth: 3, title2BorderWidth: 3,
     title1BorderColor: '#000000', title2BorderColor: '#000000',
-    title1BgEnabled: false, title1BgColor: '#000000', title1BgOpacity: 0.6,
+    title1BgEnabled: false, title1BgColor: '#000000', title1BgOpacity: 1.0,
+    titleLetterSpacing: -0.5,
     title2BgEnabled: false, title2BgColor: '#000000', title2BgOpacity: 0.6,
   })
 
   const [subtitle, setSubtitle] = useState<SubtitleState>({
     enabled: true, size: 52, color: '#FFFFFF', x: 0, y: 20, font: 'NanumSquareRoundEB',
     bgEnabled: false, bgColor: '#000000', bgOpacity: 0.6,
+    maxLines: 2,
   })
 
   const [channel, setChannel] = useState<ChannelState>({
@@ -240,7 +248,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   })
 
   const [render, setRender] = useState<RenderState>({
-    isRendering: false, message: '',
+    isRendering: false, message: '', progress: 0, error: null,
     isGeneratingScript: false, genScriptMsg: '',
     isGeneratingNarrSubs: false, genNarrSubsMsg: '',
   })
@@ -248,7 +256,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([])
   const [subEntries, setSubEntries] = useState<SubEntry[]>([])
   const [showSrt, setShowSrt] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(true)
+  const [isPlaying, setIsPlaying] = useState(false)
   const [videoDuration, setVideoDuration] = useState(0)
 
   // Refs
@@ -270,6 +278,27 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => { refreshLists() }, [refreshLists])
+
+  // Auto-select raw from URL parameter (initialFilename)
+  useEffect(() => {
+    if (!initialFilename || raws.length === 0) return
+    if (selectedRaw) return
+    const decoded = decodeURIComponent(initialFilename)
+    // 1) 정확히 일치하는 raw 파일
+    let match = raws.find(r => r.filename === decoded)
+    // 2) shorts 파일명 → raw 매핑 (_shorts.mp4 → _raw.mp4)
+    if (!match) {
+      const stem = decoded.replace(/_shorts\.\w+$/, '').replace(/_raw\.\w+$/, '')
+      match = raws.find(r => r.filename.replace(/_raw\.\w+$/, '') === stem)
+    }
+    // 3) 부분 일치
+    if (!match) {
+      match = raws.find(r => decoded.includes(r.filename) || r.filename.includes(decoded))
+    }
+    if (match) {
+      setSelectedRaw(match)
+    }
+  }, [initialFilename, raws, selectedRaw])
 
   // Load SFX list
   useEffect(() => {
@@ -335,7 +364,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
 
   const handleRender = useCallback(async () => {
     if (!selectedRaw) return
-    setRender(prev => ({ ...prev, isRendering: true, message: '렌더링 시작...' }))
+    setRender(prev => ({ ...prev, isRendering: true, message: '렌더링 시작...', progress: 0, error: null }))
     try {
       const style = getStyleParams()
       await api.render(
@@ -354,12 +383,42 @@ export function EditorProvider({ children }: { children: ReactNode }) {
           x_pct: o.x_pct, y_pct: o.y_pct, size: o.font_size,
         })) : undefined,
       )
-      setRender(prev => ({ ...prev, message: '렌더링 완료!' }))
+
+      // /api/status 폴링으로 실제 렌더링 진행률 추적
+      let seenEditing = false
+      let succeeded = false
+      for (let i = 0; i < 600; i++) {  // 최대 10분
+        await new Promise<void>(res => setTimeout(res, 1000))
+        let s: { step: string; progress: number; message: string }
+        try { s = await api.getStatus() } catch { continue }
+
+        if (s.step === 'editing') {
+          seenEditing = true
+          setRender(prev => ({ ...prev, progress: s.progress, message: s.message }))
+        } else if (s.step === 'done' && seenEditing) {
+          setRender(prev => ({ ...prev, progress: 100, message: '렌더링 완료!' }))
+          succeeded = true
+          break
+        } else if (s.step === 'error') {
+          const msg = s.message.replace(/^렌더링 오류:\s*/, '') || '렌더링에 실패했습니다.'
+          setRender(prev => ({ ...prev, error: msg }))
+          return  // 에러 상태로 모달 유지 (isRendering: true)
+        }
+      }
+
+      if (!succeeded) {
+        setRender(prev => ({ ...prev, error: '렌더링 시간이 초과되었습니다. 다시 시도해주세요.' }))
+        return
+      }
+
+      // 완료 애니메이션 1.5초 표시 후 모달 닫기
+      await new Promise<void>(res => setTimeout(res, 1500))
+      setRender(prev => ({ ...prev, isRendering: false }))
       refreshLists()
     } catch (e: any) {
-      setRender(prev => ({ ...prev, message: `렌더링 실패: ${e?.response?.data?.detail || e.message}` }))
-    } finally {
-      setRender(prev => ({ ...prev, isRendering: false }))
+      const msg = e?.response?.data?.detail || e.message || '렌더링에 실패했습니다.'
+      setRender(prev => ({ ...prev, error: String(msg) }))
+      // isRendering: true 유지 → 에러 모달 표시
     }
   }, [selectedRaw, getStyleParams, refreshLists, title, subtitle, bg, narr, hookSfx, textOverlays])
 

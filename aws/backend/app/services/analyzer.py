@@ -59,44 +59,111 @@ score(중요도) 책정 기준 — 매우 중요:
 }
 
 # ────────────────────────────────────────────────
-# 조회수가 높았던 쇼츠 예시 (few-shot)
-# 새로운 고성과 예시 발견 시 여기에 추가하세요.
+# 고CTR 제목 패턴 정의 + few-shot 예시
 # ────────────────────────────────────────────────
+TITLE_PATTERNS = [
+    {"name": "사건+이유", "desc": "사건을 밝히고 이유를 궁금하게. 첫줄: ○○ 결국 밝혔다 / 둘째줄: 왜 논란이 됐을까"},
+    {"name": "발언+반응", "desc": "강한 발언과 주변 반응 대비. 첫줄: ○○ 한마디에 / 둘째줄: 반응 묘사"},
+    {"name": "결과+의미", "desc": "결론 선언 후 의미 암시. 첫줄: 결국 결론 났다 / 둘째줄: 의미 암시"},
+    {"name": "충돌+쟁점", "desc": "대립 구도와 핵심 쟁점 제시. 첫줄: 충돌 구도 / 둘째줄: 쟁점"},
+    {"name": "질문형", "desc": "결정 사항 알리고 궁금증 유발. 첫줄: ○○ 결정 나왔다 / 둘째줄: 질문"},
+]
+
 HIGH_PERFORMING_EXAMPLES: dict[str, list[dict]] = {
     "economy": [
         {
-            "title": "이 한마디에 분위기가 바뀌었다",
-            "start": "01:22", "end": "01:55",
-            "point": "전문가 강렬 발언 → 호기심 유발 제목"
+            "pattern": "사건+이유",
+            "intro_text": "한은 결국 밝혔다\n금리 논란의 이유",
+            "candidate_title": "한은 금리 폭탄 이유",
+            "point": "금리 결정 사건 → '왜?'로 클릭 유도",
         },
         {
-            "title": "전문가도 예상 못한 결과",
-            "start": "05:33", "end": "06:11",
-            "point": "반전 결과 공개 → 클릭 유도"
+            "pattern": "발언+반응",
+            "intro_text": "전문가 한마디에\n증시 패닉 시작",
+            "candidate_title": "전문가 발언에 패닉",
+            "point": "전문가 발언 임팩트 → 시장 반응 궁금",
+        },
+        {
+            "pattern": "결과+의미",
+            "intro_text": "결국 결론 났다\n코스피의 운명",
+            "candidate_title": "코스피 결론 났다",
+            "point": "결론 선언 → '무슨 의미?'로 시청 유도",
+        },
+        {
+            "pattern": "충돌+쟁점",
+            "intro_text": "정부 vs 시장\n쟁점은 환율이다",
+            "candidate_title": "환율 쟁점 정면충돌",
+            "point": "대립 구도 제시 → 쟁점 궁금증",
+        },
+        {
+            "pattern": "질문형",
+            "intro_text": "금리 결정 나왔다\n누가 웃게 될까",
+            "candidate_title": "금리 인하 누가 웃나",
+            "point": "결정 공개 → 수혜자 궁금증",
         },
     ],
     "politics": [
         {
-            "title": "이 한마디에 분위기가 바뀌었다",
-            "start": "01:22", "end": "01:55",
-            "point": "정치인 폭탄 발언 → 강한 임팩트"
+            "pattern": "사건+이유",
+            "intro_text": "대표 결국 밝혔다\n왜 논란이 됐을까",
+            "candidate_title": "대표 폭로 왜 논란",
+            "point": "정치인 폭로 → 논란 이유 궁금",
         },
         {
-            "title": "전문가도 예상 못한 결과",
-            "start": "05:33", "end": "06:11",
-            "point": "여론 반전 공개 → 클릭 유도"
+            "pattern": "발언+반응",
+            "intro_text": "의원 한마디에\n정치권 술렁",
+            "candidate_title": "한마디에 정치권 술렁",
+            "point": "강한 발언 → 파장 궁금",
+        },
+        {
+            "pattern": "결과+의미",
+            "intro_text": "결국 결론 났다\n의미는 이것",
+            "candidate_title": "결론 났다 의미는",
+            "point": "결론 선언 → 정치적 의미 궁금",
+        },
+        {
+            "pattern": "충돌+쟁점",
+            "intro_text": "여야 정면충돌\n쟁점은 무엇인가",
+            "candidate_title": "여야 충돌 핵심 쟁점",
+            "point": "여야 대립 → 쟁점 궁금",
+        },
+        {
+            "pattern": "질문형",
+            "intro_text": "탄핵 결정 나왔다\n누가 웃게 될까",
+            "candidate_title": "탄핵 결정 누가 웃나",
+            "point": "결정 공개 → 승자 궁금",
         },
     ],
     "sports": [
         {
-            "title": "이 장면에 모두가 침묵했다",
-            "start": "02:11", "end": "02:45",
-            "point": "극적인 결정적 순간 → 감정 이입"
+            "pattern": "사건+이유",
+            "intro_text": "감독 결국 밝혔다\n왜 교체했을까",
+            "candidate_title": "감독 교체 이유 밝혀",
+            "point": "선수 교체 사건 → 이유 궁금",
         },
         {
-            "title": "이 선수가 해냈다",
-            "start": "04:20", "end": "04:58",
-            "point": "한국 선수 활약 하이라이트 → 국내 팬 타겟"
+            "pattern": "발언+반응",
+            "intro_text": "선수 한마디에\n팬들 술렁",
+            "candidate_title": "선수 발언에 팬들 충격",
+            "point": "선수 발언 → 팬 반응 궁금",
+        },
+        {
+            "pattern": "결과+의미",
+            "intro_text": "결국 결론 났다\n시리즈의 운명",
+            "candidate_title": "시리즈 결론 났다",
+            "point": "경기 결과 → 시리즈 영향 궁금",
+        },
+        {
+            "pattern": "충돌+쟁점",
+            "intro_text": "양팀 정면충돌\n승부의 갈림길",
+            "candidate_title": "정면충돌 승부 갈림",
+            "point": "팀 대결 구도 → 승부처 궁금",
+        },
+        {
+            "pattern": "질문형",
+            "intro_text": "역전골 터졌다\n누가 웃게 될까",
+            "candidate_title": "역전골 누가 웃었나",
+            "point": "역전 사건 → 최종 결과 궁금",
         },
     ],
 }
@@ -106,17 +173,27 @@ def _format_few_shot(category: str) -> str:
     examples = HIGH_PERFORMING_EXAMPLES.get(category, [])
     if not examples:
         return ""
-    lines = ["## 참고: 조회수가 높았던 쇼츠 예시\n"]
+
+    lines = ["## 고CTR 제목 패턴 (반드시 아래 패턴 중 하나를 따르세요)\n"]
+    for p in TITLE_PATTERNS:
+        lines.append(f"- **{p['name']}**: {p['desc']}")
+    lines.append("")
+
+    lines.append(f"## {category} 카테고리 제목 예시\n")
     for i, ex in enumerate(examples, 1):
+        intro_lines = ex["intro_text"].split("\n")
         lines.append(
-            f"예시{i}\n"
-            f"제목: \"{ex['title']}\"\n"
-            f"구간: {ex['start']}~{ex['end']}\n"
-            f"포인트: {ex['point']}\n"
+            f"예시{i} [{ex['pattern']}]\n"
+            f"  intro_text 첫줄: \"{intro_lines[0]}\"\n"
+            f"  intro_text 둘째줄: \"{intro_lines[1]}\"\n"
+            f"  candidate title: \"{ex['candidate_title']}\"\n"
+            f"  포인트: {ex['point']}\n"
         )
+
     lines.append(
-        "위 예시 패턴을 참고해서 아래 영상에서 쇼츠 후보를 찾아라.\n"
-        "각 후보마다 시청자를 끌어당기는 title도 함께 제안하세요.\n"
+        "위 5가지 패턴 중 영상 내용에 가장 적합한 패턴을 선택하여 intro_text와 각 candidate의 title을 작성하세요.\n"
+        "intro_text는 반드시 위 패턴 구조를 따르되, 영상의 실제 인물/사건/수치로 ○○ 자리를 채우세요.\n"
+        "candidate title도 같은 패턴 톤을 유지하되 15자 이내로 압축하세요.\n"
     )
     return "\n".join(lines)
 
@@ -136,7 +213,7 @@ SINGLE_TOPIC_PROMPT = """
 
 위 세그먼트를 분석하여 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요:
 {{
-  "intro_text": "쇼츠 상단에 표시될 후킹 제목. 위 참고 예시의 후킹 패턴을 살려 첫줄은 호기심을 자극하는 문구(12자 이내), 둘째줄은 대결 팀명(예: A vs B) 또는 핵심 키워드·날짜 등 구체적 정보(12자 이내). 반드시 2줄. 예: 이 선수가 해냈다\\n손흥민 결승골 장면",
+  "intro_text": "위 고CTR 패턴 5가지(사건+이유, 발언+반응, 결과+의미, 충돌+쟁점, 질문형) 중 하나를 반드시 선택. 첫줄은 사건/발언/결과/충돌/질문 등 호기심 유발(12자 이내), 둘째줄은 이유/반응/의미/쟁점/질문 등 궁금증 심화(12자 이내). 반드시 2줄, 각 줄 12자 이내. ○○ 자리에 영상의 실제 인물·키워드를 넣으세요. 예: 한은 결국 밝혔다\\n금리 논란의 이유",
   "hook_segment": {{
     "start": 훅 시작(초),
     "end": 훅 종료(초),
@@ -146,7 +223,7 @@ SINGLE_TOPIC_PROMPT = """
     {{
       "start": 시작시간(초),
       "end": 종료시간(초),
-      "title": "시청자를 끌어당기는 쇼츠 제목 (예시 패턴 참고, 15자 이내)",
+      "title": "위 고CTR 패턴의 톤을 유지한 구간별 제목 (15자 이내, 빈 문자열 금지)",
       "reason": "선택 이유",
       "score": 중요도 점수(1~10),
       "edit_order": 편집에서 배치할 순서(1부터 시작),
@@ -176,6 +253,9 @@ hook_segment 조건:
 - ⚠️ 기자/앵커의 마무리 멘트(예: "OOO 기자입니다", "지금까지 MBC뉴스 OOO였습니다", "OOO뉴스 OOO입니다" 등
   방송사명이나 기자 이름이 들어간 클로징 멘트)는 candidates에 포함하지 마세요. 해당 구간이 포함된 세그먼트는
   start/end로 선택하지 말고, 그 직전 세그먼트에서 구간을 끝내세요.
+- ⚠️ intro_text와 각 candidate의 title은 반드시 위 고CTR 패턴(사건+이유, 발언+반응, 결과+의미, 충돌+쟁점, 질문형) 중 하나를 따라야 합니다.
+  단순 사실 나열(예: "코스피 폭락", "환율 급등")이 아니라, 호기심과 궁금증을 유발하는 구조로 작성하세요.
+  candidate의 title은 절대 빈 문자열("")로 두지 마세요.
 """
 
 MULTI_TOPIC_PROMPT = """
@@ -193,7 +273,7 @@ MULTI_TOPIC_PROMPT = """
 {{
   "topics": [
     {{
-      "intro_text": "쇼츠 상단에 표시될 후킹 제목. 위 참고 예시의 후킹 패턴을 살려 첫줄은 호기심을 자극하는 문구(12자 이내), 둘째줄은 핵심 대상·수치·날짜 등 구체적 부제(12자 이내). 반드시 2줄. 예: 전문가도 예상 못했다\\n코스피 2400 붕괴",
+      "intro_text": "위 고CTR 패턴 5가지(사건+이유, 발언+반응, 결과+의미, 충돌+쟁점, 질문형) 중 하나를 반드시 선택. 첫줄은 사건/발언/결과/충돌/질문 등 호기심 유발(12자 이내), 둘째줄은 이유/반응/의미/쟁점/질문 등 궁금증 심화(12자 이내). 반드시 2줄, 각 줄 12자 이내. ○○ 자리에 영상의 실제 인물·키워드를 넣으세요. 예: 대표 결국 밝혔다\\n왜 논란이 됐을까",
       "hook_segment": {{
         "start": 훅 시작(초),
         "end": 훅 종료(초),
@@ -203,7 +283,7 @@ MULTI_TOPIC_PROMPT = """
         {{
           "start": 시작시간(초),
           "end": 종료시간(초),
-          "title": "시청자를 끌어당기는 쇼츠 제목 (예시 패턴 참고, 15자 이내)",
+          "title": "위 고CTR 패턴의 톤을 유지한 구간별 제목 (15자 이내, 빈 문자열 금지)",
           "reason": "선택 이유",
           "score": 중요도(1~10),
           "edit_order": 1
@@ -236,6 +316,9 @@ MULTI_TOPIC_PROMPT = """
 - ⚠️ 기자/앵커의 마무리 멘트(예: "OOO 기자입니다", "지금까지 MBC뉴스 OOO였습니다", "OOO뉴스 OOO입니다" 등
   방송사명이나 기자 이름이 들어간 클로징 멘트)는 candidates에 포함하지 마세요. 해당 구간이 포함된 세그먼트는
   start/end로 선택하지 말고, 그 직전 세그먼트에서 구간을 끝내세요.
+- ⚠️ intro_text와 각 candidate의 title은 반드시 위 고CTR 패턴(사건+이유, 발언+반응, 결과+의미, 충돌+쟁점, 질문형) 중 하나를 따라야 합니다.
+  단순 사실 나열(예: "코스피 폭락", "환율 급등")이 아니라, 호기심과 궁금증을 유발하는 구조로 작성하세요.
+  candidate의 title은 절대 빈 문자열("")로 두지 마세요.
 """
 
 MULTI_TOPIC_CATEGORIES = {"economy", "politics"}

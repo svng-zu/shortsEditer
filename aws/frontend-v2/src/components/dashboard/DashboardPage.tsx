@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { api, PipelineStatus, Quota, ShortInfo, DownloadInfo } from '../../services/api'
+import { api, PipelineStatus, ShortInfo, DownloadInfo } from '../../services/api'
 import GlassPanel from '../ui/GlassPanel'
 import Icon from '../ui/Icon'
 import Badge from '../ui/Badge'
 import Button from '../ui/Button'
-import ProgressBar from '../ui/ProgressBar'
-import QuotaLimitModal from '../ui/QuotaLimitModal'
 
 /* ── Helpers ─────────────────────────────────────────────── */
 
@@ -14,7 +12,7 @@ function formatDuration(seconds: number | null | undefined): string {
   if (!seconds) return '--:--'
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
-  return `${m}:${s.toString().padStart(2, '0')}`
+  return `${String(m).padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
 function categoryBadgeVariant(cat: string): 'sports' | 'economy' | 'politics' | 'tech' {
@@ -29,155 +27,206 @@ function truncateFilename(filename: string, maxLen = 40): string {
   return name.length > maxLen ? name.slice(0, maxLen) + '...' : name
 }
 
-/* ── Pipeline Overview ───────────────────────────────────── */
+function formatDate(iso?: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return d.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+}
 
-function PipelineOverview({ status }: { status: PipelineStatus }) {
-  const isActive = status.step !== 'idle' && status.step !== 'done'
-  const isError = status.step === 'error'
-  const isDone = status.step === 'done'
+/* ── Circular Progress ──────────────────────────────────── */
 
-  const stepLabel: Record<string, string> = {
-    idle: 'Waiting for tasks',
-    collecting: 'Collecting videos...',
-    transcribing: 'Generating transcripts...',
-    analyzing: 'Analyzing content...',
-    editing: 'Editing shorts...',
-    done: 'Pipeline complete',
-    error: 'Pipeline error',
-  }
-
-  // Estimate queueing / finished from progress
-  const totalSteps = 4
-  const completedSteps = isDone
-    ? totalSteps
-    : isError
-      ? 0
-      : Math.floor((status.progress / 100) * totalSteps)
-  const queueSteps = totalSteps - completedSteps
+function CircularProgress({ progress, size = 52, stroke = 5 }: { progress: number; size?: number; stroke?: number }) {
+  const radius = (size - stroke) / 2
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (progress / 100) * circumference
 
   return (
-    <GlassPanel className="rounded-xl p-6">
-      {/* Header row */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <Icon
-            name="sync"
-            size={28}
-            className={`text-primary ${isActive ? 'animate-spin' : ''}`}
-            {...(isActive ? { style: { animationDuration: '3s' } } : {})}
+    <svg width={size} height={size} className="transform -rotate-90">
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none"
+        stroke="currentColor" className="text-surface-container-highest" strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none"
+        stroke="url(#progress-gradient)" strokeWidth={stroke}
+        strokeDasharray={circumference} strokeDashoffset={offset}
+        strokeLinecap="round" className="transition-all duration-500" />
+      <defs>
+        <linearGradient id="progress-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#adc6ff" />
+          <stop offset="100%" stopColor="#8ab4f8" />
+        </linearGradient>
+      </defs>
+    </svg>
+  )
+}
+
+/* ── Step Labels ────────────────────────────────────────── */
+
+const STEP_LABEL: Record<string, string> = {
+  idle: '대기 중',
+  collecting: '영상 수집 중...',
+  transcribing: '자막 생성 중...',
+  analyzing: '분석 중...',
+  editing: '편집 중...',
+  done: '완료',
+  error: '오류 발생',
+}
+
+/* ── 작업 중인 프로젝트 (최상단 고정) ───────────────────── */
+
+function ActiveProjectCard({
+  download,
+  status,
+}: {
+  download: DownloadInfo
+  status: PipelineStatus
+}) {
+  const progress = status.progress
+  const stepText = status.message || STEP_LABEL[status.step] || status.step
+
+  return (
+    <GlassPanel className="rounded-2xl overflow-hidden group border-primary/20 hover:border-primary/40 transition-colors">
+      <div className="relative aspect-video bg-surface-container-highest">
+        {/* 썸네일 */}
+        {download.thumbnail_url ? (
+          <img src={download.thumbnail_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Icon name="video_file" size={40} className="text-on-surface-variant/30" />
+          </div>
+        )}
+
+        {/* 반투명 오버레이 */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10" />
+
+        {/* 진행률 원형 Progress + 텍스트 */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+          <div className="relative">
+            <CircularProgress progress={progress} size={64} stroke={5} />
+            <span className="absolute inset-0 flex items-center justify-center text-white text-label-md font-bold">
+              {Math.round(progress)}%
+            </span>
+          </div>
+          <span className="text-white/90 text-label-sm font-medium">{stepText}</span>
+        </div>
+
+        {/* Gradient Progress Bar 하단 */}
+        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/30">
+          <div
+            className="h-full rounded-r-full transition-all duration-500"
+            style={{
+              width: `${progress}%`,
+              background: 'linear-gradient(90deg, #adc6ff, #8ab4f8, #adc6ff)',
+            }}
           />
-          <div>
-            <h2 className="text-title-md text-on-surface">Pipeline Overview</h2>
-            <p className="text-label-sm text-primary">
-              {status.message || stepLabel[status.step] || status.step}
-            </p>
+        </div>
+
+        {/* 영상 길이 우측 하단 */}
+        {download.duration != null && (
+          <span className="absolute bottom-3 right-2 bg-black/70 text-white text-[11px] font-bold px-2 py-0.5 rounded">
+            {formatDuration(download.duration)}
+          </span>
+        )}
+
+        {/* 카테고리 뱃지 좌측 상단 */}
+        <span className="absolute top-2 left-2">
+          <Badge variant={categoryBadgeVariant(download.category)}>
+            {download.category}
+          </Badge>
+        </span>
+      </div>
+
+      {/* 하단 정보 */}
+      <div className="p-4">
+        <p className="text-label-lg text-on-surface font-semibold line-clamp-2 mb-2" title={download.filename}>
+          {truncateFilename(download.filename, 60)}
+        </p>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-primary/15 text-primary border border-primary/20 animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            처리중
+          </span>
+          <span className="text-label-sm text-on-surface-variant">
+            {Math.round(progress)}%
+          </span>
+        </div>
+      </div>
+    </GlassPanel>
+  )
+}
+
+/* ── 완료된 프로젝트 카드 ───────────────────────────────── */
+
+function CompletedShortCard({ short }: { short: ShortInfo }) {
+  const navigate = useNavigate()
+
+  return (
+    <GlassPanel
+      className="rounded-2xl overflow-hidden group hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 cursor-pointer"
+      onClick={() => navigate(`/editor/${encodeURIComponent(short.filename)}`)}
+    >
+      <div className="relative aspect-video bg-surface-container-highest overflow-hidden">
+        {short.url ? (
+          <video
+            src={`${short.url}#t=1`}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            muted
+            preload="metadata"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Icon name="movie" size={40} className="text-on-surface-variant/30" />
+          </div>
+        )}
+
+        {/* 호버 오버레이 */}
+        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+            <Icon name="play_arrow" size={28} filled className="text-white" />
           </div>
         </div>
 
-        <span
-          className={`
-            text-label-md font-bold px-4 py-1.5 rounded-full
-            ${isError
-              ? 'bg-error/10 text-error'
-              : isDone
-                ? 'bg-tertiary/10 text-tertiary'
-                : 'bg-primary/10 text-primary'
-            }
-          `}
-        >
-          {Math.round(status.progress)}% Complete
-        </span>
-      </div>
-
-      {/* Progress bar */}
-      <ProgressBar
-        progress={status.progress}
-        color={isError ? 'secondary' : isDone ? 'tertiary' : 'primary'}
-        glow={isActive}
-        className="mb-4"
-      />
-
-      {/* Bottom stats */}
-      <div className="flex items-center gap-6 text-label-sm text-on-surface-variant">
-        <span className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-primary inline-block" />
-          {queueSteps} Queueing
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-tertiary inline-block" />
-          {completedSteps} Finished
-        </span>
-        <span className="flex items-center gap-2">
-          <Icon name="timer" size={16} />
-          Est. {isActive ? '~2 min' : isDone ? '0 min' : '--'}
-        </span>
-      </div>
-    </GlassPanel>
-  )
-}
-
-/* ── Quick Quota Card ────────────────────────────────────── */
-
-function QuickQuotaCard({
-  quota,
-  onQuotaExceeded,
-}: {
-  quota: Quota | null
-  onQuotaExceeded: () => void
-}) {
-  const navigate = useNavigate()
-  const used = quota?.used ?? 0
-  const limit = quota?.limit ?? 10
-  const plan = quota?.plan_display ?? quota?.plan ?? 'Free'
-  const isExceeded = limit !== null && used >= limit
-
-  return (
-    <GlassPanel className="rounded-xl p-6 flex flex-col justify-between h-full">
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-label-sm uppercase tracking-widest text-on-surface-variant">
-            Quick Quota
-          </h3>
-          <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-            {plan}
+        {/* 카테고리 */}
+        {short.category && (
+          <span className="absolute top-2 left-2">
+            <Badge variant={categoryBadgeVariant(short.category)}>
+              {short.category}
+            </Badge>
           </span>
-        </div>
-        <div className="flex items-baseline gap-1 mb-1">
-          <span className={`text-headline-xl ${isExceeded ? 'text-error' : 'text-primary'}`}>{used}</span>
-          <span className="text-headline-lg text-on-surface-variant/50">/ {limit ?? '∞'}</span>
-        </div>
-        <p className="text-label-sm text-on-surface-variant">
-          {isExceeded ? '한도에 도달했습니다' : '이번 달 사용량'}
-        </p>
+        )}
       </div>
 
-      {isExceeded ? (
-        <Button variant="secondary" className="mt-6 w-full" onClick={onQuotaExceeded}>
-          <Icon name="warning" size={18} />
-          플랜 업그레이드
-        </Button>
-      ) : (
-        <Button variant="secondary" className="mt-6 w-full" onClick={() => navigate('/pricing')}>
-          <Icon name="bolt" size={18} />
-          Upgrade to Pro
-        </Button>
-      )}
+      {/* 하단 정보 */}
+      <div className="p-4">
+        <p className="text-label-md text-on-surface font-semibold line-clamp-2 mb-2" title={short.title || short.filename}>
+          {short.title || truncateFilename(short.filename, 50)}
+        </p>
+        <div className="flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-tertiary/15 text-tertiary border border-tertiary/20">
+            <Icon name="check_circle" size={12} filled />
+            완료
+          </span>
+          {short.channel_name && (
+            <div className="flex items-center gap-1.5 min-w-0">
+              {short.channel_thumbnail_url && (
+                <img src={short.channel_thumbnail_url} alt="" className="w-4 h-4 rounded-full" />
+              )}
+              <span className="text-[11px] text-on-surface-variant truncate">{short.channel_name}</span>
+            </div>
+          )}
+        </div>
+      </div>
     </GlassPanel>
   )
 }
 
-/* ── Shorts Gallery Preview ──────────────────────────────── */
+/* ── 쇼츠 갤러리 미리보기 ───────────────────────────────── */
 
 function ShortsGalleryPreview({ shorts }: { shorts: ShortInfo[] }) {
   return (
-    <GlassPanel className="rounded-xl p-6 h-full">
+    <GlassPanel className="rounded-2xl p-6 h-full">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-title-md text-on-surface">Shorts Gallery Preview</h3>
-        <Link
-          to="/editor"
-          className="text-label-sm text-primary hover:text-primary/80 transition-colors"
-        >
-          View All
+        <h3 className="text-[24px] font-semibold text-on-surface">쇼츠 갤러리</h3>
+        <Link to="/editor" className="text-[18px] text-primary hover:text-primary/80 transition-colors">
+          전체 보기 →
         </Link>
       </div>
 
@@ -185,7 +234,7 @@ function ShortsGalleryPreview({ shorts }: { shorts: ShortInfo[] }) {
         <div className="flex items-center justify-center h-48 text-on-surface-variant/50">
           <div className="text-center">
             <Icon name="movie" size={48} className="mb-2 opacity-30" />
-            <p className="text-label-sm">No shorts yet. Run the pipeline to generate shorts.</p>
+            <p className="text-label-sm">아직 쇼츠가 없습니다. 영상을 수집하고 변환해보세요.</p>
           </div>
         </div>
       ) : (
@@ -198,26 +247,18 @@ function ShortsGalleryPreview({ shorts }: { shorts: ShortInfo[] }) {
             >
               <div className="relative rounded-xl overflow-hidden bg-surface-container-highest aspect-[9/16]">
                 {short.url ? (
-                  <video
-                    src={short.url}
-                    className="w-full h-full object-cover"
-                    muted
-                    preload="metadata"
-                  />
+                  <video src={short.url} className="w-full h-full object-cover" muted preload="metadata" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <Icon name="movie" size={36} className="text-on-surface-variant/30" />
                   </div>
                 )}
-                {/* Gradient overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                {/* Title */}
                 <div className="absolute bottom-0 left-0 right-0 p-3">
                   <p className="text-[11px] font-medium text-white leading-tight line-clamp-2">
                     {short.title || truncateFilename(short.filename, 30)}
                   </p>
                 </div>
-                {/* Hover play icon */}
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
                     <Icon name="play_arrow" size={24} filled className="text-white" />
@@ -232,109 +273,70 @@ function ShortsGalleryPreview({ shorts }: { shorts: ShortInfo[] }) {
   )
 }
 
-/* ── Recent Downloads Grid ───────────────────────────────── */
+/* ── 수집된 영상 (대기) ─────────────────────────────────── */
 
-function RecentDownloadsGrid({
-  downloads,
+function DownloadCard({
+  download,
   onProcess,
 }: {
-  downloads: DownloadInfo[]
-  onProcess: (filename: string, category: string) => void
+  download: DownloadInfo
+  onProcess: () => void
 }) {
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-title-md text-on-surface">Recent Downloads</h3>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setViewMode('grid')}
-            className={`p-1.5 rounded-lg transition-colors ${
-              viewMode === 'grid' ? 'text-primary bg-primary/10' : 'text-on-surface-variant hover:text-on-surface'
-            }`}
-          >
-            <Icon name="grid_view" size={20} />
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`p-1.5 rounded-lg transition-colors ${
-              viewMode === 'list' ? 'text-primary bg-primary/10' : 'text-on-surface-variant hover:text-on-surface'
-            }`}
-          >
-            <Icon name="view_list" size={20} />
+    <GlassPanel className="rounded-2xl overflow-hidden group hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
+      <div className="relative aspect-video bg-surface-container-highest overflow-hidden">
+        {download.thumbnail_url ? (
+          <img src={download.thumbnail_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Icon name="video_file" size={40} className="text-on-surface-variant/30" />
+          </div>
+        )}
+
+        {/* 호버 오버레이 */}
+        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <button onClick={(e) => { e.stopPropagation(); onProcess() }}
+            className="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-label-md shadow-lg hover:brightness-110 active:scale-95 transition-all flex items-center gap-2">
+            <Icon name="auto_awesome" size={18} />
+            쇼츠로 변환하기
           </button>
         </div>
+
+        {/* 영상 길이 */}
+        {download.duration != null && (
+          <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[11px] font-bold px-2 py-0.5 rounded">
+            {formatDuration(download.duration)}
+          </span>
+        )}
+
+        {/* 카테고리 */}
+        <span className="absolute top-2 left-2">
+          <Badge variant={categoryBadgeVariant(download.category)}>
+            {download.category}
+          </Badge>
+        </span>
       </div>
 
-      {downloads.length === 0 ? (
-        <GlassPanel className="rounded-xl p-12 text-center">
-          <Icon name="cloud_download" size={48} className="text-on-surface-variant/30 mb-3 mx-auto block" />
-          <p className="text-label-sm text-on-surface-variant">
-            No downloads yet. Add a channel or download a video URL.
-          </p>
-        </GlassPanel>
-      ) : (
-        <div
-          className={
-            viewMode === 'grid'
-              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'
-              : 'flex flex-col gap-3'
-          }
-        >
-          {downloads.map((dl) => (
-            <GlassPanel key={dl.filename} className="rounded-xl overflow-hidden group">
-              {/* Thumbnail area */}
-              <div className="relative aspect-video bg-surface-container-highest">
-                {dl.thumbnail_url ? (
-                  <img
-                    src={dl.thumbnail_url}
-                    alt={dl.filename}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Icon name="video_file" size={36} className="text-on-surface-variant/30" />
-                  </div>
-                )}
-
-                {/* Duration badge */}
-                {dl.duration != null && (
-                  <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
-                    {formatDuration(dl.duration)}
-                  </span>
-                )}
-
-                {/* Category badge */}
-                <span className="absolute top-2 left-2">
-                  <Badge variant={categoryBadgeVariant(dl.category)}>
-                    {dl.category}
-                  </Badge>
-                </span>
-              </div>
-
-              {/* Info area */}
-              <div className="p-4">
-                <p className="text-label-md text-on-surface line-clamp-2 mb-3" title={dl.filename}>
-                  {truncateFilename(dl.filename)}
-                </p>
-
-                <Button
-                  variant="ghost"
-                  className="w-full text-label-sm"
-                  onClick={() => onProcess(dl.filename, dl.category)}
-                >
-                  <Icon name="auto_awesome" size={16} />
-                  Process
-                </Button>
-              </div>
-            </GlassPanel>
-          ))}
+      <div className="p-4">
+        <p className="text-label-md text-on-surface font-semibold line-clamp-2 mb-2" title={download.filename}>
+          {truncateFilename(download.filename, 50)}
+        </p>
+        <div className="flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-surface-container-highest text-on-surface-variant">
+            <Icon name="schedule" size={12} />
+            대기 중
+          </span>
+          {download.channel_name && (
+            <div className="flex items-center gap-1.5 min-w-0">
+              {download.channel_thumbnail_url && (
+                <img src={download.channel_thumbnail_url} alt="" className="w-4 h-4 rounded-full" />
+              )}
+              <span className="text-[11px] text-on-surface-variant truncate">{download.channel_name}</span>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    </GlassPanel>
   )
 }
 
@@ -345,7 +347,6 @@ function FAB() {
   const navigate = useNavigate()
   const fabRef = useRef<HTMLDivElement>(null)
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
@@ -359,44 +360,28 @@ function FAB() {
 
   return (
     <div ref={fabRef} className="fixed bottom-24 md:bottom-8 right-6 md:right-8 z-40 flex flex-col items-end gap-3">
-      {/* Menu items */}
       {open && (
         <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
           <button
             onClick={() => { setOpen(false); navigate('/channels') }}
-            className="
-              flex items-center gap-3 pl-4 pr-5 py-3 rounded-2xl
-              glass-panel-elevated text-on-surface text-label-md
-              hover:bg-primary/10 transition-all whitespace-nowrap
-            "
+            className="flex items-center gap-3 pl-4 pr-5 py-3 rounded-2xl glass-panel-elevated text-on-surface text-label-md hover:bg-primary/10 transition-all whitespace-nowrap"
           >
             <Icon name="link" size={20} className="text-primary" />
-            Download URL
+            URL 다운로드
           </button>
           <button
             onClick={() => { setOpen(false); navigate('/channels') }}
-            className="
-              flex items-center gap-3 pl-4 pr-5 py-3 rounded-2xl
-              glass-panel-elevated text-on-surface text-label-md
-              hover:bg-primary/10 transition-all whitespace-nowrap
-            "
+            className="flex items-center gap-3 pl-4 pr-5 py-3 rounded-2xl glass-panel-elevated text-on-surface text-label-md hover:bg-primary/10 transition-all whitespace-nowrap"
           >
             <Icon name="subscriptions" size={20} className="text-tertiary" />
-            Add Channel
+            채널 추가
           </button>
         </div>
       )}
 
-      {/* Main FAB */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`
-          w-16 h-16 rounded-full bg-primary text-on-primary
-          flex items-center justify-center
-          shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95
-          transition-all duration-200
-          ${open ? 'rotate-45' : ''}
-        `}
+        className={`w-16 h-16 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all duration-200 ${open ? 'rotate-45' : ''}`}
       >
         <Icon name="add" size={32} />
       </button>
@@ -410,80 +395,73 @@ export default function DashboardPage() {
   const navigate = useNavigate()
 
   const [status, setStatus] = useState<PipelineStatus>({ step: 'idle', message: '', progress: 0 })
-  const [quota, setQuota] = useState<Quota | null>(null)
   const [shorts, setShorts] = useState<ShortInfo[]>([])
   const [downloads, setDownloads] = useState<DownloadInfo[]>([])
   const [loading, setLoading] = useState(true)
-  const [showQuotaModal, setShowQuotaModal] = useState(false)
 
-  // Initial data fetch
+  const [showProcessModal, setShowProcessModal] = useState(false)
+  const [pendingItem, setPendingItem] = useState<{ filename: string; category: string } | null>(null)
+  const [processDuration, setProcessDuration] = useState(60)
+  const [processing, setProcessing] = useState(false)
+  const [processError, setProcessError] = useState<string | null>(null)
+
   useEffect(() => {
     let cancelled = false
-
     async function load() {
       try {
-        const [statusRes, quotaRes, shortsRes, downloadsRes] = await Promise.allSettled([
-          api.getStatus(),
-          api.getQuota(),
-          api.getShorts(),
-          api.getDownloads(),
+        const [statusRes, shortsRes, downloadsRes] = await Promise.allSettled([
+          api.getStatus(), api.getShorts(), api.getDownloads(),
         ])
-
         if (cancelled) return
-
         if (statusRes.status === 'fulfilled') setStatus(statusRes.value)
-        if (quotaRes.status === 'fulfilled') setQuota(quotaRes.value)
         if (shortsRes.status === 'fulfilled') setShorts(shortsRes.value.shorts)
         if (downloadsRes.status === 'fulfilled') setDownloads(downloadsRes.value.downloads)
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
-
     load()
     return () => { cancelled = true }
   }, [])
 
-  // Poll status when pipeline is active
   useEffect(() => {
     const isActive = status.step !== 'idle' && status.step !== 'done' && status.step !== 'error'
     if (!isActive) return
-
     const interval = setInterval(async () => {
       try {
         const s = await api.getStatus()
         setStatus(s)
-
-        // Refresh downloads and shorts when pipeline finishes
         if (s.step === 'done' || s.step === 'idle') {
-          const [shortsRes, downloadsRes] = await Promise.allSettled([
-            api.getShorts(),
-            api.getDownloads(),
-          ])
+          const [shortsRes, downloadsRes] = await Promise.allSettled([api.getShorts(), api.getDownloads()])
           if (shortsRes.status === 'fulfilled') setShorts(shortsRes.value.shorts)
           if (downloadsRes.status === 'fulfilled') setDownloads(downloadsRes.value.downloads)
         }
-      } catch {
-        // Ignore polling errors
-      }
+      } catch {}
     }, 2000)
-
     return () => clearInterval(interval)
   }, [status.step])
 
-  const handleProcess = useCallback(
-    async (filename: string, category: string) => {
-      try {
-        await api.processSelected([{ filename, category }])
-        // Refresh status to start polling
-        const s = await api.getStatus()
-        setStatus(s)
-      } catch {
-        // Error handling could be improved with toast notifications
-      }
-    },
-    [],
-  )
+  const openProcessModal = useCallback((filename: string, category: string) => {
+    setPendingItem({ filename, category })
+    setProcessError(null)
+    setShowProcessModal(true)
+  }, [])
+
+  const confirmProcess = useCallback(async () => {
+    if (!pendingItem) return
+    setProcessing(true)
+    setProcessError(null)
+    setShowProcessModal(false)
+    try {
+      await api.processSelected([pendingItem], 1, processDuration)
+      const s = await api.getStatus()
+      setStatus(s)
+    } catch (e: any) {
+      setProcessError(e?.response?.data?.detail || '처리를 시작할 수 없습니다.')
+    } finally {
+      setProcessing(false)
+    }
+  }, [pendingItem, processDuration])
 
   if (loading) {
     return (
@@ -493,27 +471,186 @@ export default function DashboardPage() {
     )
   }
 
+  const isActive = status.step !== 'idle' && status.step !== 'done' && status.step !== 'error'
+  const activeDownload = isActive ? downloads[0] : null
+
   return (
-    <div className="space-y-6 max-w-[1400px]">
-      {/* Pipeline Overview — full width */}
-      <PipelineOverview status={status} />
+    <div className="space-y-8 max-w-[1400px]">
 
-      {/* Two-column: Quota (1/3) + Shorts Gallery (2/3) — stacked on mobile */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <QuickQuotaCard quota={quota} onQuotaExceeded={() => setShowQuotaModal(true)} />
-        <div className="col-span-1 lg:col-span-2">
-          <ShortsGalleryPreview shorts={shorts} />
+      {/* ── 1. 작업 중인 프로젝트 (최상단 고정) ── */}
+      {isActive && activeDownload && (
+        <section>
+          <div className="flex items-center gap-3 mb-4">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-primary" />
+            </span>
+            <h2 className="text-title-lg text-on-surface font-bold">작업 중인 프로젝트</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <ActiveProjectCard download={activeDownload} status={status} />
+          </div>
+        </section>
+      )}
+
+      {/* ── 2. 쇼츠 갤러리 ── */}
+      <ShortsGalleryPreview shorts={shorts} />
+
+      {/* ── 3. 완료된 쇼츠 ── */}
+      {shorts.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[24px] font-semibold text-on-surface">완료된 쇼츠</h2>
+            <Link to="/editor" className="text-[18px] text-primary hover:text-primary/80 transition-colors">
+              전체 보기 →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {shorts.slice(0, 8).map((s) => (
+              <CompletedShortCard key={s.filename} short={s} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── 4. 수집된 영상 (대기) ── */}
+      {downloads.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[24px] font-semibold text-on-surface">수집된 영상</h2>
+            <Link to="/channels?tab=downloads" className="text-[18px] text-primary hover:text-primary/80 transition-colors">
+              전체 보기 →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {downloads.map((dl) => (
+              <DownloadCard key={dl.filename} download={dl} onProcess={() => openProcessModal(dl.filename, dl.category)} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 빈 상태 */}
+      {shorts.length === 0 && downloads.length === 0 && !isActive && (
+        <GlassPanel className="rounded-2xl p-16 text-center">
+          <Icon name="rocket_launch" size={56} className="text-on-surface-variant/20 mx-auto mb-4" />
+          <p className="text-title-md text-on-surface mb-2">시작해볼까요?</p>
+          <p className="text-body-md text-on-surface-variant mb-6">채널을 추가하거나 URL을 입력해서 영상을 수집해보세요.</p>
+          <Button variant="primary" onClick={() => navigate('/channels')}>
+            <Icon name="add" size={18} />
+            영상 수집하기
+          </Button>
+        </GlassPanel>
+      )}
+
+      {/* 처리 상태 메시지 */}
+      {processing && (
+        <div className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-primary/90 text-on-primary px-6 py-3 rounded-2xl shadow-lg">
+          <span className="w-4 h-4 border-2 border-on-primary/40 border-t-on-primary rounded-full animate-spin" />
+          쇼츠 생성 중...
         </div>
-      </div>
+      )}
+      {processError && (
+        <div className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-error/90 text-on-error px-6 py-3 rounded-2xl shadow-lg cursor-pointer"
+          onClick={() => setProcessError(null)}>
+          <Icon name="error" size={18} />
+          {processError}
+        </div>
+      )}
 
-      {/* Recent Downloads — full width */}
-      <RecentDownloadsGrid downloads={downloads} onProcess={handleProcess} />
+      {/* AI 쇼츠 생성 설정 모달 */}
+      {showProcessModal && (
+        <div
+          className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center px-4"
+          onClick={() => setShowProcessModal(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-3xl border border-white/10 shadow-2xl overflow-hidden"
+            style={{ background: 'linear-gradient(145deg, #0d1628 0%, #0b1220 100%)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-7 pt-7 pb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-2xl">✨</span>
+                <h2 className="text-[22px] font-bold text-white">AI 쇼츠 생성 설정</h2>
+              </div>
+              <p className="text-[16px] text-white/50 leading-relaxed">
+                생성될 쇼츠 영상의 최대 길이를 설정해주세요.<br/>
+                AI가 선택한 길이 이내에서 가장 적합한 구간을 자동으로 추출합니다.
+              </p>
+            </div>
 
-      {/* FAB */}
+            <div className="mx-7 rounded-2xl border border-white/10 bg-white/5 p-7">
+              <div className="text-center mb-6">
+                <div className="text-[64px] font-bold leading-none tabular-nums"
+                  style={{ background: 'linear-gradient(135deg, #818cf8, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  {String(Math.floor(processDuration / 60)).padStart(2, '0')}:{String(processDuration % 60).padStart(2, '0')}
+                </div>
+                <div className="text-[18px] text-white/40 mt-2">
+                  {Math.floor(processDuration / 60) > 0
+                    ? `${Math.floor(processDuration / 60)}분 ${processDuration % 60 > 0 ? `${processDuration % 60}초` : ''}`
+                    : `${processDuration}초`}
+                </div>
+              </div>
+              <input
+                type="range" min={10} max={120} step={5}
+                value={processDuration}
+                onChange={e => setProcessDuration(Number(e.target.value))}
+                className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                style={{ accentColor: '#818cf8' }}
+              />
+              <div className="flex justify-between text-[18px] text-white/30 mt-2">
+                <span>10초</span><span>2분</span>
+              </div>
+            </div>
+
+            <div className="px-7 mt-5">
+              <p className="text-[18px] font-semibold text-white/40 uppercase tracking-widest mb-3">빠른 선택</p>
+              <div className="grid grid-cols-5 gap-2">
+                {[
+                  { label: '15초', value: 15 },
+                  { label: '30초', value: 30 },
+                  { label: '1분', value: 60 },
+                  { label: '1분 30초', value: 90 },
+                  { label: '2분', value: 120 },
+                ].map(preset => (
+                  <button
+                    key={preset.value}
+                    onClick={() => setProcessDuration(preset.value)}
+                    className={`py-2.5 rounded-xl text-[16px] font-semibold transition-all border ${
+                      processDuration === preset.value
+                        ? 'border-violet-500/60 text-white'
+                        : 'border-white/10 text-white hover:border-white/20'
+                    }`}
+                    style={processDuration === preset.value ? { background: 'rgba(139,92,246,0.15)' } : { background: 'rgba(255,255,255,0.03)' }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3 px-7 py-7">
+              <button
+                onClick={() => setShowProcessModal(false)}
+                className="flex-1 h-12 rounded-xl border border-white/10 text-white/60 font-semibold hover:border-white/20 hover:text-white/80 transition-all"
+                style={{ background: 'rgba(255,255,255,0.04)' }}
+              >
+                취소
+              </button>
+              <button
+                onClick={confirmProcess}
+                className="flex-1 h-12 rounded-xl font-semibold text-white text-[15px] transition-all hover:opacity-90 active:scale-[0.98]"
+                style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899)' }}
+              >
+                ✨ AI 쇼츠 생성 시작
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <FAB />
-
-      {/* Quota Limit Modal */}
-      <QuotaLimitModal open={showQuotaModal} onClose={() => setShowQuotaModal(false)} />
     </div>
   )
 }

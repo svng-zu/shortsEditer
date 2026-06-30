@@ -3,5 +3,15 @@
     "url": "https://www.youtube.com/@MBCNEWS11",
     "category": "politics",
     "thumbnail_url": ""
+  },
+  {
+    "url": "https://www.youtube.com/@chmbcnews",
+    "category": "sports",
+    "thumbnail_url": "https://yt3.googleusercontent.com/5OSo-jP_aeQV6F9bLBOjFpSr0UVmb0nHt9lbHldArPpw0U7ay4v0dKbuSGqKc3WsgBbGFNb6nwc=s0"
+  },
+  {
+    "url": "https://www.youtube.com/@MBCNEWS11/videos",
+    "category": "sports",
+    "thumbnail_url": "https://yt3.googleusercontent.com/ytc/AIdro_nKpBrT7zzqTfdlfUHzw60wMU5KqV-kBmiFjU9dvMI8ePo=s0"
   }
 ]
